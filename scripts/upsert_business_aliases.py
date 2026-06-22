@@ -57,6 +57,14 @@ ALIASES = [
         "full_table_name": "INSUR.TRN_MBD_CLAIM_STATUS",
         "type": "business_alias",
     },
+        {
+        "id": 200006,
+        "text": "Business alias: material requisition, MRS, material request, pending MRS approval, department material request. Main tables are INVENTORY.MRS, INVENTORY.MRS_TEMP, INVENTORY.TRN_APPROVAL_DETAILS, INVENTORY.MS_APPROVAL_WORKFLOW.",
+        "schema": "INVENTORY",
+        "table": "MRS",
+        "full_table_name": "INVENTORY.MRS",
+        "type": "business_alias",
+    },
 ]
 
 def main():

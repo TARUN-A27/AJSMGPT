@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AJSMGPT</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root {
+    --bg: #09090b;
+    --panel: #111113;
+    --panel2: #18181b;
+    --border: #27272a;
+    --text: #fafafa;
+    --muted: #a1a1aa;
+    --soft: #71717a;
+    --accent: #ffffff;
+    --accent-text: #09090b;
+    --danger-bg: #2a1215;
+    --danger-text: #fecaca;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+}
+
+.app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    height: 58px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 22px;
+    background: rgba(9, 9, 11, 0.92);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+}
+
+.logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--text);
+    color: var(--bg);
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+}
+
+.sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-left: 10px;
+    font-weight: 400;
+}
+
+.chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 18px 150px;
+}
+
+.chat-inner {
+    width: min(980px, 100%);
+    margin: 0 auto;
+}
+
+.welcome {
+    min-height: 52vh;
+    display: grid;
+    place-items: center;
+    text-align: center;
+}
+
+.welcome h1 {
+    font-size: 44px;
+    line-height: 1.05;
+    margin: 0;
+    letter-spacing: -0.05em;
+}
+
+.welcome p {
+    color: var(--muted);
+    margin: 14px 0 0;
+}
+
+.quick {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 22px;
+}
+
+.chip {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.chip:hover {
+    color: var(--text);
+    border-color: #52525b;
+}
+
+.message {
+    display: flex;
+    margin-bottom: 22px;
+}
+
+.message.user {
+    justify-content: flex-end;
+}
+
+.bubble {
+    max-width: 88%;
+    border-radius: 18px;
+    padding: 14px 16px;
+    line-height: 1.5;
+    font-size: 14px;
+}
+
+.user .bubble {
+    background: #f4f4f5;
+    color: #09090b;
+}
+
+.assistant .bubble {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 100%;
+}
+
+.loading {
+    color: var(--muted);
+}
+
+.error {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border: 1px solid #7f1d1d;
+    border-radius: 14px;
+    padding: 14px;
+    white-space: pre-wrap;
+}
+
+.card {
+    border: 1px solid var(--border);
+    background: #0b0b0d;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.card-head {
+    padding: 13px 15px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.card-title {
+    font-weight: 800;
+}
+
+.badges {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.badge {
+    border: 1px solid var(--border);
+    background: #050505;
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 12px;
+}
+
+.sql {
+    margin: 0;
+    padding: 15px;
+    overflow-x: auto;
+    background: #050505;
+    color: #d4d4d8;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.table-wrap {
+    overflow: auto;
+    max-height: 430px;
+}
+
+table {
+    width: 100%;
+    min-width: 850px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #111113;
+    color: #e4e4e7;
+    text-align: left;
+    z-index: 1;
+}
+
+th, td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+td {
+    color: #d4d4d8;
+}
+
+tr:hover td {
+    background: rgba(255,255,255,.035);
+}
+
+.composer-wrap {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to top, #09090b 75%, rgba(9, 9, 11, 0));
+    padding: 24px 18px 22px;
+}
+
+.composer {
+    width: min(980px, 100%);
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    border-radius: 22px;
+    padding: 10px;
+    box-shadow: 0 20px 80px rgba(0,0,0,.45);
+}
+
+.input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+textarea {
+    flex: 1;
+    min-height: 48px;
+    max-height: 150px;
+    resize: none;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    padding: 12px;
+    font-family: inherit;
+}
+
+textarea::placeholder {
+    color: var(--soft);
+}
+
+.ask-btn {
+    border: 0;
+    background: var(--accent);
+    color: var(--accent-text);
+    border-radius: 14px;
+    height: 44px;
+    padding: 0 18px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.ask-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.hint {
+    color: var(--soft);
+    font-size: 12px;
+    padding: 4px 12px 2px;
+}
+
+.hidden {
+    display: none;
+}
+
+@media (max-width: 700px) {
+    .sub {
+        display: none;
+    }
+
+    .welcome h1 {
+        font-size: 34px;
+    }
+
+    .bubble {
+        max-width: 96%;
+    }
+
+    .input-row {
+        align-items: stretch;
+    }
+
+    .ask-btn {
+        height: auto;
+        min-width: 62px;
+    }
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+    <header class="header">
+        <div class="brand">
+            <div class="logo">A</div>
+            AJSMGPT
+        </div>
+    </header>
+
+    <main id="chat" class="chat">
+        <div class="chat-inner">
+            <section id="welcome" class="welcome">
+                <div>
+                    <h1>Ask your ERP database</h1>
+                    <p>Qwen generates SELECT-only SQL, validates it, and returns live Oracle data.</p>
+
+                    <div class="quick">
+                        <span class="chip" onclick="setQuestion('show supplier details')">Supplier details</span>
+                        <span class="chip" onclick="setQuestion('show employee department')">Employee department</span>
+                        <span class="chip" onclick="setQuestion('show current stock of item')">Current stock</span>
+                        <span class="chip" onclick="setQuestion('show pending purchase orders')">Pending PO</span>
+                        <span class="chip" onclick="setQuestion('show material requisition pending approval')">Pending MRS</span>
+                    </div>
+                </div>
+            </section>
+
+            <div id="messages"></div>
+        </div>
+    </main>
+
+    <section class="composer-wrap">
+        <div class="composer">
+            <div class="input-row">
+                <textarea id="questionInput" placeholder="Message AJSMGPT..." oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
+                <button id="askButton" class="ask-btn" onclick="askQuestion()">Ask</button>
+            </div>
+            <div class="hint">Press Enter to ask. Shift + Enter for new line.</div>
+        </div>
+    </section>
+</div>
+
+<script>
+function setQuestion(text) {
+    const input = document.getElementById("questionInput");
+    input.value = text;
+    input.focus();
+    autoGrow(input);
+}
+
+function autoGrow(el) {
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 150) + "px";
+}
+
+function handleKey(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        askQuestion();
+    }
+}
+
+async function askQuestion() {
+    const input = document.getElementById("questionInput");
+    const button = document.getElementById("askButton");
+    const question = input.value.trim();
+
+    if (!question) return;
+
+    document.getElementById("welcome").classList.add("hidden");
+
+    addUserMessage(question);
+    input.value = "";
+    autoGrow(input);
+
+    const loadingId = addAssistantLoading();
+
+    button.disabled = true;
+
+    try {
+        const response = await fetch("/ask", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({question})
+        });
+
+        const json = await response.json();
+
+        if (!json.success) {
+            throw new Error(json.error || "Something went wrong.");
+        }
+
+        replaceLoadingWithResult(loadingId, json.data);
+    } catch (error) {
+        replaceLoadingWithError(loadingId, error.message);
+    } finally {
+        button.disabled = false;
+        input.focus();
+    }
+}
+
+function addUserMessage(text) {
+    const messages = document.getElementById("messages");
+    const div = document.createElement("div");
+    div.className = "message user";
+    div.innerHTML = `<div class="bubble">${escapeHtml(text)}</div>`;
+    messages.appendChild(div);
+    scrollBottom();
+}
+
+function addAssistantLoading() {
+    const messages = document.getElementById("messages");
+    const id = "msg_" + Date.now();
+
+    const div = document.createElement("div");
+    div.className = "message assistant";
+    div.id = id;
+    div.innerHTML = `<div class="bubble loading">Thinking… generating SQL, validating columns, and fetching Oracle rows.</div>`;
+
+    messages.appendChild(div);
+    scrollBottom();
+    return id;
+}
+
+function replaceLoadingWithError(id, message) {
+    const div = document.getElementById(id);
+    div.innerHTML = `<div class="bubble"><div class="error">${escapeHtml(message)}</div></div>`;
+    scrollBottom();
+}
+
+function replaceLoadingWithResult(id, data) {
+    const div = document.getElementById(id);
+
+    div.innerHTML = `
+        <div class="bubble">
+            <div><b>Done.</b> Found ${data.row_count ?? 0} rows.</div>
+
+            <div class="card">
+                <div class="card-head">
+                    <div class="card-title">Generated SQL</div>
+                    <div class="badges">
+                        <span class="badge">Rows: ${data.row_count ?? 0}</span>
+                        <span class="badge">Confidence: ${data.confidence ?? "-"}</span>
+                    </div>
+                </div>
+                <pre class="sql">${escapeHtml(data.sql || "")}</pre>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <div class="card-title">Data Preview</div>
+                    <div class="badge">Tables: ${escapeHtml((data.tables_used || []).join(", ") || "-")}</div>
+                </div>
+                ${buildTable(data.columns || [], data.rows || [])}
+            </div>
+        </div>
+    `;
+
+    scrollBottom();
+}
+
+function buildTable(columns, rows) {
+    if (!rows.length) {
+        return `<div style="padding:18px;color:var(--muted)">No rows found.</div>`;
+    }
+
+    let html = `<div class="table-wrap"><table><thead><tr>`;
+
+    columns.forEach(col => {
+        html += `<th>${escapeHtml(col)}</th>`;
+    });
+
+    html += `</tr></thead><tbody>`;
+
+    rows.forEach(row => {
+        html += `<tr>`;
+        row.forEach(value => {
+            html += `<td>${escapeHtml(formatValue(value))}</td>`;
+        });
+        html += `</tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    return html;
+}
+
+function formatValue(value) {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function scrollBottom() {
+    const chat = document.getElementById("chat");
+    setTimeout(() => {
+        chat.scrollTop = chat.scrollHeight;
+    }, 30);
+}
+</script>
+</body>
+</html>

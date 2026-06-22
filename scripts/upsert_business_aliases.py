@@ -73,6 +73,30 @@ ALIASES = [
         "full_table_name": "INVENTORY.PURCHASEORDER",
         "type": "business_alias",
     },
+        {
+        "id": 200008,
+        "text": "Business rule: supplier details should use SCM.PARTYMASTER. Useful real columns are PARTYCODE, PARTYNAME, ADDRESS1, ADDRESS2, ADDRESS3, OFFPHONE1, OFFPHONE2, EMAIL, EMAIL1, CONTPERSON1, PERPHONE1, GSTINID, PANNO, PARTYSTATUS. Do not use NAME, ADDRESS, CONTACT because these columns do not exist.",
+        "schema": "SCM",
+        "table": "PARTYMASTER",
+        "full_table_name": "SCM.PARTYMASTER",
+        "type": "business_alias",
+    },
+    {
+        "id": 200009,
+        "text": "Business rule: employee department should use HRDNEW.STAFF joined with HRDNEW.DEPARTMENT. Join HRDNEW.STAFF.DEPTCODE = HRDNEW.DEPARTMENT.DEPTCODE. Useful real STAFF columns are EMPCODE, EMPNAME, DEPTCODE, DESIGNATIONCODE, UNITCODE, DOJ, STAFFTYPE. Useful DEPARTMENT columns are DEPTCODE, DEPTNAME, HRDNAME, ACTIVESTATUS. Do not use DEPTNAME from STAFF because STAFF does not have DEPTNAME.",
+        "schema": "HRDNEW",
+        "table": "STAFF",
+        "full_table_name": "HRDNEW.STAFF",
+        "type": "business_alias",
+    },
+        {
+        "id": 200010,
+        "text": "Strict SQL rule for employee department: never select DEPTNAME from HRDNEW.STAFF. Correct SQL pattern is SELECT s.EMPCODE, s.EMPNAME, s.DEPTCODE, d.DEPTNAME FROM HRDNEW.STAFF s JOIN HRDNEW.DEPARTMENT d ON s.DEPTCODE = d.DEPTCODE. DEPTNAME exists only in HRDNEW.DEPARTMENT.",
+        "schema": "HRDNEW",
+        "table": "STAFF",
+        "full_table_name": "HRDNEW.STAFF",
+        "type": "business_alias",
+    },
 ]
 
 def main():

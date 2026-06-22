@@ -97,6 +97,14 @@ ALIASES = [
         "full_table_name": "HRDNEW.STAFF",
         "type": "business_alias",
     },
+        {
+        "id": 200011,
+        "text": "Strict SQL rule for material requisition pending approval: INVENTORY.MRS is the main table. Useful real MRS columns are ID, MRSNO, MRSDATE, ITEM_CODE, ITEMNAME, QTY, UNIT_CODE, DEPT_CODE, ORDERNO, STATUS, DEPTMRSAUTH, MRSAUTHUSERCODE, ENTRYDATETIME, REMARKS, REQUESTREMARKS. INVENTORY.TRN_APPROVAL_DETAILS has RECORD_ID, SCREEN_ID, USERCODE, APP_LEVEL, APP_GROUP, APP_STATUS, APP_DATE, ACTION, REMARKS. APP_STATUS is NUMBER, never compare APP_STATUS to text like 'Pending'. Do not invent joins unless relationship context confirms it. If status code meaning is unknown, do not filter; show approval/status columns only.",
+        "schema": "INVENTORY",
+        "table": "MRS",
+        "full_table_name": "INVENTORY.MRS",
+        "type": "business_alias",
+    },
 ]
 
 def main():

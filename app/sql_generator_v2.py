@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from app.ollama_client import chat_with_qwen
 from app.schema_search import build_compact_context_text, search_schema_context
+from app.sql_column_validator import validate_sql_columns
 from app.sql_safety import validate_select_only
 
 load_dotenv()
@@ -184,6 +185,7 @@ def generate_select_sql_v2(question: str, limit: int = 6) -> dict:
         raise ValueError(f"Model did not return SQL. Response: {raw_response}")
 
     validated_sql = validate_select_only(result["sql"])
+    validate_sql_columns(validated_sql)
     result["sql"] = validated_sql
 
     if not result["question"]:

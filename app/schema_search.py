@@ -38,7 +38,7 @@ IMPORTANT_COLUMN_KEYWORDS = [
 
 def search_schema_context(question: str, limit: int = 5) -> list[dict]:
     """
-    Search Qdrant for relevant INVENTORY schema metadata.
+    Search Qdrant for relevant schema metadata and relationships.
     This only searches metadata, not Oracle business data.
     """
 
@@ -65,6 +65,8 @@ def search_schema_context(question: str, limit: int = 5) -> list[dict]:
             "schema": payload.get("schema"),
             "table": payload.get("table"),
             "full_table_name": payload.get("full_table_name"),
+            "type": payload.get("type"),
+            "constraint_name": payload.get("constraint_name"),
             "columns": payload.get("columns") or [],
             "text": payload.get("text"),
         })
@@ -122,6 +124,39 @@ def build_compact_context_text(results: list[dict], max_tables: int = 5) -> str:
         columns = item.get("columns") or []
         all_column_names = get_column_names(columns)
         important_columns = pick_important_columns(columns)
+        item_type = item.get("type") or "table_metadata"
+
+        if item_type == "relationship":
+            context_parts.append(
+                f"""
+Context Rank: {index}
+Type: relationship
+Text: {item.get('text')}
+
+Rules:
+- Oracle access is SELECT only.
+- Use allowed schemas only.
+- Always use full table names like INVENTORY.PURCHASEORDER.
+""".strip()
+            )
+            continue
+
+        if item_type == "business_alias":
+            context_parts.append(
+                f"""
+Context Rank: {index}
+Type: business_alias
+Table: {item.get('full_table_name')}
+Alias notes:
+{item.get('text')}
+
+Rules:
+- Oracle access is SELECT only.
+- Use allowed schemas only.
+- Always use full table names like INVENTORY.PURCHASEORDER.
+""".strip()
+            )
+            continue
 
         context_parts.append(
             f"""

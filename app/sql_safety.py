@@ -1,5 +1,9 @@
+import os
 import re
 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BLOCKED_KEYWORDS = [
     "INSERT",
@@ -24,7 +28,14 @@ BLOCKED_KEYWORDS = [
 ]
 
 
-ALLOWED_SCHEMA = "INVENTORY"
+ORACLE_SCHEMAS = os.getenv("ORACLE_SCHEMAS", "INVENTORY")
+ALLOWED_SCHEMAS = {
+    schema.strip().upper()
+    for schema in ORACLE_SCHEMAS.split(",")
+    if schema.strip()
+}
+
+KNOWN_SCHEMAS = {"ADMIN", "HRDNEW", "INSUR", "INVENTORY", "SCM"}
 
 
 class SQLSafetyError(Exception):
@@ -75,19 +86,15 @@ def validate_select_only(sql: str) -> str:
         if re.search(pattern, upper_sql):
             raise SQLSafetyError(f"Blocked SQL keyword detected: {keyword}")
 
-    # Block access to other schemas like HRDNEW.TABLE, ADMIN.TABLE, SCM.TABLE etc.
-    schema_references = re.findall(r"\b([A-Z][A-Z0-9_]*)\s*\.", upper_sql)
-
-    for schema in schema_references:
-        # Ignore aliases like po.COLUMN or item.COLUMN.
-        # Real schema names are blocked if not INVENTORY and look like known schema names.
-        if schema in ["ADMIN", "HRDNEW", "INSUR", "SCM"]:
-            raise SQLSafetyError(f"Schema not allowed: {schema}")
-
-    # If any full schema.table reference is used, it must be INVENTORY.
-    forbidden_schema_pattern = r"\b(ADMIN|HRDNEW|INSUR|SCM)\s*\."
-    if re.search(forbidden_schema_pattern, upper_sql):
-        raise SQLSafetyError("Only INVENTORY schema is allowed.")
+    # Block access to any known schema not in allowed schemas.
+    if ALLOWED_SCHEMAS:
+        forbidden_schemas = KNOWN_SCHEMAS - ALLOWED_SCHEMAS
+        if forbidden_schemas:
+            forbidden_pattern = r"\b(" + "|".join(sorted(forbidden_schemas)) + r")\s*\."
+            if re.search(forbidden_pattern, upper_sql):
+                raise SQLSafetyError(
+                    f"Schema not allowed. Only schemas {sorted(ALLOWED_SCHEMAS)} are permitted."
+                )
 
     return cleaned
 

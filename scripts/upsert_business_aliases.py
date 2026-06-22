@@ -65,6 +65,14 @@ ALIASES = [
         "full_table_name": "INVENTORY.MRS",
         "type": "business_alias",
     },
+        {
+        "id": 200007,
+        "text": "Business rule: pending purchase orders should use INVENTORY.PURCHASEORDER as the main table. Useful columns are ID, ORDERNO, ORDERDATE, SUP_CODE, ITEM_CODE, QTY, RATE, NET, STATUS, GRN_PENDINGSTATUS. INVENTORY.PURCHASEORDER.ID can join INVENTORY.PURCHASEORDERSTATUS.ORDERID when status history is needed. Avoid assuming STATUS='Pending' unless confirmed.",
+        "schema": "INVENTORY",
+        "table": "PURCHASEORDER",
+        "full_table_name": "INVENTORY.PURCHASEORDER",
+        "type": "business_alias",
+    },
 ]
 
 def main():

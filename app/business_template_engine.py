@@ -61,6 +61,15 @@ def match_business_template(question: str) -> dict | None:
                 required_parameter = template.get("required_parameter", "item_name")
                 placeholder = "{" + required_parameter.upper() + "}"
 
+                if required_parameter == "dept_name":
+                    parameter_value = re.sub(
+                        r"\b(department|dept)\b",
+                        "",
+                        parameter_value,
+                        flags=re.IGNORECASE,
+                    ).strip()
+                    parameter_value = re.sub(r"\\s+", " ", parameter_value)
+
                 sql = template["sql_template"].replace(
                     placeholder,
                     parameter_value,

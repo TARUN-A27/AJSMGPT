@@ -42,6 +42,11 @@ def _extract_parameter(question: str, matched_phrase: str) -> str | None:
 
     raw_value = question[start + len(matched_phrase):].strip()
 
+    # Support suffix style questions like "keyboard stock"
+    # where the parameter appears before the matched phrase.
+    if not raw_value:
+        raw_value = question[:start].strip()
+
     # Remove common trailing words that are not part of search value.
     raw_value = re.sub(
         r"\b(today|this month|this year|details|list|report|please|show|give me)\b",
@@ -83,7 +88,7 @@ def match_business_template(question: str) -> dict | None:
     required_parameter = template.get("required_parameter", "item_name")
     placeholder = "{" + required_parameter.upper() + "}"
 
-    if required_parameter in {"item_code", "party_code", "empcode"}:
+    if required_parameter in {"item_code", "party_code", "empcode", "supplier_code"}:
         parameter_value = _clean_exact_code(parameter_value)
         if not parameter_value:
             return None
@@ -95,7 +100,7 @@ def match_business_template(question: str) -> dict | None:
             parameter_value,
             flags=re.IGNORECASE,
         ).strip()
-        parameter_value = re.sub(r"\\s+", " ", parameter_value)
+        parameter_value = re.sub(r"\s+", " ", parameter_value)
 
     sql = template["sql_template"].replace(
         placeholder,

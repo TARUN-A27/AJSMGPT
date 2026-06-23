@@ -21,7 +21,7 @@ def _clean_material_name(value: str) -> str:
     return value.upper()
 
 
-def _extract_item_name(question: str, matched_phrase: str) -> str | None:
+def _extract_parameter(question: str, matched_phrase: str) -> str | None:
     lower_question = question.lower()
     start = lower_question.find(matched_phrase)
 
@@ -30,7 +30,7 @@ def _extract_item_name(question: str, matched_phrase: str) -> str | None:
 
     raw_value = question[start + len(matched_phrase):].strip()
 
-    # Remove common trailing words that are not part of item name.
+    # Remove common trailing words that are not part of search value.
     raw_value = re.sub(
         r"\b(today|this month|this year|details|list|report|please|show|give me)\b",
         "",
@@ -53,14 +53,17 @@ def match_business_template(question: str) -> dict | None:
             phrase_lower = phrase.lower()
 
             if phrase_lower in question_lower:
-                item_name = _extract_item_name(question, phrase_lower)
+                parameter_value = _extract_parameter(question, phrase_lower)
 
-                if not item_name:
+                if not parameter_value:
                     continue
 
+                required_parameter = template.get("required_parameter", "item_name")
+                placeholder = "{" + required_parameter.upper() + "}"
+
                 sql = template["sql_template"].replace(
-                    "{ITEM_NAME}",
-                    item_name,
+                    placeholder,
+                    parameter_value,
                 )
 
                 return {
@@ -73,7 +76,7 @@ def match_business_template(question: str) -> dict | None:
                     "relationships_used": template.get("relationships_used", []),
                     "confidence": template.get("confidence", 0.95),
                     "parameters": {
-                        "item_name": item_name,
+                        required_parameter: parameter_value,
                     },
                     "source": "business_template",
                 }

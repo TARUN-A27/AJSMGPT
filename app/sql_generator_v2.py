@@ -142,8 +142,85 @@ Question understanding summary:
 """.strip()
 
 
-def build_prompt(question: str, context_text: str, understanding: dict | None = None) -> str:
+def _match_table_name(full_table_name: str, patterns: list[str]) -> bool:
+    name = (full_table_name or "").upper()
+    return any(re.search(pattern, name) for pattern in patterns)
+
+
+def build_table_preference_text(question: str, context_results: list[dict]) -> str:
+    ql = question.lower()
+    hints = []
+    if "document" in ql:
+        document_tables = [item["full_table_name"] for item in context_results if item.get("full_table_name") and _match_table_name(item["full_table_name"], [r"DOCUMENT", r"ENQUIRYDOCUMENT"])]
+        if document_tables:
+            hints.append(
+                "For document questions, prefer the document tables shown in context: "
+                + ", ".join(document_tables)
+                + ". Do not default to SCM.PARTYMASTER unless the user explicitly asks for supplier or party master details."
+            )
+        else:
+            hints.append(
+                "For document questions, prefer document-related tables and do not use SCM.PARTYMASTER unless explicitly asked for supplier or party master details."
+            )
+
+    if "vehicle movement" in ql:
+        movement_tables = [item["full_table_name"] for item in context_results if item.get("full_table_name") and _match_table_name(item["full_table_name"], [r"TRN_VEHICLEMOVEMENT"])]
+        if movement_tables:
+            hints.append(
+                "For vehicle movement questions, prefer these vehicle movement tables if available: "
+                + ", ".join(movement_tables)
+                + ". If a supplier or party code is present in the question, only apply it if a matching supplier/party column is clearly available in the retrieved schema context."
+            )
+        else:
+            hints.append(
+                "For vehicle movement questions, prefer vehicle movement tables and do not invent a supplier party filter unless a relevant column exists in the schema context."
+            )
+
+    if "current attendance" in ql:
+        current_tables = [item["full_table_name"] for item in context_results if item.get("full_table_name") and _match_table_name(item["full_table_name"], [r"CURRENTATTENDANCE"])]
+        if current_tables:
+            hints.append(
+                "For current attendance questions, prefer HRDNEW.CURRENTATTENDANCE over HRDNEW.CANTEENATTENDANCE when it is available in context."
+            )
+
+    if "department authentication" in ql or "authentication" in ql:
+        hints.append(
+            "For authentication questions, prefer HRDNEW.HODDEPTAUTHENTICATION when it is shown in the retrieved schema context."
+        )
+
+    return "\n".join(hints)
+
+
+def prioritize_context_results(question: str, context_results: list[dict]) -> list[dict]:
+    ql = question.lower()
+    preferred_patterns = []
+
+    if "document" in ql:
+        preferred_patterns.extend([r"DOCUMENT", r"ENQUIRYDOCUMENT"])
+    if "vehicle movement" in ql:
+        preferred_patterns.append(r"TRN_VEHICLEMOVEMENT")
+    if "current attendance" in ql:
+        preferred_patterns.append(r"CURRENTATTENDANCE")
+    if "department authentication" in ql or "authentication" in ql:
+        preferred_patterns.append(r"HODDEPTAUTHENTICATION")
+
+    if not preferred_patterns:
+        return context_results
+
+    def score(item: dict) -> tuple[int, float]:
+        name = (item.get("full_table_name") or "").upper()
+        bonus = 0
+        for pattern in preferred_patterns:
+            if re.search(pattern, name):
+                bonus += 100
+        return (bonus, item.get("score", 0) or 0)
+
+    return sorted(context_results, key=score, reverse=True)
+
+
+def build_prompt(question: str, context_text: str, understanding: dict | None = None, context_results: list[dict] | None = None) -> str:
     understanding_text = build_understanding_summary(understanding)
+    preferred_text = build_table_preference_text(question, context_results or [])
     return f"""
 User question:
 {question}
@@ -152,6 +229,8 @@ Relevant schema context:
 {context_text}
 
 {understanding_text}
+
+{preferred_text}
 
 Required output:
 Return only valid JSON with the following fields:
@@ -173,6 +252,10 @@ Important instructions:
 - Do not assume common columns like ID, ORDERID, SUPPLIERID, TOTALAMOUNT, NAME, ADDRESS, CONTACT, EMAIL unless they are explicitly shown in context.
 - If exact columns are unclear, select only clearly available columns from the context.
 - If requested_outputs contains supplier_company_name, include supplier/company name only if it exists in context.
+- For document questions, prefer document-related tables shown in the retrieved schema context and do not use SCM.PARTYMASTER unless explicitly asked for supplier or party master details.
+- For vehicle movement questions, prefer vehicle movement tables and only use supplier/party filters if the exact supplier/party column exists in the context.
+- For current attendance questions, prefer HRDNEW.CURRENTATTENDANCE over HRDNEW.CANTEENATTENDANCE when current attendance is available.
+- For department authentication questions, prefer HRDNEW.HODDEPTAUTHENTICATION when available in the retrieved schema context.
 - Do not include any SQL outside the SELECT statement.
 - Do not include commentary outside the required JSON.
 """.strip()
@@ -215,15 +298,47 @@ def generate_select_sql_v2(question: str, limit: int = 6, understanding: dict | 
 
     user_prompt = build_prompt(question, context_text, understanding)
     raw_response = chat_with_qwen(SYSTEM_PROMPT, user_prompt)
-    parsed = extract_json(raw_response)
+
+    # Normalize model text: strip common markdown fences before extracting JSON
+    raw_response_clean = re.sub(r"`{3,}.*?\n", "", raw_response, flags=re.DOTALL)
+    raw_response_clean = raw_response_clean.strip()
+
+    parsed = extract_json(raw_response_clean)
     result = normalize_response(parsed)
 
     if not result["sql"]:
-        raise ValueError(f"Model did not return SQL. Response: {raw_response}")
+        raise ValueError(f"Model did not return SQL. Response: {raw_response_clean}")
 
-    validated_sql = validate_select_only(result["sql"])
+    # Clean SQL: remove markdown fences and trailing semicolon
+    def _clean_sql_text(s: str) -> str:
+        if not s:
+            return s
+        s = s.strip()
+        # remove ``` fences
+        s = re.sub(r"^```(?:sql)?\s*", "", s, flags=re.I)
+        s = re.sub(r"\s*```$", "", s)
+        # remove any leading/trailing backticks
+        s = s.strip('`')
+        s = s.strip()
+        # remove trailing semicolon
+        if s.endswith(";"):
+            s = s[:-1].strip()
+        return s
+
+    cleaned_sql = _clean_sql_text(result["sql"])
+
+    # Ensure query begins with SELECT or WITH
+    if not cleaned_sql.upper().lstrip().startswith(("SELECT ", "WITH ")):
+        raise ValueError(f"Model returned non-SELECT SQL. SQL: {cleaned_sql}")
+
+    validated_sql = validate_select_only(cleaned_sql)
     validate_sql_columns(validated_sql)
     result["sql"] = validated_sql
+
+    # include retrieved schema info
+    result["retrieved_schema"] = [item.get("full_table_name") for item in context_results]
+    # mark source
+    result["source"] = result.get("source") or "qwen_schema_fallback"
 
     if not result["question"]:
         result["question"] = question

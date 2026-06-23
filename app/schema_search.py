@@ -48,8 +48,16 @@ def search_schema_context(question: str, limit: int = 5, collections: list[str] 
     client = QdrantClient(url=QDRANT_URL)
     question_vector = get_embedding(question)
 
-    collection_names = collections or [QDRANT_COLLECTION]
+    # Normalize collections input: allow None, single string, or list
+    if collections is None:
+        collection_names = [QDRANT_COLLECTION] if QDRANT_COLLECTION else []
+    elif isinstance(collections, str):
+        collection_names = [collections]
+    else:
+        collection_names = list(collections)
+
     results = []
+    seen = {}
 
     for collection in collection_names:
         if not collection:
@@ -63,7 +71,7 @@ def search_schema_context(question: str, limit: int = 5, collections: list[str] 
 
         for point in response.points:
             payload = point.payload or {}
-            results.append({
+            item = {
                 "score": point.score,
                 "schema": payload.get("schema"),
                 "table": payload.get("table"),
@@ -72,9 +80,16 @@ def search_schema_context(question: str, limit: int = 5, collections: list[str] 
                 "constraint_name": payload.get("constraint_name"),
                 "columns": payload.get("columns") or [],
                 "text": payload.get("text"),
-            })
+            }
 
-    results.sort(key=lambda item: item.get("score", 0), reverse=True)
+            key = item.get("full_table_name") or f"{item.get('schema')}.{item.get('table')}"
+            # keep the highest score for duplicate keys
+            existing = seen.get(key)
+            if existing is None or (item.get("score", 0) or 0) > (existing.get("score", 0) or 0):
+                seen[key] = item
+
+    # convert seen to list and sort by score desc
+    results = sorted(seen.values(), key=lambda it: it.get("score", 0) or 0, reverse=True)
     return results
 
 

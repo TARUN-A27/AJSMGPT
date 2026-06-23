@@ -78,8 +78,9 @@ def validate_select_only(sql: str) -> str:
 
     upper_sql = cleaned.upper()
 
-    if not upper_sql.startswith("SELECT "):
-        raise SQLSafetyError("Only SELECT queries are allowed.")
+    # Allow top-level SELECT or WITH ... SELECT queries
+    if not (upper_sql.startswith("SELECT ") or upper_sql.startswith("WITH ")):
+        raise SQLSafetyError("Only SELECT (or WITH ... SELECT) queries are allowed.")
 
     for keyword in BLOCKED_KEYWORDS:
         pattern = rf"\b{keyword}\b"

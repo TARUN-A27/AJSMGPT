@@ -35,6 +35,7 @@ HR_WORDS = {
 
 INVENTORY_COLLECTIONS = ["ajsmgpt_inventory_schema_metadata"]
 HR_COLLECTIONS = ["ajsmgpt_schema_metadata"]
+ADMIN_COLLECTIONS = ["ajsmgpt_schema_metadata"]
 BOTH_COLLECTIONS = ["ajsmgpt_inventory_schema_metadata", "ajsmgpt_schema_metadata"]
 
 KNOWN_TEMPLATE_INTENTS = {
@@ -131,21 +132,32 @@ def understand_question(question: str) -> dict:
     ql = question.lower()
     inventory_matches = sum(1 for word in INVENTORY_WORDS if word in ql)
     hr_matches = sum(1 for word in HR_WORDS if word in ql)
+    admin_matches = 0
+    # admin/other: use ADMIN_COLLECTIONS
+    for w in ["cashbank", "voucher", "camera", "vehicle", "document", "gate", "mainpass", "video"]:
+        if w in ql:
+            admin_matches += 1
 
-    if inventory_matches and not hr_matches:
+    if inventory_matches and not hr_matches and not admin_matches:
         domain = "inventory"
-    elif hr_matches and not inventory_matches:
+    elif hr_matches and not inventory_matches and not admin_matches:
         domain = "hr"
+    elif admin_matches and not inventory_matches and not hr_matches:
+        domain = "admin"
     elif inventory_matches and hr_matches:
         domain = "mixed"
     else:
         domain = "general"
 
-    collections = (
-        INVENTORY_COLLECTIONS if domain == "inventory"
-        else HR_COLLECTIONS if domain == "hr"
-        else BOTH_COLLECTIONS
-    )
+    # Select collections based on detected domain
+    if domain == "inventory":
+        collections = INVENTORY_COLLECTIONS
+    elif domain == "hr":
+        collections = HR_COLLECTIONS
+    elif domain == "admin":
+        collections = ADMIN_COLLECTIONS
+    else:
+        collections = BOTH_COLLECTIONS
 
     intent_hint = _detect_intent_hint(question)
     item_name = _extract_item_name(question)

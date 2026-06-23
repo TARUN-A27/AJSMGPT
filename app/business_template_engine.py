@@ -264,6 +264,23 @@ def _layman_route(question: str, templates: list[dict]) -> dict | None:
     mrs_keywords = ["mrs", "material requisition", "material request", "requested", "pending request"]
     issue_keywords = ["issue", "issued", "given", "material given", "material issued", "taken from stores"]
     indent_keywords = ["indent", "request no", "request", "indent no", "department request"]
+    # Admin/document/transaction keywords: if present, avoid generic supplier/employee routing
+    admin_keywords = [
+        "cashbank",
+        "voucher",
+        "document",
+        "vehicle",
+        "movement",
+        "camera",
+        "video",
+        "attendance",
+        "authentication",
+        "department authentication",
+        "gate",
+        "mainpass",
+        "current attendance",
+    ]
+    is_admin_like = any(k in ql for k in admin_keywords)
 
     # Priority 1: Exact code/entity routes (item/party/emp/supplier/issue/indent/order)
     def extract_order_no(s: str) -> str | None:
@@ -325,7 +342,7 @@ def _layman_route(question: str, templates: list[dict]) -> dict | None:
 
     # Party / supplier / empcode / issue / indent / order
     party = extract_party_code(q)
-    if party:
+    if party and not is_admin_like:
         tmpl = find_template_by_intent("supplier_by_party_code")
         if tmpl:
             sql = tmpl["sql_template"].replace("{PARTY_CODE}", party)
@@ -343,7 +360,7 @@ def _layman_route(question: str, templates: list[dict]) -> dict | None:
             }
 
     emp = extract_empcode(q)
-    if emp:
+    if emp and not is_admin_like:
         tmpl = find_template_by_intent("employee_by_empcode")
         if tmpl:
             sql = tmpl["sql_template"].replace("{EMPCODE}", emp)
@@ -361,7 +378,7 @@ def _layman_route(question: str, templates: list[dict]) -> dict | None:
             }
 
     sup = extract_supplier_code(q)
-    if sup:
+    if sup and not is_admin_like:
         if re.search(r"summary|total|how much", ql) and any(k in ql for k in grn_keywords):
             tmpl = find_template_by_intent("grn_summary_by_supplier_code")
         elif any(k in ql for k in grn_keywords):
@@ -517,7 +534,7 @@ def _layman_route(question: str, templates: list[dict]) -> dict | None:
 
     # Supplier by name (who is dutch blue / dutch blue gst)
     # keep this later so it doesn't preempt codes
-    if re.search(r"(?:who is|show supplier|show vendor|supplier details|vendor details|supplier gst|vendor gst|supplier by gst|vendor by gst|supplier by name|vendor by name)\b", ql):
+    if not is_admin_like and re.search(r"(?:who is|show supplier|show vendor|supplier details|vendor details|supplier gst|vendor gst|supplier by gst|vendor by gst|supplier by name|vendor by name)\b", ql):
         # capture the trailing supplier name after the intent phrase
         m = re.search(r"(?:who is|show supplier(?: details)?(?: for)?|show vendor(?: details)?(?: for)?|supplier details(?: for)?|vendor details(?: for)?|supplier gst(?: for)?|vendor gst(?: for)?|supplier by gst|vendor by gst|supplier by name|vendor by name)\s+(.+?)(?:\?|$)", ql)
         name = None
@@ -694,7 +711,7 @@ def _layman_route(question: str, templates: list[dict]) -> dict | None:
                     }
 
     # Employee intents
-    if any(k in ql for k in employee_keywords):
+    if any(k in ql for k in employee_keywords) and not is_admin_like:
         emp = extract_empcode(q)
         if emp:
             tmpl = find_template_by_intent("employee_by_empcode")

@@ -176,6 +176,9 @@ def generate_select_sql_v2(question: str, limit: int = 6) -> dict:
 
     template_result = match_business_template(question)
     if template_result:
+        validated_sql = validate_select_only(template_result["sql"])
+        validate_sql_columns(validated_sql)
+        template_result["sql"] = validated_sql
         return template_result
 
     context_results = search_schema_context(question, limit=limit)

@@ -21,6 +21,18 @@ def _clean_material_name(value: str) -> str:
     return value.upper()
 
 
+def _clean_exact_code(value: str) -> str:
+    value = value.strip()
+    value = re.sub(r"[;'\"]", "", value)
+    value = re.sub(r"\s+", " ", value)
+    value = value.upper()
+    if " " in value:
+        value = value.split(" ", 1)[0]
+    if not re.match(r"^[A-Z0-9_-]+$", value):
+        return ""
+    return value
+
+
 def _extract_parameter(question: str, matched_phrase: str) -> str | None:
     lower_question = question.lower()
     start = lower_question.find(matched_phrase)
@@ -48,46 +60,59 @@ def match_business_template(question: str) -> dict | None:
     question_lower = question.lower().strip()
     templates = _load_templates()
 
+    best_match = None
+    best_phrase = ""
+
     for template in templates:
         for phrase in template.get("phrases", []):
             phrase_lower = phrase.lower()
 
-            if phrase_lower in question_lower:
-                parameter_value = _extract_parameter(question, phrase_lower)
+            if phrase_lower in question_lower and len(phrase_lower) > len(best_phrase):
+                best_match = (template, phrase_lower)
+                best_phrase = phrase_lower
 
-                if not parameter_value:
-                    continue
+    if not best_match:
+        return None
 
-                required_parameter = template.get("required_parameter", "item_name")
-                placeholder = "{" + required_parameter.upper() + "}"
+    template, phrase_lower = best_match
+    parameter_value = _extract_parameter(question, phrase_lower)
 
-                if required_parameter == "dept_name":
-                    parameter_value = re.sub(
-                        r"\b(department|dept)\b",
-                        "",
-                        parameter_value,
-                        flags=re.IGNORECASE,
-                    ).strip()
-                    parameter_value = re.sub(r"\\s+", " ", parameter_value)
+    if not parameter_value:
+        return None
 
-                sql = template["sql_template"].replace(
-                    placeholder,
-                    parameter_value,
-                )
+    required_parameter = template.get("required_parameter", "item_name")
+    placeholder = "{" + required_parameter.upper() + "}"
 
-                return {
-                    "matched": True,
-                    "intent": template["intent"],
-                    "question": question,
-                    "sql": sql,
-                    "explanation": template.get("explanation"),
-                    "tables_used": template.get("tables_used", []),
-                    "relationships_used": template.get("relationships_used", []),
-                    "confidence": template.get("confidence", 0.95),
-                    "parameters": {
-                        required_parameter: parameter_value,
-                    },
-                    "source": "business_template",
-                }
+    if required_parameter in {"item_code", "party_code", "empcode"}:
+        parameter_value = _clean_exact_code(parameter_value)
+        if not parameter_value:
+            return None
 
-    return None
+    if required_parameter == "dept_name":
+        parameter_value = re.sub(
+            r"\b(department|dept)\b",
+            "",
+            parameter_value,
+            flags=re.IGNORECASE,
+        ).strip()
+        parameter_value = re.sub(r"\\s+", " ", parameter_value)
+
+    sql = template["sql_template"].replace(
+        placeholder,
+        parameter_value,
+    )
+
+    return {
+        "matched": True,
+        "intent": template["intent"],
+        "question": question,
+        "sql": sql,
+        "explanation": template.get("explanation"),
+        "tables_used": template.get("tables_used", []),
+        "relationships_used": template.get("relationships_used", []),
+        "confidence": template.get("confidence", 0.95),
+        "parameters": {
+            required_parameter: parameter_value,
+        },
+        "source": "business_template",
+    }

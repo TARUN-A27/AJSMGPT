@@ -1,0 +1,927 @@
+[
+  {
+    "intent": "pending_po_by_item_name",
+    "description": "Pending/open purchase order filtered by material or item name",
+    "phrases": [
+      "recent purchase order for",
+      "latest po for",
+      "latest purchase orders for",
+      "latest purchase order for",
+      "pending po for",
+      "pending purchase order for",
+      "pending order for",
+      "open purchase order for",
+      "purchase pending for",
+      "order pending for"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [
+      "INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE"
+    ],
+    "sql_template": "SELECT PO.ORDERNO, PO.ORDERDATE, PO.SUP_CODE, PO.ITEM_CODE, INV.ITEM_NAME, PO.QTY, PO.RATE, PO.NET, PO.STATUS, PO.GRN_PENDINGSTATUS FROM INVENTORY.PURCHASEORDER PO JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+    "explanation": "Uses verified pending purchase order by material/item-name pattern. It joins PURCHASEORDER with INVITEMS and filters by INVITEMS.ITEM_NAME. STATUS and GRN_PENDINGSTATUS are shown but not filtered because numeric status meanings are not confirmed.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "po_summary_by_item_name",
+    "description": "Purchase order summary totals filtered by material or item name",
+    "phrases": [
+      "purchase order summary for",
+      "po summary for",
+      "how much did we order",
+      "how much we ordered",
+      "how much was ordered",
+      "what did we order",
+      "what was ordered"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [
+      "INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE"
+    ],
+    "sql_template": "SELECT INV.ITEM_NAME, COUNT(DISTINCT PO.ORDERNO) AS ORDER_COUNT, COUNT(*) AS LINE_COUNT, SUM(NVL(PO.QTY, 0)) AS TOTAL_PO_QTY, SUM(NVL(PO.NET, 0)) AS TOTAL_PO_VALUE FROM INVENTORY.PURCHASEORDER PO JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' GROUP BY INV.ITEM_NAME",
+    "explanation": "Uses verified purchase order summary by item name with order counts and total quantities/values.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "last_purchase_date_by_item_name",
+    "description": "Latest purchase order date for an item, filtered by item name",
+    "phrases": [
+      "last purchase date",
+      "last purchased",
+      "latest purchase",
+      "last bought",
+      "when did we buy",
+      "last po date",
+      "last order date",
+      "latest purchase date"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.PURCHASEORDER.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT * FROM (SELECT PO.ORDERNO, PO.ORDERDATE AS LAST_PURCHASE_DATE, PO.SUP_CODE, P.PARTYNAME AS COMPANY_NAME, PO.ITEM_CODE, INV.ITEM_NAME, PO.QTY, PO.RATE, PO.NET, PO.STATUS, PO.GRN_PENDINGSTATUS FROM INVENTORY.PURCHASEORDER PO JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC) WHERE ROWNUM = 1",
+    "explanation": "Returns the latest purchase order for an item by item name, including supplier/company name as COMPANY_NAME. The query orders by ORDERDATE descending and returns the most recent row using ROWNUM.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "last_received_date_by_item_name",
+    "description": "Latest goods receipt date for an item, filtered by item name",
+    "phrases": [
+      "last received date",
+      "last grn date",
+      "when did .* last come",
+      "last goods received date"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.GRN.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.GRN.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT * FROM (SELECT G.GRNNO, G.GRNDATE AS LAST_RECEIVED_DATE, G.SUP_CODE, P.PARTYNAME, G.ORDERNO, G.CODE AS ITEM_CODE, INV.ITEM_NAME, G.QTY, G.INVQTY, G.ORDERQTY, G.PENDING, G.STATUS, G.REJECTIONSTATUS, G.GRNAUTHSTATUS FROM INVENTORY.GRN G JOIN INVENTORY.INVITEMS INV ON G.CODE = INV.ITEM_CODE LEFT JOIN SCM.PARTYMASTER P ON G.SUP_CODE = P.PARTYCODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' ORDER BY G.GRNDATE DESC NULLS LAST, G.GRNNO DESC) WHERE ROWNUM = 1",
+    "explanation": "Returns the latest goods receipt for an item by item name, ordered by GRNDATE descending and limited to the most recent row using ROWNUM.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_availability_by_item_name",
+    "description": "User-friendly item stock availability by item name, including items with no STOCK row",
+    "phrases": [
+      "current availability for",
+      "latest keyboard stock",
+      "latest stock of",
+      "latest stock for",
+      "stock availability for",
+      "available stock for",
+      "current stock availability for",
+      "availability for",
+      "stock balance for",
+      "stock of",
+      "stock"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.INVITEMS",
+      "INVENTORY.STOCK"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE"
+    ],
+    "sql_template": "SELECT INV.ITEM_CODE, INV.ITEM_NAME, NVL(S.STOCK, 0) AS STOCK, NVL(S.STOCKVALUE, 0) AS STOCKVALUE, NVL(S.RESERVEDQTY, 0) AS RESERVEDQTY, NVL(S.INDENTQTY, 0) AS INDENTQTY, NVL(S.TRANSFERQTY, 0) AS TRANSFERQTY, INV.UOMCODE, INV.DEPTCODE, INV.STKGROUPCODE, INV.HSNCODE, INV.GSTTYPECODE, INV.STATUS, INV.OBSOLETE, INV.ITEM_LOCKSTATUS FROM INVENTORY.INVITEMS INV LEFT JOIN INVENTORY.STOCK S ON S.ITEMCODE = INV.ITEM_CODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' ORDER BY INV.ITEM_NAME, INV.ITEM_CODE",
+    "explanation": "Uses INVITEMS as the base table and LEFT JOINs STOCK, so items are shown even when no stock row exists. Missing stock values are returned as 0.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_by_item_name",
+    "description": "Current/available stock filtered by material or item name",
+    "phrases": [
+      "show stock for",
+      "show stock of",
+      "available stock for",
+      "available stock of",
+      "current stock for",
+      "current stock of",
+      "stock for",
+      "stock of",
+      "stock",
+      "stock balance",
+      "current stock"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE"
+    ],
+    "sql_template": "SELECT S.ITEMCODE, INV.ITEM_NAME, S.STOCK, S.STOCKVALUE, S.RESERVEDQTY, S.INDENTQTY, S.TRANSFERQTY, S.MILLCODE FROM INVENTORY.STOCK S JOIN INVENTORY.INVITEMS INV ON S.ITEMCODE = INV.ITEM_CODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%'",
+    "explanation": "Uses verified stock by material/item-name pattern. It joins INVENTORY.STOCK with INVENTORY.INVITEMS using STOCK.ITEMCODE = INVITEMS.ITEM_CODE and filters by INVITEMS.ITEM_NAME. STOCK.ITEMCODE is the real stock item column, not ITEM_CODE.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_summary_by_item_name",
+    "description": "Stock summary totals filtered by material or item name",
+    "phrases": [
+      "stock summary for",
+      "how much is in stock",
+      "stock totals for",
+      "stock total for",
+      "inventory summary for"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE"
+    ],
+    "sql_template": "SELECT INV.ITEM_NAME, SUM(NVL(S.STOCK, 0)) AS TOTAL_STOCK, SUM(NVL(S.STOCKVALUE, 0)) AS TOTAL_STOCKVALUE, SUM(NVL(S.RESERVEDQTY, 0)) AS TOTAL_RESERVEDQTY, SUM(NVL(S.INDENTQTY, 0)) AS TOTAL_INDENTQTY, SUM(NVL(S.TRANSFERQTY, 0)) AS TOTAL_TRANSFERQTY FROM INVENTORY.STOCK S JOIN INVENTORY.INVITEMS INV ON S.ITEMCODE = INV.ITEM_CODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' GROUP BY INV.ITEM_NAME",
+    "explanation": "Uses verified stock summary totals by item name.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_by_item_code",
+    "description": "Current stock for an exact item code.",
+    "phrases": [
+      "stock of item ",
+      "stock for item ",
+      "stock for item code ",
+      "stock of item code ",
+      "current stock for item ",
+      "current stock of item ",
+      "current stock for item code ",
+      "current stock of item code "
+    ],
+    "required_parameter": "item_code",
+    "tables_used": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE"
+    ],
+    "sql_template": "SELECT S.ITEMCODE, INV.ITEM_NAME, S.STOCK, S.STOCKVALUE, S.RESERVEDQTY, S.INDENTQTY, S.TRANSFERQTY, S.MILLCODE FROM INVENTORY.STOCK S JOIN INVENTORY.INVITEMS INV ON S.ITEMCODE = INV.ITEM_CODE WHERE UPPER(S.ITEMCODE) = '{ITEM_CODE}'",
+    "explanation": "Uses verified item-code lookup for stock. It joins INVENTORY.STOCK with INVENTORY.INVITEMS and matches the exact item code using UPPER(S.ITEMCODE).",
+    "confidence": 0.99
+  },
+  {
+    "intent": "pending_po_by_item_code",
+    "description": "Pending or open purchase order details for an exact item code.",
+    "phrases": [
+      "pending po for item code ",
+      "pending purchase order for item code ",
+      "purchase order for item code ",
+      "pending po for item ",
+      "pending purchase order for item ",
+      "purchase order for item "
+    ],
+    "required_parameter": "item_code",
+    "tables_used": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [
+      "INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE"
+    ],
+    "sql_template": "SELECT PO.ORDERNO, PO.ORDERDATE, PO.SUP_CODE, PO.ITEM_CODE, INV.ITEM_NAME, PO.QTY, PO.RATE, PO.NET, PO.STATUS, PO.GRN_PENDINGSTATUS FROM INVENTORY.PURCHASEORDER PO JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE WHERE UPPER(PO.ITEM_CODE) = '{ITEM_CODE}'",
+    "explanation": "Uses verified purchase order lookup by exact item code. It joins INVENTORY.PURCHASEORDER with INVENTORY.INVITEMS and filters by exact UPPER(PO.ITEM_CODE).",
+    "confidence": 0.99
+  },
+  {
+    "intent": "supplier_by_party_code",
+    "description": "Supplier/vendor details by exact party code.",
+    "phrases": [
+      "supplier details for party code ",
+      "vendor details for party code ",
+      "supplier details for party ",
+      "vendor details for party ",
+      "supplier details for code ",
+      "vendor details for code "
+    ],
+    "required_parameter": "party_code",
+    "tables_used": [
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [],
+    "sql_template": "SELECT PARTYCODE, PARTYNAME, GSTINID, PANNO, EMAIL, EMAIL1, OFFPHONE1, OFFPHONE2, ADDRESS1, ADDRESS2, ADDRESS3, CONTPERSON1, PERPHONE1, PARTYSTATUS FROM SCM.PARTYMASTER WHERE UPPER(PARTYCODE) = '{PARTY_CODE}'",
+    "explanation": "Uses verified supplier/vendor lookup by exact party code. It returns supplier details from SCM.PARTYMASTER using exact UPPER(PARTYCODE).",
+    "confidence": 0.99
+  },
+  {
+    "intent": "employee_by_empcode",
+    "description": "Employee/staff details for an exact employee code.",
+    "phrases": [
+      "employee details for empcode ",
+      "staff details for empcode ",
+      "employee details for employee code ",
+      "staff details for employee code "
+    ],
+    "required_parameter": "empcode",
+    "tables_used": [
+      "HRDNEW.STAFF",
+      "HRDNEW.DEPARTMENT",
+      "HRDNEW.DESIGNATION"
+    ],
+    "relationships_used": [
+      "HRDNEW.STAFF.DEPTCODE = HRDNEW.DEPARTMENT.DEPTCODE",
+      "HRDNEW.STAFF.DESIGNATIONCODE = HRDNEW.DESIGNATION.DESIGNATIONCODE"
+    ],
+    "sql_template": "SELECT S.EMPCODE, S.EMPNAME, S.DEPTCODE, D.DEPTNAME, S.DESIGNATIONCODE, DES.DESIGNATIONNAME, S.DOJ, S.DOB, S.SEX, S.PHONENO, S.MILLCODE FROM HRDNEW.STAFF S JOIN HRDNEW.DEPARTMENT D ON S.DEPTCODE = D.DEPTCODE LEFT JOIN HRDNEW.DESIGNATION DES ON S.DESIGNATIONCODE = DES.DESIGNATIONCODE WHERE UPPER(S.EMPCODE) = '{EMPCODE}'",
+    "explanation": "Uses verified exact employee code lookup. It joins HRDNEW.STAFF with HRDNEW.DEPARTMENT and HRDNEW.DESIGNATION and filters by exact UPPER(S.EMPCODE).",
+    "confidence": 0.99
+  },
+  {
+    "intent": "supplier_by_name",
+    "description": "Supplier/vendor details, GST, PAN, contact, email, phone and address by party name",
+    "phrases": [
+      "show supplier details for",
+      "show vendor details for",
+      "supplier details for",
+      "vendor details for",
+      "show supplier gst for",
+      "show vendor gst for",
+      "supplier gst for",
+      "vendor gst for",
+      "supplier contact for",
+      "vendor contact for",
+      "supplier email for",
+      "vendor email for"
+    ],
+    "required_parameter": "party_name",
+    "tables_used": [
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [],
+    "sql_template": "SELECT PARTYCODE, PARTYNAME, GSTINID, PANNO, EMAIL, EMAIL1, OFFPHONE1, OFFPHONE2, ADDRESS1, ADDRESS2, ADDRESS3, CONTPERSON1, PERPHONE1, PARTYSTATUS FROM SCM.PARTYMASTER WHERE UPPER(PARTYNAME) LIKE '%{PARTY_NAME}%'",
+    "explanation": "Uses verified supplier/vendor lookup pattern from SCM.PARTYMASTER. It filters by PARTYNAME and returns GST, PAN, contact, email, phone, address and status details.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "employee_by_department",
+    "description": "Employee/staff list filtered by department name",
+    "phrases": [
+      "show employees in",
+      "employees in",
+      "staff list in",
+      "staff in",
+      "employee details for",
+      "employees for",
+      "staff details for"
+    ],
+    "required_parameter": "dept_name",
+    "tables_used": [
+      "HRDNEW.STAFF",
+      "HRDNEW.DEPARTMENT",
+      "HRDNEW.DESIGNATION"
+    ],
+    "relationships_used": [
+      "HRDNEW.STAFF.DEPTCODE = HRDNEW.DEPARTMENT.DEPTCODE",
+      "HRDNEW.STAFF.DESIGNATIONCODE = HRDNEW.DESIGNATION.DESIGNATIONCODE"
+    ],
+    "sql_template": "SELECT S.EMPCODE, S.EMPNAME, S.DEPTCODE, D.DEPTNAME, S.DESIGNATIONCODE, DES.DESIGNATIONNAME, S.DOJ, S.DOB, S.SEX, S.PHONENO, S.MILLCODE FROM HRDNEW.STAFF S JOIN HRDNEW.DEPARTMENT D ON S.DEPTCODE = D.DEPTCODE LEFT JOIN HRDNEW.DESIGNATION DES ON S.DESIGNATIONCODE = DES.DESIGNATIONCODE WHERE UPPER(D.DEPTNAME) LIKE '%{DEPT_NAME}%'",
+    "explanation": "Uses verified employee department lookup pattern. STAFF has DEPTCODE, not DEPTNAME, so it joins HRDNEW.STAFF with HRDNEW.DEPARTMENT and filters by DEPARTMENT.DEPTNAME. DESIGNATION is joined for designation name.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "pending_mrs_by_item_name",
+    "description": "Pending material requisition/MRS filtered by item or material name",
+    "phrases": [
+      "recent pending mrs for",
+      "latest material requisition pending for",
+      "latest mrs pending for",
+      "latest pending mrs for",
+      "pending mrs for",
+      "pending material requisition for",
+      "mrs pending for",
+      "material requisition pending for"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.MRS_TEMP",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT"
+    ],
+    "relationships_used": [
+      "INVENTORY.MRS_TEMP.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.MRS_TEMP.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.MRS_TEMP.DEPT_CODE = INVENTORY.DEPT.DEPT_CODE"
+    ],
+    "sql_template": "SELECT M.MRSNO, M.MRSDATE, M.ITEM_CODE, INV.ITEM_NAME, M.QTY, M.UNIT_CODE, U.UNIT_NAME, M.DEPT_CODE, D.DEPT_NAME, M.DUEDATE, M.ORDERNO, M.APPROVALSTATUS, M.READYFORAPPROVAL, M.REJECTIONSTATUS, M.STORESREJECTIONSTATUS, M.REASONFORMRS FROM INVENTORY.MRS_TEMP M JOIN INVENTORY.INVITEMS INV ON M.ITEM_CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON M.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON M.DEPT_CODE = D.DEPT_CODE WHERE M.MRSFLAG = 1 AND NVL(M.REJECTIONSTATUS, 0) = 0 AND NVL(M.STORESREJECTIONSTATUS, 0) = 0 AND NVL(M.ITEMDELETE, 0) = 0 AND NVL(M.ISDELETE, 0) = 0 AND UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' ORDER BY M.MRSDATE DESC NULLS LAST, M.MRSNO DESC",
+    "explanation": "Uses verified pending MRS pattern from INVENTORY.MRS_TEMP. It filters active non-rejected, non-deleted MRS rows and searches by INVITEMS.ITEM_NAME. Numeric status fields are shown, not compared to text.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "pending_mrs_by_item_code",
+    "description": "Pending material requisition/MRS filtered by exact item code",
+    "phrases": [
+      "latest material requisition pending for item code",
+      "latest mrs pending for item code",
+      "latest pending mrs for item code",
+      "pending mrs for item code",
+      "pending material requisition for item code",
+      "mrs pending for item code",
+      "material requisition pending for item code"
+    ],
+    "required_parameter": "item_code",
+    "tables_used": [
+      "INVENTORY.MRS_TEMP",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT"
+    ],
+    "relationships_used": [
+      "INVENTORY.MRS_TEMP.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.MRS_TEMP.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.MRS_TEMP.DEPT_CODE = INVENTORY.DEPT.DEPT_CODE"
+    ],
+    "sql_template": "SELECT M.MRSNO, M.MRSDATE, M.ITEM_CODE, INV.ITEM_NAME, M.QTY, M.UNIT_CODE, U.UNIT_NAME, M.DEPT_CODE, D.DEPT_NAME, M.DUEDATE, M.ORDERNO, M.APPROVALSTATUS, M.READYFORAPPROVAL, M.REJECTIONSTATUS, M.STORESREJECTIONSTATUS, M.REASONFORMRS FROM INVENTORY.MRS_TEMP M JOIN INVENTORY.INVITEMS INV ON M.ITEM_CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON M.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON M.DEPT_CODE = D.DEPT_CODE WHERE M.MRSFLAG = 1 AND NVL(M.REJECTIONSTATUS, 0) = 0 AND NVL(M.STORESREJECTIONSTATUS, 0) = 0 AND NVL(M.ITEMDELETE, 0) = 0 AND NVL(M.ISDELETE, 0) = 0 AND UPPER(M.ITEM_CODE) = '{ITEM_CODE}' ORDER BY M.MRSDATE DESC NULLS LAST, M.MRSNO DESC",
+    "explanation": "Uses verified pending MRS pattern from INVENTORY.MRS_TEMP. It filters active non-rejected, non-deleted MRS rows and searches by exact MRS_TEMP.ITEM_CODE. Numeric status fields are shown, not compared to text.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "grn_by_item_code",
+    "description": "GRN details filtered by exact item code",
+    "phrases": [
+      "grn for item code",
+      "grn details for item code",
+      "goods receipt for item code",
+      "goods receipt note for item code"
+    ],
+    "required_parameter": "item_code",
+    "tables_used": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.GRN.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.GRN.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT G.GRNNO, G.GRNDATE, G.SUP_CODE, P.PARTYNAME, G.ORDERNO, G.CODE, INV.ITEM_NAME, G.QTY, G.INVQTY, G.ORDERQTY, G.PENDING, G.STATUS, G.REJECTIONSTATUS, G.GRNAUTHSTATUS FROM INVENTORY.GRN G JOIN INVENTORY.INVITEMS INV ON G.CODE = INV.ITEM_CODE LEFT JOIN SCM.PARTYMASTER P ON G.SUP_CODE = P.PARTYCODE WHERE UPPER(G.CODE) = '{ITEM_CODE}'",
+    "explanation": "Uses verified GRN lookup by exact item code. STATUS, REJECTIONSTATUS and GRNAUTHSTATUS are shown but not interpreted as text.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "grn_by_supplier_code",
+    "description": "GRN details filtered by exact supplier/party code",
+    "phrases": [
+      "recent grn for supplier",
+      "latest goods receipt note for supplier",
+      "latest goods receipt for supplier",
+      "latest grn for supplier",
+      "grn for supplier code",
+      "grn details for supplier code",
+      "grn for party code",
+      "goods receipt for supplier code"
+    ],
+    "required_parameter": "supplier_code",
+    "tables_used": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.GRN.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.GRN.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT G.GRNNO, G.GRNDATE, G.SUP_CODE, P.PARTYNAME, G.ORDERNO, G.CODE, INV.ITEM_NAME, G.QTY, G.INVQTY, G.ORDERQTY, G.PENDING, G.STATUS, G.REJECTIONSTATUS, G.GRNAUTHSTATUS FROM INVENTORY.GRN G JOIN INVENTORY.INVITEMS INV ON G.CODE = INV.ITEM_CODE LEFT JOIN SCM.PARTYMASTER P ON G.SUP_CODE = P.PARTYCODE WHERE UPPER(G.SUP_CODE) = '{SUPPLIER_CODE}' ORDER BY G.GRNDATE DESC NULLS LAST, G.GRNNO DESC",
+    "explanation": "Uses verified GRN lookup by supplier code. SUP_CODE is text/VARCHAR2, so it is compared as text.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "grn_by_order_no",
+    "description": "GRN details filtered by purchase order number",
+    "phrases": [
+      "grn for order number",
+      "grn for order no",
+      "grn details for order number",
+      "goods receipt for order number"
+    ],
+    "required_parameter": "order_no",
+    "tables_used": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.GRN.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.GRN.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT G.GRNNO, G.GRNDATE, G.SUP_CODE, P.PARTYNAME, G.ORDERNO, G.CODE, INV.ITEM_NAME, G.QTY, G.INVQTY, G.ORDERQTY, G.PENDING, G.STATUS, G.REJECTIONSTATUS, G.GRNAUTHSTATUS FROM INVENTORY.GRN G JOIN INVENTORY.INVITEMS INV ON G.CODE = INV.ITEM_CODE LEFT JOIN SCM.PARTYMASTER P ON G.SUP_CODE = P.PARTYCODE WHERE G.ORDERNO = {ORDER_NO}",
+    "explanation": "Uses verified GRN lookup by purchase order number. ORDERNO is NUMBER, so it is compared without quotes.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "grn_by_item_name",
+    "description": "GRN details filtered by item/material name",
+    "phrases": [
+      "recent grn for",
+      "latest goods receipt note for",
+      "latest goods receipt for",
+      "latest grn for",
+      "grn for",
+      "grn details for",
+      "goods receipt for",
+      "goods receipt note for"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.GRN.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.GRN.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT G.GRNNO, G.GRNDATE, G.SUP_CODE, P.PARTYNAME, G.ORDERNO, G.CODE, INV.ITEM_NAME, G.QTY, G.INVQTY, G.ORDERQTY, G.PENDING, G.STATUS, G.REJECTIONSTATUS, G.GRNAUTHSTATUS FROM INVENTORY.GRN G JOIN INVENTORY.INVITEMS INV ON G.CODE = INV.ITEM_CODE LEFT JOIN SCM.PARTYMASTER P ON G.SUP_CODE = P.PARTYCODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' ORDER BY G.GRNDATE DESC NULLS LAST, G.GRNNO DESC",
+    "explanation": "Uses verified GRN lookup by item/material name through INVITEMS.ITEM_NAME.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "issue_by_item_code",
+    "description": "Material issue details filtered by exact item code",
+    "phrases": [
+      "issue for item code",
+      "issue details for item code",
+      "material issue for item code",
+      "item issue for item code"
+    ],
+    "required_parameter": "item_code",
+    "tables_used": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.ISSUE.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.ISSUE.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.ISSUE.DEPT_CODE = INVENTORY.DEPT.DEPT_CODE",
+      "INVENTORY.ISSUE.PARTYCODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT I.ISSUENO, I.ISSUEDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.INDENTNO, I.UNIT_CODE, U.UNIT_NAME, I.DEPT_CODE, D.DEPT_NAME, I.PARTYCODE, P.PARTYNAME, I.STATUS, I.RECDSTATUS, I.RECEIVEREMPCODE FROM INVENTORY.ISSUE I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPT_CODE = D.DEPT_CODE LEFT JOIN SCM.PARTYMASTER P ON I.PARTYCODE = P.PARTYCODE WHERE UPPER(I.CODE) = '{ITEM_CODE}'",
+    "explanation": "Uses verified material issue lookup by exact item code. ISSUE.CODE is VARCHAR2 and joins INVITEMS.ITEM_CODE. STATUS and RECDSTATUS are numeric and shown only.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "issue_by_item_name",
+    "description": "Material issue details filtered by item/material name",
+    "phrases": [
+      "recent material issue for",
+      "recent issue for",
+      "latest material issue for",
+      "latest issue for",
+      "issue for",
+      "issue details for",
+      "material issue for",
+      "item issue for"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.ISSUE.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.ISSUE.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.ISSUE.DEPT_CODE = INVENTORY.DEPT.DEPT_CODE",
+      "INVENTORY.ISSUE.PARTYCODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT I.ISSUENO, I.ISSUEDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.INDENTNO, I.UNIT_CODE, U.UNIT_NAME, I.DEPT_CODE, D.DEPT_NAME, I.PARTYCODE, P.PARTYNAME, I.STATUS, I.RECDSTATUS, I.RECEIVEREMPCODE FROM INVENTORY.ISSUE I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPT_CODE = D.DEPT_CODE LEFT JOIN SCM.PARTYMASTER P ON I.PARTYCODE = P.PARTYCODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%' ORDER BY I.ISSUEDATE DESC NULLS LAST, I.ISSUENO DESC",
+    "explanation": "Uses verified material issue lookup by item/material name through INVITEMS.ITEM_NAME. STATUS and RECDSTATUS are numeric and shown only.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "issue_by_issue_no",
+    "description": "Material issue details filtered by issue number",
+    "phrases": [
+      "issue for issue number",
+      "issue for issue no",
+      "issue details for issue number",
+      "material issue for issue number"
+    ],
+    "required_parameter": "issue_no",
+    "tables_used": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.ISSUE.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.ISSUE.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.ISSUE.DEPT_CODE = INVENTORY.DEPT.DEPT_CODE",
+      "INVENTORY.ISSUE.PARTYCODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT I.ISSUENO, I.ISSUEDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.INDENTNO, I.UNIT_CODE, U.UNIT_NAME, I.DEPT_CODE, D.DEPT_NAME, I.PARTYCODE, P.PARTYNAME, I.STATUS, I.RECDSTATUS, I.RECEIVEREMPCODE FROM INVENTORY.ISSUE I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPT_CODE = D.DEPT_CODE LEFT JOIN SCM.PARTYMASTER P ON I.PARTYCODE = P.PARTYCODE WHERE I.ISSUENO = {ISSUE_NO}",
+    "explanation": "Uses verified material issue lookup by issue number. ISSUENO is NUMBER, so it is compared without quotes.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "issue_by_indent_no",
+    "description": "Material issue details filtered by indent number",
+    "phrases": [
+      "issue for indent number",
+      "issue for indent no",
+      "issue details for indent number",
+      "material issue for indent number"
+    ],
+    "required_parameter": "indent_no",
+    "tables_used": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.ISSUE.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.ISSUE.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.ISSUE.DEPT_CODE = INVENTORY.DEPT.DEPT_CODE",
+      "INVENTORY.ISSUE.PARTYCODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT I.ISSUENO, I.ISSUEDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.INDENTNO, I.UNIT_CODE, U.UNIT_NAME, I.DEPT_CODE, D.DEPT_NAME, I.PARTYCODE, P.PARTYNAME, I.STATUS, I.RECDSTATUS, I.RECEIVEREMPCODE FROM INVENTORY.ISSUE I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPT_CODE = D.DEPT_CODE LEFT JOIN SCM.PARTYMASTER P ON I.PARTYCODE = P.PARTYCODE WHERE I.INDENTNO = {INDENT_NO}",
+    "explanation": "Uses verified material issue lookup by indent number. INDENTNO is NUMBER, so it is compared without quotes.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "indent_by_item_code",
+    "description": "Indent details filtered by exact item code",
+    "phrases": [
+      "indent for item code",
+      "indent details for item code",
+      "material indent for item code",
+      "indent item code"
+    ],
+    "required_parameter": "item_code",
+    "tables_used": [
+      "INVENTORY.INDENT",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT"
+    ],
+    "relationships_used": [
+      "INVENTORY.INDENT.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INDENT.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.INDENT.DEPTCODE = INVENTORY.DEPT.DEPT_CODE"
+    ],
+    "sql_template": "SELECT I.INDENTNO, I.INDENTDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.ISSUEQTY, I.INDENTCLOSEQTY, I.UNIT_CODE, U.UNIT_NAME, I.DEPTCODE, D.DEPT_NAME, I.STATUS, I.ISSUESTATUS, I.CANCELSTATUS, I.AUTHENTICATION, I.REMARKS FROM INVENTORY.INDENT I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPTCODE = D.DEPT_CODE WHERE UPPER(I.CODE) = '{ITEM_CODE}'",
+    "explanation": "Uses verified indent lookup by exact item code. INDENT.CODE is VARCHAR2 and joins INVITEMS.ITEM_CODE.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "indent_by_item_name",
+    "description": "Indent details filtered by item/material name",
+    "phrases": [
+      "indent for",
+      "indent details for",
+      "material indent for",
+      "show indent for"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.INDENT",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT"
+    ],
+    "relationships_used": [
+      "INVENTORY.INDENT.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INDENT.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.INDENT.DEPTCODE = INVENTORY.DEPT.DEPT_CODE"
+    ],
+    "sql_template": "SELECT I.INDENTNO, I.INDENTDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.ISSUEQTY, I.INDENTCLOSEQTY, I.UNIT_CODE, U.UNIT_NAME, I.DEPTCODE, D.DEPT_NAME, I.STATUS, I.ISSUESTATUS, I.CANCELSTATUS, I.AUTHENTICATION, I.REMARKS FROM INVENTORY.INDENT I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPTCODE = D.DEPT_CODE WHERE UPPER(INV.ITEM_NAME) LIKE '%{ITEM_NAME}%'",
+    "explanation": "Uses verified indent lookup by item/material name through INVITEMS.ITEM_NAME.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "indent_by_indent_no",
+    "description": "Indent details filtered by indent number",
+    "phrases": [
+      "indent for indent number",
+      "indent for indent no",
+      "indent details for indent number",
+      "material indent for indent number"
+    ],
+    "required_parameter": "indent_no",
+    "tables_used": [
+      "INVENTORY.INDENT",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT"
+    ],
+    "relationships_used": [
+      "INVENTORY.INDENT.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INDENT.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.INDENT.DEPTCODE = INVENTORY.DEPT.DEPT_CODE"
+    ],
+    "sql_template": "SELECT I.INDENTNO, I.INDENTDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.ISSUEQTY, I.INDENTCLOSEQTY, I.UNIT_CODE, U.UNIT_NAME, I.DEPTCODE, D.DEPT_NAME, I.STATUS, I.ISSUESTATUS, I.CANCELSTATUS, I.AUTHENTICATION, I.REMARKS FROM INVENTORY.INDENT I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPTCODE = D.DEPT_CODE WHERE I.INDENTNO = {INDENT_NO}",
+    "explanation": "Uses verified indent lookup by indent number. INDENTNO is NUMBER, so it is compared without quotes.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "indent_by_department",
+    "description": "Indent details filtered by department name",
+    "phrases": [
+      "indent for department",
+      "indent for dept",
+      "indent details for department",
+      "material indent for department"
+    ],
+    "required_parameter": "dept_name",
+    "tables_used": [
+      "INVENTORY.INDENT",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "INVENTORY.DEPT"
+    ],
+    "relationships_used": [
+      "INVENTORY.INDENT.CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INDENT.UNIT_CODE = INVENTORY.UNIT.UNIT_CODE",
+      "INVENTORY.INDENT.DEPTCODE = INVENTORY.DEPT.DEPT_CODE"
+    ],
+    "sql_template": "SELECT I.INDENTNO, I.INDENTDATE, I.CODE, INV.ITEM_NAME, I.QTY, I.ISSUEQTY, I.INDENTCLOSEQTY, I.UNIT_CODE, U.UNIT_NAME, I.DEPTCODE, D.DEPT_NAME, I.STATUS, I.ISSUESTATUS, I.CANCELSTATUS, I.AUTHENTICATION, I.REMARKS FROM INVENTORY.INDENT I JOIN INVENTORY.INVITEMS INV ON I.CODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON I.UNIT_CODE = U.UNIT_CODE LEFT JOIN INVENTORY.DEPT D ON I.DEPTCODE = D.DEPT_CODE WHERE UPPER(D.DEPT_NAME) LIKE '%{DEPT_NAME}%'",
+    "explanation": "Uses verified indent lookup by department name through INVENTORY.DEPT.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "item_master_by_item_code",
+    "description": "Item master details filtered by exact item code",
+    "phrases": [
+      "item details for item code",
+      "item master for item code",
+      "item info for item code",
+      "hsn code for item code",
+      "item status for item code"
+    ],
+    "required_parameter": "item_code",
+    "tables_used": [
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [],
+    "sql_template": "SELECT ITEM_CODE, ITEM_NAME, SHORT_NAME, UOMCODE, MATGROUPCODE, STKGROUPCODE, DEPTCODE, MINQTY, MAXQTY, ROQ, OPGQTY, RECQTY, ISSQTY, STATUS, OBSOLETE, ITEM_LOCKSTATUS, HSNCODE, GSTTYPECODE FROM INVENTORY.INVITEMS WHERE UPPER(ITEM_CODE) = '{ITEM_CODE}'",
+    "explanation": "Uses verified item master lookup by exact item code from INVENTORY.INVITEMS.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "item_master_by_item_name",
+    "description": "Item master details filtered by item/material name",
+    "phrases": [
+      "item details for",
+      "item master for",
+      "item info for",
+      "hsn code for",
+      "item status for"
+    ],
+    "required_parameter": "item_name",
+    "tables_used": [
+      "INVENTORY.INVITEMS"
+    ],
+    "relationships_used": [],
+    "sql_template": "SELECT ITEM_CODE, ITEM_NAME, SHORT_NAME, UOMCODE, MATGROUPCODE, STKGROUPCODE, DEPTCODE, MINQTY, MAXQTY, ROQ, OPGQTY, RECQTY, ISSQTY, STATUS, OBSOLETE, ITEM_LOCKSTATUS, HSNCODE, GSTTYPECODE FROM INVENTORY.INVITEMS WHERE UPPER(ITEM_NAME) LIKE '%{ITEM_NAME}%'",
+    "explanation": "Uses verified item master lookup by item/material name from INVENTORY.INVITEMS.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_by_department",
+    "description": "Stock details filtered by department name",
+    "phrases": [
+      "stock for department",
+      "stock by department",
+      "department stock for",
+      "stock for dept",
+      "detailed stock balance with item department and unit for department",
+      "show detailed stock balance with item department and unit for department",
+      "stock balance with item department and unit for department",
+      "show stock details for department",
+      "detailed stock for department"
+    ],
+    "required_parameter": "dept_name",
+    "tables_used": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.DEPT",
+      "INVENTORY.UNIT"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INVITEMS.DEPTCODE = INVENTORY.DEPT.DEPT_CODE",
+      "INVENTORY.INVITEMS.UOMCODE = INVENTORY.UNIT.UNIT_CODE"
+    ],
+    "sql_template": "SELECT S.ITEMCODE, INV.ITEM_NAME, S.STOCK, S.STOCKVALUE, S.RESERVEDQTY, S.INDENTQTY, S.TRANSFERQTY, S.MILLCODE, INV.DEPTCODE, D.DEPT_NAME, INV.UOMCODE, U.UNIT_NAME FROM INVENTORY.STOCK S JOIN INVENTORY.INVITEMS INV ON S.ITEMCODE = INV.ITEM_CODE LEFT JOIN INVENTORY.DEPT D ON INV.DEPTCODE = D.DEPT_CODE LEFT JOIN INVENTORY.UNIT U ON INV.UOMCODE = U.UNIT_CODE WHERE UPPER(D.DEPT_NAME) LIKE '%{DEPT_NAME}%'",
+    "explanation": "Uses verified stock lookup by department name through INVITEMS.DEPTCODE and INVENTORY.DEPT.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_by_unit",
+    "description": "Stock details filtered by unit name",
+    "phrases": [
+      "stock for unit",
+      "stock by unit",
+      "unit stock for",
+      "stock in unit",
+      "detailed stock balance with item department and unit for unit",
+      "show detailed stock balance with item department and unit for unit",
+      "stock balance with item department and unit for unit",
+      "show stock details for unit",
+      "detailed stock for unit"
+    ],
+    "required_parameter": "unit_name",
+    "tables_used": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.DEPT",
+      "INVENTORY.UNIT"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INVITEMS.DEPTCODE = INVENTORY.DEPT.DEPT_CODE",
+      "INVENTORY.INVITEMS.UOMCODE = INVENTORY.UNIT.UNIT_CODE"
+    ],
+    "sql_template": "SELECT S.ITEMCODE, INV.ITEM_NAME, S.STOCK, S.STOCKVALUE, S.RESERVEDQTY, S.INDENTQTY, S.TRANSFERQTY, S.MILLCODE, INV.DEPTCODE, D.DEPT_NAME, INV.UOMCODE, U.UNIT_NAME FROM INVENTORY.STOCK S JOIN INVENTORY.INVITEMS INV ON S.ITEMCODE = INV.ITEM_CODE LEFT JOIN INVENTORY.DEPT D ON INV.DEPTCODE = D.DEPT_CODE LEFT JOIN INVENTORY.UNIT U ON INV.UOMCODE = U.UNIT_CODE WHERE UPPER(U.UNIT_NAME) LIKE '%{UNIT_NAME}%'",
+    "explanation": "Uses verified stock lookup by unit name through INVITEMS.UOMCODE and INVENTORY.UNIT.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_summary_by_department",
+    "description": "Stock summary totals filtered by department name",
+    "phrases": [
+      "stock summary for department",
+      "department stock summary for",
+      "stock total for department",
+      "total stock for department",
+      "stock summary totals for department",
+      "display stock summary totals for department",
+      "department wise stock summary for",
+      "department-wise stock summary for"
+    ],
+    "required_parameter": "dept_name",
+    "tables_used": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.DEPT"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INVITEMS.DEPTCODE = INVENTORY.DEPT.DEPT_CODE"
+    ],
+    "sql_template": "SELECT D.DEPT_NAME, COUNT(*) AS ITEM_COUNT, SUM(NVL(S.STOCK, 0)) AS TOTAL_STOCK, SUM(NVL(S.STOCKVALUE, 0)) AS TOTAL_STOCKVALUE, SUM(NVL(S.RESERVEDQTY, 0)) AS TOTAL_RESERVEDQTY, SUM(NVL(S.INDENTQTY, 0)) AS TOTAL_INDENTQTY, SUM(NVL(S.TRANSFERQTY, 0)) AS TOTAL_TRANSFERQTY FROM INVENTORY.STOCK S JOIN INVENTORY.INVITEMS INV ON S.ITEMCODE = INV.ITEM_CODE LEFT JOIN INVENTORY.DEPT D ON INV.DEPTCODE = D.DEPT_CODE WHERE UPPER(D.DEPT_NAME) LIKE '%{DEPT_NAME}%' GROUP BY D.DEPT_NAME",
+    "explanation": "Uses verified department-wise stock summary with item count, total stock and total stock value.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "stock_summary_by_unit",
+    "description": "Stock summary totals filtered by unit name",
+    "phrases": [
+      "stock summary for unit",
+      "unit stock summary for",
+      "stock total for unit",
+      "total stock for unit",
+      "stock summary totals for unit",
+      "display stock summary totals for unit",
+      "unit wise stock summary for",
+      "unit-wise stock summary for"
+    ],
+    "required_parameter": "unit_name",
+    "tables_used": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT"
+    ],
+    "relationships_used": [
+      "INVENTORY.STOCK.ITEMCODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.INVITEMS.UOMCODE = INVENTORY.UNIT.UNIT_CODE"
+    ],
+    "sql_template": "SELECT U.UNIT_NAME, COUNT(*) AS ITEM_COUNT, SUM(NVL(S.STOCK, 0)) AS TOTAL_STOCK, SUM(NVL(S.STOCKVALUE, 0)) AS TOTAL_STOCKVALUE, SUM(NVL(S.RESERVEDQTY, 0)) AS TOTAL_RESERVEDQTY, SUM(NVL(S.INDENTQTY, 0)) AS TOTAL_INDENTQTY, SUM(NVL(S.TRANSFERQTY, 0)) AS TOTAL_TRANSFERQTY FROM INVENTORY.STOCK S JOIN INVENTORY.INVITEMS INV ON S.ITEMCODE = INV.ITEM_CODE LEFT JOIN INVENTORY.UNIT U ON INV.UOMCODE = U.UNIT_CODE WHERE UPPER(U.UNIT_NAME) LIKE '%{UNIT_NAME}%' GROUP BY U.UNIT_NAME",
+    "explanation": "Uses verified unit-wise stock summary with item count, total stock and total stock value.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "po_summary_by_supplier_code",
+    "description": "Purchase order summary totals filtered by supplier code",
+    "phrases": [
+      "po summary for supplier code",
+      "purchase order summary for supplier code",
+      "po total for supplier code",
+      "purchase value for supplier code",
+      "purchase order total for supplier code",
+      "purchase order summary totals for supplier code",
+      "supplier-wise purchase order summary for supplier code",
+      "supplier wise purchase order summary for supplier code",
+      "show purchase order summary totals for supplier code",
+      "show po summary totals for supplier code"
+    ],
+    "required_parameter": "supplier_code",
+    "tables_used": [
+      "INVENTORY.PURCHASEORDER",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.PURCHASEORDER.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT PO.SUP_CODE, P.PARTYNAME, COUNT(DISTINCT PO.ORDERNO) AS ORDER_COUNT, COUNT(*) AS LINE_COUNT, SUM(NVL(PO.QTY, 0)) AS TOTAL_PO_QTY, SUM(NVL(PO.NET, 0)) AS TOTAL_PO_VALUE FROM INVENTORY.PURCHASEORDER PO LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE WHERE UPPER(PO.SUP_CODE) = '{SUPPLIER_CODE}' GROUP BY PO.SUP_CODE, P.PARTYNAME",
+    "explanation": "Uses verified supplier-wise purchase order summary. SUP_CODE is VARCHAR2 and PO quantities/values are numeric totals.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "pending_po_by_supplier_code",
+    "description": "Pending/open purchase order details filtered by supplier code",
+    "phrases": [
+      "recent purchase order for supplier",
+      "latest po for supplier",
+      "latest purchase orders for supplier",
+      "latest purchase order for supplier",
+      "open purchase orders for supplier code",
+      "open purchase orders for supplier",
+      "pending purchase orders for supplier code",
+      "pending purchase orders for supplier",
+      "purchase orders for supplier code",
+      "purchase orders for supplier"
+    ],
+    "required_parameter": "supplier_code",
+    "tables_used": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE",
+      "INVENTORY.PURCHASEORDER.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT PO.ORDERNO, PO.ORDERDATE, PO.SUP_CODE, PO.ITEM_CODE, INV.ITEM_NAME, PO.QTY, PO.RATE, PO.NET, PO.STATUS, PO.GRN_PENDINGSTATUS FROM INVENTORY.PURCHASEORDER PO JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE WHERE UPPER(PO.SUP_CODE) = '{SUPPLIER_CODE}' ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+    "explanation": "Uses verified pending purchase order details filtered by supplier code.",
+    "confidence": 0.98
+  },
+  {
+    "intent": "grn_summary_by_supplier_code",
+    "description": "GRN summary totals filtered by supplier code",
+    "phrases": [
+      "grn summary for supplier code",
+      "goods receipt summary for supplier code",
+      "grn total for supplier code",
+      "goods receipt total for supplier code",
+      "grn summary totals for supplier code",
+      "goods receipt note summary totals for supplier code",
+      "supplier-wise grn summary for supplier code",
+      "supplier wise grn summary for supplier code",
+      "show grn summary totals for supplier code"
+    ],
+    "required_parameter": "supplier_code",
+    "tables_used": [
+      "INVENTORY.GRN",
+      "SCM.PARTYMASTER"
+    ],
+    "relationships_used": [
+      "INVENTORY.GRN.SUP_CODE = SCM.PARTYMASTER.PARTYCODE"
+    ],
+    "sql_template": "SELECT G.SUP_CODE, P.PARTYNAME, COUNT(DISTINCT G.GRNNO) AS GRN_COUNT, COUNT(*) AS LINE_COUNT, SUM(NVL(G.QTY, 0)) AS TOTAL_GRN_QTY, SUM(NVL(G.INVQTY, 0)) AS TOTAL_INV_QTY, SUM(NVL(G.ORDERQTY, 0)) AS TOTAL_ORDER_QTY, SUM(NVL(G.PENDING, 0)) AS TOTAL_PENDING_QTY FROM INVENTORY.GRN G LEFT JOIN SCM.PARTYMASTER P ON G.SUP_CODE = P.PARTYCODE WHERE UPPER(G.SUP_CODE) = '{SUPPLIER_CODE}' GROUP BY G.SUP_CODE, P.PARTYNAME",
+    "explanation": "Uses verified supplier-wise GRN summary. SUP_CODE is VARCHAR2 and GRN quantities are numeric totals.",
+    "confidence": 0.98
+  }
+]

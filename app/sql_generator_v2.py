@@ -7,6 +7,7 @@ from app.ollama_client import chat_with_qwen
 from app.schema_search import build_compact_context_text, search_schema_context
 from app.sql_column_validator import validate_sql_columns
 from app.sql_safety import validate_select_only
+from app.business_template_engine import match_business_template
 
 load_dotenv()
 
@@ -172,6 +173,10 @@ def normalize_response(parsed: dict) -> dict:
 def generate_select_sql_v2(question: str, limit: int = 6) -> dict:
     if not question or not question.strip():
         raise ValueError("Question cannot be empty.")
+
+    template_result = match_business_template(question)
+    if template_result:
+        return template_result
 
     context_results = search_schema_context(question, limit=limit)
     context_text = build_compact_context_text(context_results, max_tables=6)

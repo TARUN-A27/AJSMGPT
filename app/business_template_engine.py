@@ -1,0 +1,81 @@
+import json
+import re
+from pathlib import Path
+
+
+TEMPLATE_PATH = Path("data/business_query_templates.json")
+
+
+def _load_templates() -> list[dict]:
+    if not TEMPLATE_PATH.exists():
+        return []
+
+    with TEMPLATE_PATH.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def _clean_material_name(value: str) -> str:
+    value = value.strip()
+    value = re.sub(r"[;'\"]", "", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.upper()
+
+
+def _extract_item_name(question: str, matched_phrase: str) -> str | None:
+    lower_question = question.lower()
+    start = lower_question.find(matched_phrase)
+
+    if start == -1:
+        return None
+
+    raw_value = question[start + len(matched_phrase):].strip()
+
+    # Remove common trailing words that are not part of item name.
+    raw_value = re.sub(
+        r"\b(today|this month|this year|details|list|report|please|show|give me)\b",
+        "",
+        raw_value,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    if not raw_value:
+        return None
+
+    return _clean_material_name(raw_value)
+
+
+def match_business_template(question: str) -> dict | None:
+    question_lower = question.lower().strip()
+    templates = _load_templates()
+
+    for template in templates:
+        for phrase in template.get("phrases", []):
+            phrase_lower = phrase.lower()
+
+            if phrase_lower in question_lower:
+                item_name = _extract_item_name(question, phrase_lower)
+
+                if not item_name:
+                    continue
+
+                sql = template["sql_template"].replace(
+                    "{ITEM_NAME}",
+                    item_name,
+                )
+
+                return {
+                    "matched": True,
+                    "intent": template["intent"],
+                    "question": question,
+                    "sql": sql,
+                    "explanation": template.get("explanation"),
+                    "tables_used": template.get("tables_used", []),
+                    "relationships_used": template.get("relationships_used", []),
+                    "confidence": template.get("confidence", 0.95),
+                    "parameters": {
+                        "item_name": item_name,
+                    },
+                    "source": "business_template",
+                }
+
+    return None

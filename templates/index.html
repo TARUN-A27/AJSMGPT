@@ -146,6 +146,7 @@ body {
 .user .bubble {
     background: #f4f4f5;
     color: #09090b;
+    white-space: pre-wrap;
 }
 
 .assistant .bubble {
@@ -379,7 +380,7 @@ textarea::placeholder {
                 <textarea id="questionInput" placeholder="Message AJSMGPT..." oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
                 <button id="askButton" class="ask-btn" onclick="askQuestion()">Ask</button>
             </div>
-            <div class="hint">Press Enter to ask. Shift + Enter for new line.</div>
+            <div class="hint">Type each question on a new line. Press Ctrl + Enter or Ask to generate.</div>
         </div>
     </section>
 </div>
@@ -398,45 +399,65 @@ function autoGrow(el) {
 }
 
 function handleKey(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    // Enter = new line
+    // Ctrl + Enter = Ask
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         askQuestion();
     }
 }
 
+function splitQuestions(inputText) {
+    return inputText
+        .split("\n")
+        .map(q => q.trim())
+        .filter(q => q.length > 0);
+}
+
 async function askQuestion() {
     const input = document.getElementById("questionInput");
     const button = document.getElementById("askButton");
-    const question = input.value.trim();
+    const rawQuestion = input.value;
 
-    if (!question) return;
+    const questions = splitQuestions(rawQuestion);
+    if (!questions.length) return;
 
     document.getElementById("welcome").classList.add("hidden");
 
-    addUserMessage(question);
+    addUserMessage(rawQuestion);
     input.value = "";
     autoGrow(input);
-
-    const loadingId = addAssistantLoading();
 
     button.disabled = true;
 
     try {
-        const response = await fetch("/ask", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({question})
-        });
+        for (let i = 0; i < questions.length; i++) {
+            const question = questions[i];
 
-        const json = await response.json();
+            const loadingId = addAssistantLoading(
+                questions.length > 1
+                    ? `Question ${i + 1} of ${questions.length}: ${question}`
+                    : null
+            );
 
-        if (!json.success) {
-            throw new Error(json.error || "Something went wrong.");
+            try {
+                const response = await fetch("/ask", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({question})
+                });
+
+                const json = await response.json();
+
+                if (!json.success) {
+                    throw new Error(json.error || "Something went wrong.");
+                }
+
+                replaceLoadingWithResult(loadingId, json.data, question, i + 1, questions.length);
+            } catch (error) {
+                replaceLoadingWithError(loadingId, error.message, question, i + 1, questions.length);
+            }
         }
-
-        replaceLoadingWithResult(loadingId, json.data);
-    } catch (error) {
-        replaceLoadingWithError(loadingId, error.message);
     } finally {
         button.disabled = false;
         input.focus();
@@ -452,31 +473,46 @@ function addUserMessage(text) {
     scrollBottom();
 }
 
-function addAssistantLoading() {
+function addAssistantLoading(label = null) {
     const messages = document.getElementById("messages");
-    const id = "msg_" + Date.now();
+    const id = "msg_" + Date.now() + "_" + Math.random().toString(16).slice(2);
 
     const div = document.createElement("div");
     div.className = "message assistant";
     div.id = id;
-    div.innerHTML = `<div class="bubble loading">Thinking… generating SQL, validating columns, and fetching Oracle rows.</div>`;
+
+    const labelHtml = label
+        ? `<div style="font-weight:800;margin-bottom:8px">${escapeHtml(label)}</div>`
+        : "";
+
+    div.innerHTML = `<div class="bubble loading">${labelHtml}Thinking… generating SQL, validating columns, and fetching Oracle rows.</div>`;
 
     messages.appendChild(div);
     scrollBottom();
     return id;
 }
 
-function replaceLoadingWithError(id, message) {
+function replaceLoadingWithError(id, message, question = null, index = null, total = null) {
     const div = document.getElementById(id);
-    div.innerHTML = `<div class="bubble"><div class="error">${escapeHtml(message)}</div></div>`;
+
+    const title = question && total > 1
+        ? `<div style="font-weight:800;margin-bottom:10px">Question ${index} of ${total}: ${escapeHtml(question)}</div>`
+        : "";
+
+    div.innerHTML = `<div class="bubble">${title}<div class="error">${escapeHtml(message)}</div></div>`;
     scrollBottom();
 }
 
-function replaceLoadingWithResult(id, data) {
+function replaceLoadingWithResult(id, data, question = null, index = null, total = null) {
     const div = document.getElementById(id);
+
+    const title = question && total > 1
+        ? `<div style="font-weight:800;margin-bottom:10px">Question ${index} of ${total}: ${escapeHtml(question)}</div>`
+        : "";
 
     div.innerHTML = `
         <div class="bubble">
+            ${title}
             <div><b>Done.</b> Found ${data.row_count ?? 0} rows.</div>
 
             <div class="card">

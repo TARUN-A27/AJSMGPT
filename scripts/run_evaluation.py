@@ -66,6 +66,14 @@ def main() -> int:
                 else:
                     ok(f"SQL contains: {token}")
 
+            must_not_contain = case.get("must_not_contain", [])
+            for token in must_not_contain:
+                if token.upper() in sql_upper:
+                    fail(f"SQL contains forbidden token: {token}")
+                    case_ok = False
+                else:
+                    ok(f"SQL does not contain forbidden token: {token}")
+
             if should_execute:
                 result = run_safe_select(sql)
                 row_count = result.get("row_count", 0)

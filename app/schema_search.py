@@ -36,7 +36,7 @@ IMPORTANT_COLUMN_KEYWORDS = [
 ]
 
 
-def search_schema_context(question: str, limit: int = 5) -> list[dict]:
+def search_schema_context(question: str, limit: int = 5, collections: list[str] | None = None) -> list[dict]:
     """
     Search Qdrant for relevant schema metadata and relationships.
     This only searches metadata, not Oracle business data.
@@ -48,29 +48,33 @@ def search_schema_context(question: str, limit: int = 5) -> list[dict]:
     client = QdrantClient(url=QDRANT_URL)
     question_vector = get_embedding(question)
 
-    response = client.query_points(
-        collection_name=QDRANT_COLLECTION,
-        query=question_vector,
-        limit=limit,
-        with_payload=True
-    )
-
+    collection_names = collections or [QDRANT_COLLECTION]
     results = []
 
-    for point in response.points:
-        payload = point.payload or {}
+    for collection in collection_names:
+        if not collection:
+            continue
+        response = client.query_points(
+            collection_name=collection,
+            query=question_vector,
+            limit=limit,
+            with_payload=True,
+        )
 
-        results.append({
-            "score": point.score,
-            "schema": payload.get("schema"),
-            "table": payload.get("table"),
-            "full_table_name": payload.get("full_table_name"),
-            "type": payload.get("type"),
-            "constraint_name": payload.get("constraint_name"),
-            "columns": payload.get("columns") or [],
-            "text": payload.get("text"),
-        })
+        for point in response.points:
+            payload = point.payload or {}
+            results.append({
+                "score": point.score,
+                "schema": payload.get("schema"),
+                "table": payload.get("table"),
+                "full_table_name": payload.get("full_table_name"),
+                "type": payload.get("type"),
+                "constraint_name": payload.get("constraint_name"),
+                "columns": payload.get("columns") or [],
+                "text": payload.get("text"),
+            })
 
+    results.sort(key=lambda item: item.get("score", 0), reverse=True)
     return results
 
 
@@ -172,7 +176,7 @@ All available columns:
 
 Rules:
 - Oracle access is SELECT only.
-- Use only INVENTORY schema tables.
+- Use only schemas allowed by ORACLE_SCHEMAS and only tables shown in this context.
 - Always use full table names like INVENTORY.PURCHASEORDER.
 """.strip()
         )

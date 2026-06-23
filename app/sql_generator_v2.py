@@ -121,13 +121,37 @@ def derive_relationships_used(sql: str, context_results: list[dict]) -> list[str
     return relationships
 
 
-def build_prompt(question: str, context_text: str) -> str:
+def build_understanding_summary(understanding: dict | None) -> str:
+    if not understanding:
+        return ""
+
+    requested_outputs = understanding.get("requested_outputs") or []
+    outputs_text = ", ".join(requested_outputs) if requested_outputs else "none"
+    entities = understanding.get("entities") or {}
+    entities_text = ", ".join(f"{k}: {v}" for k, v in entities.items()) if entities else "none"
+
+    return f"""
+Question understanding summary:
+- domain: {understanding.get('domain')}
+- intent_hint: {understanding.get('intent_hint')}
+- entities: {entities_text}
+- requested_outputs: {outputs_text}
+- detail_level: {understanding.get('detail_level')}
+- needs_template: {understanding.get('needs_template')}
+- needs_qwen: {understanding.get('needs_qwen')}
+""".strip()
+
+
+def build_prompt(question: str, context_text: str, understanding: dict | None = None) -> str:
+    understanding_text = build_understanding_summary(understanding)
     return f"""
 User question:
 {question}
 
 Relevant schema context:
 {context_text}
+
+{understanding_text}
 
 Required output:
 Return only valid JSON with the following fields:
@@ -148,6 +172,7 @@ Important instructions:
 - Never invent columns.
 - Do not assume common columns like ID, ORDERID, SUPPLIERID, TOTALAMOUNT, NAME, ADDRESS, CONTACT, EMAIL unless they are explicitly shown in context.
 - If exact columns are unclear, select only clearly available columns from the context.
+- If requested_outputs contains supplier_company_name, include supplier/company name only if it exists in context.
 - Do not include any SQL outside the SELECT statement.
 - Do not include commentary outside the required JSON.
 """.strip()
@@ -170,7 +195,7 @@ def normalize_response(parsed: dict) -> dict:
     return result
 
 
-def generate_select_sql_v2(question: str, limit: int = 6) -> dict:
+def generate_select_sql_v2(question: str, limit: int = 6, understanding: dict | None = None) -> dict:
     if not question or not question.strip():
         raise ValueError("Question cannot be empty.")
 
@@ -181,10 +206,14 @@ def generate_select_sql_v2(question: str, limit: int = 6) -> dict:
         template_result["sql"] = validated_sql
         return template_result
 
-    context_results = search_schema_context(question, limit=limit)
+    collections = None
+    if understanding:
+        collections = understanding.get("collections")
+
+    context_results = search_schema_context(question, limit=limit, collections=collections)
     context_text = build_compact_context_text(context_results, max_tables=6)
 
-    user_prompt = build_prompt(question, context_text)
+    user_prompt = build_prompt(question, context_text, understanding)
     raw_response = chat_with_qwen(SYSTEM_PROMPT, user_prompt)
     parsed = extract_json(raw_response)
     result = normalize_response(parsed)

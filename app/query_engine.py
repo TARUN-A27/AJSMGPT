@@ -7,6 +7,8 @@ from typing import Any
 from app.backend_logger import log_event, new_request_id, set_request_id
 from app.business_template_engine import match_business_template
 from app.oracle_client import run_safe_select
+from app.question_understanding import understand_question
+from app.answer_formatter import format_answer
 from app.sql_generator_v2 import generate_select_sql_v2
 
 
@@ -67,6 +69,15 @@ def answer_question(question: str) -> dict[str, Any]:
     )
 
     try:
+        understanding = understand_question(question)
+
+        log_event(
+            request_id,
+            "question_understanding",
+            "Question understanding generated",
+            understanding=understanding,
+        )
+
         template_result = match_business_template(question)
 
         if template_result:
@@ -94,7 +105,7 @@ def answer_question(question: str) -> dict[str, Any]:
                 "No business template matched; starting Qdrant/Qwen SQL generation",
             )
 
-            sql_result = generate_select_sql_v2(question, limit=5)
+            sql_result = generate_select_sql_v2(question, limit=5, understanding=understanding)
             sql = sql_result["sql"]
 
         log_event(
@@ -132,7 +143,7 @@ def answer_question(question: str) -> dict[str, Any]:
             elapsed_ms=elapsed_ms,
         )
 
-        return {
+        result = {
             "success": True,
             "request_id": request_id,
             "question": question,
@@ -148,7 +159,12 @@ def answer_question(question: str) -> dict[str, Any]:
             "rows": db_result.get("rows", []),
             "row_count": db_result.get("row_count", 0),
             "elapsed_ms": elapsed_ms,
+            "understanding": understanding,
         }
+
+        result["answer"] = format_answer(result)
+
+        return result
 
     except Exception as exc:
         elapsed_ms = int((time.time() - start_time) * 1000)

@@ -6,3 +6,8 @@ data/
 logs/
 .vscode/
 .idea/
+
+# AJSMGPT local test outputs
+*.log
+qdrant_dumps/
+templates/*.bak

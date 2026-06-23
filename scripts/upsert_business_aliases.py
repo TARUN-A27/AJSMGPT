@@ -115,6 +115,52 @@ ALIASES = [
     },
 ]
 
+ALIASES.append(
+    {
+        "id": 200013,
+        "text": (
+            "Business rule: pending purchase order by material name or item name. "
+            "When user asks pending order, pending PO, open purchase order, or purchase pending "
+            "for a material name like keyboard, do NOT compare INVENTORY.PURCHASEORDER.ITEM_CODE directly "
+            "to the material name. Keyboard is an item/material name, not item code. "
+            "Use INVENTORY.PURCHASEORDER joined with INVENTORY.INVITEMS on "
+            "INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE. "
+            "Filter material name using UPPER(INVENTORY.INVITEMS.ITEM_NAME) LIKE '%KEYBOARD%' "
+            "or replace KEYBOARD with the user supplied material name. "
+            "Useful purchase order columns are ORDERNO, ORDERDATE, SUP_CODE, ITEM_CODE, QTY, RATE, NET, STATUS, GRN_PENDINGSTATUS. "
+            "Useful item columns are ITEM_CODE and ITEM_NAME. "
+            "If pending quantity column INVQTY exists in PURCHASEORDER context, pending condition can be "
+            "NVL(PURCHASEORDER.QTY,0) > NVL(PURCHASEORDER.INVQTY,0). "
+            "If INVQTY is not confirmed, do not invent pending status meaning; show STATUS and GRN_PENDINGSTATUS."
+        ),
+        "schema": "INVENTORY",
+        "table": "PURCHASEORDER",
+        "full_table_name": "INVENTORY.PURCHASEORDER",
+        "type": "business_alias",
+    }
+)
+
+
+ALIASES.append(
+    {
+        "id": 200014,
+        "text": (
+            "CRITICAL STRICT SQL RULE for pending purchase order by material/item name: "
+            "When user asks pending order, pending PO, open purchase order, purchase pending, or pending order for item like fabric, yarn, button, thread, keyboard, "
+            "use INVENTORY.PURCHASEORDER joined with INVENTORY.INVITEMS on PURCHASEORDER.ITEM_CODE = INVITEMS.ITEM_CODE. "
+            "Filter item/material name only using UPPER(INVENTORY.INVITEMS.ITEM_NAME) LIKE '%MATERIAL_NAME%'. "
+            "Never compare INVENTORY.PURCHASEORDER.STATUS with text like 'Pending'. STATUS is NUMBER. "
+            "Never compare INVENTORY.PURCHASEORDER.GRN_PENDINGSTATUS with text like 'Pending'. GRN_PENDINGSTATUS is NUMBER. "
+            "Do not use STATUS = 'Pending', GRN_PENDINGSTATUS = 'Pending', STATUS IS NULL, or GRN_PENDINGSTATUS IS NULL for pending PO unless exact numeric status code is confirmed. "
+            "If numeric pending status meaning is unknown, do not filter by STATUS or GRN_PENDINGSTATUS. Only display STATUS and GRN_PENDINGSTATUS as output columns."
+        ),
+        "schema": "INVENTORY",
+        "table": "PURCHASEORDER",
+        "full_table_name": "INVENTORY.PURCHASEORDER",
+        "type": "business_alias",
+    }
+)
+
 def main():
     client = QdrantClient(url=QDRANT_URL)
 

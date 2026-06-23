@@ -1,8 +1,13 @@
 import os
+import time
+
 import oracledb
 from dotenv import load_dotenv
 
-from app.sql_safety import add_oracle_row_limit
+from app.backend_logger import log_event
+from app.sql_datatype_validator import validate_sql_datatypes
+from app.sql_safety import add_oracle_row_limit, validate_select_only
+
 
 load_dotenv()
 
@@ -21,7 +26,9 @@ def init_oracle_client_once():
     if _oracle_client_initialized:
         return
 
-    oracledb.init_oracle_client(lib_dir=ORACLE_CLIENT_LIB_DIR)
+    if ORACLE_CLIENT_LIB_DIR:
+        oracledb.init_oracle_client(lib_dir=ORACLE_CLIENT_LIB_DIR)
+
     _oracle_client_initialized = True
 
 
@@ -31,18 +38,45 @@ def get_connection():
     return oracledb.connect(
         user=ORACLE_USER,
         password=ORACLE_PASSWORD,
-        dsn=ORACLE_DSN
+        dsn=ORACLE_DSN,
     )
 
 
 def run_safe_select(sql: str):
     """
     Runs SELECT-only SQL safely.
-    Blocks all write/DDL/PLSQL commands.
+    Blocks write/DDL/PLSQL commands.
+    Validates obvious datatype mistakes.
     Applies row limit.
     """
 
+    started = time.time()
+
+    log_event(
+        None,
+        "sql_validation_start",
+        "Starting SQL safety and datatype validation",
+        sql=sql,
+    )
+
+    validate_select_only(sql)
+    validate_sql_datatypes(sql)
+
+    log_event(
+        None,
+        "sql_validation_complete",
+        "SQL safety and datatype validation passed",
+    )
+
     safe_sql = add_oracle_row_limit(sql, max_rows=SQL_MAX_ROWS)
+
+    log_event(
+        None,
+        "row_limit_applied",
+        "Oracle row limit applied",
+        max_rows=SQL_MAX_ROWS,
+        final_sql=safe_sql,
+    )
 
     conn = get_connection()
     cur = conn.cursor()
@@ -53,11 +87,14 @@ def run_safe_select(sql: str):
         columns = [desc[0] for desc in cur.description]
         rows = cur.fetchall()
 
+        elapsed_ms = int((time.time() - started) * 1000)
+
         result = {
             "sql": safe_sql,
             "columns": columns,
             "rows": [list(row) for row in rows],
-            "row_count": len(rows)
+            "row_count": len(rows),
+            "elapsed_ms": elapsed_ms,
         }
 
         return result

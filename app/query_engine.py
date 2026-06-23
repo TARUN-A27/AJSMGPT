@@ -14,21 +14,84 @@ def _safe_preview(value, limit=1200):
     return text
 
 
+def _safe_error_message(exc: Exception) -> str:
+    error_text = str(exc)
+
+    if "Invalid datatype comparison" in error_text:
+        return (
+            "I could not safely execute this query because the generated SQL used an invalid datatype comparison. "
+            + error_text
+        )
+
+    if "Invalid LIKE comparison" in error_text:
+        return (
+            "I could not safely execute this query because the generated SQL used LIKE on a non-text column. "
+            + error_text
+        )
+
+    if "Only SELECT statements are allowed" in error_text:
+        return "This request was blocked because only SELECT queries are allowed."
+
+    if "ORA-01722" in error_text:
+        return (
+            "Oracle rejected the query because of an invalid number comparison. "
+            "This usually means a NUMBER column was compared with text."
+        )
+
+    if "ORA-" in error_text:
+        return "Oracle could not execute the generated query. Please try a simpler wording or check the backend log."
+
+    if "JSON" in error_text:
+        return "The model returned an invalid response format. Please try again."
+
+    return "Backend could not process this question safely. Please check the backend log."
+
+
 def _summarize_retrieved_context(items):
     summary = []
 
     for item in items:
-        payload = item.get("payload", {}) if isinstance(item, dict) else {}
+        if isinstance(item, dict):
+            payload = item.get("payload") or item.get("metadata") or item
+            score = item.get("score")
+        else:
+            payload = getattr(item, "payload", {}) or {}
+            score = getattr(item, "score", None)
+
+        schema = (
+            payload.get("schema")
+            or payload.get("owner")
+            or payload.get("table_schema")
+        )
+
+        table = (
+            payload.get("table")
+            or payload.get("table_name")
+            or payload.get("name")
+        )
+
+        full_table = (
+            payload.get("full_table_name")
+            or payload.get("qualified_table")
+            or payload.get("table_ref")
+        )
+
+        if not schema and not table and full_table and "." in full_table:
+            schema, table = full_table.split(".", 1)
 
         summary.append({
-            "score": item.get("score") if isinstance(item, dict) else None,
+            "score": score,
             "type": payload.get("type", "table"),
-            "schema": payload.get("schema"),
-            "table": payload.get("table"),
-            "table_name": payload.get("table_name"),
+            "schema": schema,
+            "table": table,
             "title": payload.get("title"),
-            "business_terms": payload.get("business_terms"),
-            "description": payload.get("description"),
+            "business_terms": payload.get("business_terms") or payload.get("aliases"),
+            "description": (
+                payload.get("description")
+                or payload.get("alias_notes")
+                or payload.get("text")
+                or payload.get("content")
+            ),
         })
 
     return summary
@@ -48,8 +111,6 @@ def answer_question(question: str) -> dict:
     )
 
     try:
-        # Extra trace-only retrieval.
-        # This helps us see what Qdrant is returning before SQL generation.
         log_event(
             request_id,
             "qdrant_retrieval_start",
@@ -112,6 +173,7 @@ def answer_question(question: str) -> dict:
         )
 
         return {
+            "success": True,
             "request_id": request_id,
             "question": question,
             "sql": sql,
@@ -127,6 +189,7 @@ def answer_question(question: str) -> dict:
 
     except Exception as exc:
         elapsed_ms = int((time.time() - start_time) * 1000)
+        safe_message = _safe_error_message(exc)
 
         log_event(
             request_id,
@@ -135,10 +198,18 @@ def answer_question(question: str) -> dict:
             question=question,
             error_type=type(exc).__name__,
             error=str(exc),
+            safe_message=safe_message,
             elapsed_ms=elapsed_ms,
         )
 
-        raise
+        return {
+            "success": False,
+            "request_id": request_id,
+            "question": question,
+            "error": safe_message,
+            "error_type": type(exc).__name__,
+            "elapsed_ms": elapsed_ms,
+        }
 
 
 if __name__ == "__main__":

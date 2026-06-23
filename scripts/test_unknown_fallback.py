@@ -43,6 +43,15 @@ def main():
         assert expected_table in sql.upper(), f"Expected {expected_table}, got {sql}"
 
         upper_sql = sql.upper()
+
+        if "CURRENT ATTENDANCE" in question.upper():
+            assert "ORDER BY INDATE DESC" in upper_sql, sql
+
+        if "DOCUMENT DETAILS" in question.upper():
+            assert "ORDER BY DOCDATE DESC" in upper_sql, sql
+
+        if "VEHICLE MOVEMENT" in question.upper():
+            assert "ORDER BY V.ENTRYDATE DESC" in upper_sql, sql
         for token in FORBIDDEN:
             assert token not in upper_sql, f"Unsafe token {token} found in SQL: {sql}"
 

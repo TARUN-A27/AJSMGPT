@@ -131,6 +131,7 @@ def _known_schema_fallback_sql(question: str) -> dict[str, Any] | None:
                 "FROM ADMIN.TRN_VEHICLEMOVEMENT V "
                 "LEFT JOIN ADMIN.TRN_VEHICLEMOVEMENT_DETAILS D ON D.TRANSID = V.ID"
                 + where_clause
+                + " ORDER BY V.ENTRYDATE DESC NULLS LAST, V.ID DESC"
             ),
             "explanation": "Vehicle movement header is in ADMIN.TRN_VEHICLEMOVEMENT and image/time details are in ADMIN.TRN_VEHICLEMOVEMENT_DETAILS.",
             "tables_used": ["ADMIN.TRN_VEHICLEMOVEMENT", "ADMIN.TRN_VEHICLEMOVEMENT_DETAILS"],
@@ -150,6 +151,7 @@ def _known_schema_fallback_sql(question: str) -> dict[str, Any] | None:
                 "AOAUTHSTATUS, ONDUTYSTATUS, CAMERAFLAG "
                 "FROM HRDNEW.CURRENTATTENDANCE"
                 + where_clause
+                + " ORDER BY INDATE DESC, INTIME DESC NULLS LAST"
             ),
             "explanation": "Current attendance details are stored in HRDNEW.CURRENTATTENDANCE.",
             "tables_used": ["HRDNEW.CURRENTATTENDANCE"],
@@ -186,6 +188,7 @@ def _known_schema_fallback_sql(question: str) -> dict[str, Any] | None:
                 "BLDATE, INVNO, INVDATE "
                 "FROM ADMIN.DOCUMENT"
                 + where_clause
+                + " ORDER BY DOCDATE DESC NULLS LAST, ID DESC"
             ),
             "explanation": "Document details are stored in ADMIN.DOCUMENT.",
             "tables_used": ["ADMIN.DOCUMENT"],

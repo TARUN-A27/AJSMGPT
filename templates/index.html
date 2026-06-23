@@ -10,6 +10,7 @@
     --bg: #09090b;
     --panel: #111113;
     --panel2: #18181b;
+    --panel3: #0f0f12;
     --border: #27272a;
     --text: #fafafa;
     --muted: #a1a1aa;
@@ -18,6 +19,10 @@
     --accent-text: #09090b;
     --danger-bg: #2a1215;
     --danger-text: #fecaca;
+    --ok-bg: #052e1c;
+    --ok-text: #bbf7d0;
+    --warn-bg: #2a1f05;
+    --warn-text: #fde68a;
 }
 
 * {
@@ -27,7 +32,9 @@
 body {
     margin: 0;
     height: 100vh;
-    background: var(--bg);
+    background:
+        radial-gradient(circle at top left, rgba(255,255,255,.055), transparent 30%),
+        var(--bg);
     color: var(--text);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden;
@@ -44,8 +51,10 @@ body {
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 0 22px;
     background: rgba(9, 9, 11, 0.92);
+    backdrop-filter: blur(12px);
 }
 
 .brand {
@@ -73,6 +82,26 @@ body {
     font-weight: 400;
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.top-btn {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.top-btn:hover {
+    color: var(--text);
+    border-color: #52525b;
+}
+
 .chat {
     flex: 1;
     overflow-y: auto;
@@ -80,7 +109,7 @@ body {
 }
 
 .chat-inner {
-    width: min(980px, 100%);
+    width: min(1080px, 100%);
     margin: 0 auto;
 }
 
@@ -119,6 +148,7 @@ body {
     padding: 8px 12px;
     cursor: pointer;
     font-size: 13px;
+    user-select: none;
 }
 
 .chip:hover {
@@ -136,7 +166,7 @@ body {
 }
 
 .bubble {
-    max-width: 88%;
+    max-width: 92%;
     border-radius: 18px;
     padding: 14px 16px;
     line-height: 1.5;
@@ -160,6 +190,22 @@ body {
     color: var(--muted);
 }
 
+.spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid #3f3f46;
+    border-top-color: #fafafa;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    margin-right: 8px;
+    vertical-align: -2px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 .error {
     background: var(--danger-bg);
     color: var(--danger-text);
@@ -167,6 +213,27 @@ body {
     border-radius: 14px;
     padding: 14px;
     white-space: pre-wrap;
+}
+
+.notice {
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    background: var(--panel3);
+    color: var(--muted);
+}
+
+.notice.ok {
+    background: var(--ok-bg);
+    color: var(--ok-text);
+    border-color: #14532d;
+}
+
+.notice.warn {
+    background: var(--warn-bg);
+    color: var(--warn-text);
+    border-color: #713f12;
 }
 
 .card {
@@ -194,6 +261,7 @@ body {
     display: flex;
     gap: 7px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
 .badge {
@@ -203,6 +271,21 @@ body {
     border-radius: 999px;
     padding: 5px 9px;
     font-size: 12px;
+    white-space: nowrap;
+}
+
+.action-btn {
+    border: 1px solid var(--border);
+    background: var(--panel2);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 6px 9px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.action-btn:hover {
+    background: #27272a;
 }
 
 .sql {
@@ -244,10 +327,23 @@ th, td {
 
 td {
     color: #d4d4d8;
+    max-width: 360px;
+    overflow-wrap: anywhere;
 }
 
 tr:hover td {
     background: rgba(255,255,255,.035);
+}
+
+.table-footer {
+    padding: 12px 15px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 .composer-wrap {
@@ -260,7 +356,7 @@ tr:hover td {
 }
 
 .composer {
-    width: min(980px, 100%);
+    width: min(1080px, 100%);
     margin: 0 auto;
     border: 1px solid var(--border);
     background: var(--panel);
@@ -324,6 +420,10 @@ textarea::placeholder {
         display: none;
     }
 
+    .header {
+        padding: 0 12px;
+    }
+
     .welcome h1 {
         font-size: 34px;
     }
@@ -340,6 +440,10 @@ textarea::placeholder {
         height: auto;
         min-width: 62px;
     }
+
+    .header-actions {
+        display: none;
+    }
 }
 </style>
 </head>
@@ -350,6 +454,11 @@ textarea::placeholder {
         <div class="brand">
             <div class="logo">A</div>
             AJSMGPT
+            <span class="sub">Oracle ERP assistant · SELECT-only</span>
+        </div>
+
+        <div class="header-actions">
+            <button class="top-btn" onclick="clearChat()">Clear chat</button>
         </div>
     </header>
 
@@ -358,14 +467,14 @@ textarea::placeholder {
             <section id="welcome" class="welcome">
                 <div>
                     <h1>Ask your ERP database</h1>
-                    <p>Qwen generates SELECT-only SQL, validates it, and returns live Oracle data.</p>
+                    <p>Qwen generates safe SELECT SQL, validates it, and returns live Oracle data.</p>
 
                     <div class="quick">
-                        <span class="chip" onclick="setQuestion('show supplier details')">Supplier details</span>
-                        <span class="chip" onclick="setQuestion('show employee department')">Employee department</span>
-                        <span class="chip" onclick="setQuestion('show current stock of item')">Current stock</span>
-                        <span class="chip" onclick="setQuestion('show pending purchase orders')">Pending PO</span>
-                        <span class="chip" onclick="setQuestion('show material requisition pending approval')">Pending MRS</span>
+                        <span class="chip" onclick="setQuestion('document details for party 911378')">Document details</span>
+                        <span class="chip" onclick="setQuestion('show current attendance for empcode 165224')">Current attendance</span>
+                        <span class="chip" onclick="setQuestion('show camera ip details')">Camera IP</span>
+                        <span class="chip" onclick="setQuestion('last purchase of keyboard by company name')">Last keyboard purchase</span>
+                        <span class="chip" onclick="setQuestion('keyboard stock')">Keyboard stock</span>
                     </div>
                 </div>
             </section>
@@ -386,11 +495,19 @@ textarea::placeholder {
 </div>
 
 <script>
+const TABLE_PREVIEW_LIMIT = 20;
+
 function setQuestion(text) {
     const input = document.getElementById("questionInput");
     input.value = text;
     input.focus();
     autoGrow(input);
+}
+
+function clearChat() {
+    document.getElementById("messages").innerHTML = "";
+    document.getElementById("welcome").classList.remove("hidden");
+    document.getElementById("questionInput").focus();
 }
 
 function autoGrow(el) {
@@ -399,8 +516,6 @@ function autoGrow(el) {
 }
 
 function handleKey(event) {
-    // Enter = new line
-    // Ctrl + Enter = Ask
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         askQuestion();
@@ -449,7 +564,7 @@ async function askQuestion() {
 
                 const json = await response.json();
 
-                if (!json.success) {
+                if (!response.ok || !json.success) {
                     throw new Error(json.error || "Something went wrong.");
                 }
 
@@ -485,7 +600,13 @@ function addAssistantLoading(label = null) {
         ? `<div style="font-weight:800;margin-bottom:8px">${escapeHtml(label)}</div>`
         : "";
 
-    div.innerHTML = `<div class="bubble loading">${labelHtml}Thinking… generating SQL, validating columns, and fetching Oracle rows.</div>`;
+    div.innerHTML = `
+        <div class="bubble loading">
+            ${labelHtml}
+            <span class="spinner"></span>
+            Thinking… generating SQL, validating columns, and fetching Oracle rows.
+        </div>
+    `;
 
     messages.appendChild(div);
     scrollBottom();
@@ -510,17 +631,22 @@ function replaceLoadingWithResult(id, data, question = null, index = null, total
         ? `<div style="font-weight:800;margin-bottom:10px">Question ${index} of ${total}: ${escapeHtml(question)}</div>`
         : "";
 
+    const rowCount = data.row_count ?? 0;
+    const notice = buildNotice(rowCount, data);
+
     div.innerHTML = `
         <div class="bubble">
             ${title}
-            <div><b>Done.</b> Found ${data.row_count ?? 0} rows.</div>
+            <div><b>${rowCount > 0 ? "Done." : "Done, but no matching rows found."}</b> ${rowCount > 0 ? `Found ${rowCount} rows.` : ""}</div>
+            ${notice}
 
             <div class="card">
                 <div class="card-head">
                     <div class="card-title">Generated SQL</div>
                     <div class="badges">
-                        <span class="badge">Rows: ${data.row_count ?? 0}</span>
+                        <span class="badge">Rows: ${rowCount}</span>
                         <span class="badge">Confidence: ${data.confidence ?? "-"}</span>
+                        <button class="action-btn" onclick="copyText(this, ${jsString(data.sql || "")})">Copy SQL</button>
                     </div>
                 </div>
                 <pre class="sql">${escapeHtml(data.sql || "")}</pre>
@@ -529,7 +655,10 @@ function replaceLoadingWithResult(id, data, question = null, index = null, total
             <div class="card">
                 <div class="card-head">
                     <div class="card-title">Data Preview</div>
-                    <div class="badge">Tables: ${escapeHtml((data.tables_used || []).join(", ") || "-")}</div>
+                    <div class="badges">
+                        <span class="badge">Tables: ${escapeHtml((data.tables_used || []).join(", ") || "-")}</span>
+                        ${(data.rows || []).length ? `<button class="action-btn" onclick="downloadCsv(${jsString(question || "ajsmgpt_result")}, ${jsString(csvFromRows(data.columns || [], data.rows || []))})">Export CSV</button>` : ""}
+                    </div>
                 </div>
                 ${buildTable(data.columns || [], data.rows || [])}
             </div>
@@ -539,10 +668,27 @@ function replaceLoadingWithResult(id, data, question = null, index = null, total
     scrollBottom();
 }
 
+function buildNotice(rowCount, data) {
+    if (rowCount > 0) {
+        return "";
+    }
+
+    const tables = (data.tables_used || []).join(", ") || "selected table";
+    return `
+        <div class="notice warn">
+            No matching records found in ${escapeHtml(tables)} for this filter.
+            The SQL was generated and executed safely.
+        </div>
+    `;
+}
+
 function buildTable(columns, rows) {
     if (!rows.length) {
         return `<div style="padding:18px;color:var(--muted)">No rows found.</div>`;
     }
+
+    const limitedRows = rows.slice(0, TABLE_PREVIEW_LIMIT);
+    const hiddenCount = rows.length - limitedRows.length;
 
     let html = `<div class="table-wrap"><table><thead><tr>`;
 
@@ -552,7 +698,7 @@ function buildTable(columns, rows) {
 
     html += `</tr></thead><tbody>`;
 
-    rows.forEach(row => {
+    limitedRows.forEach(row => {
         html += `<tr>`;
         row.forEach(value => {
             html += `<td>${escapeHtml(formatValue(value))}</td>`;
@@ -561,7 +707,52 @@ function buildTable(columns, rows) {
     });
 
     html += `</tbody></table></div>`;
+
+    html += `
+        <div class="table-footer">
+            <span>Showing ${limitedRows.length} of ${rows.length} returned rows.</span>
+            ${hiddenCount > 0 ? `<span>${hiddenCount} more rows hidden to keep the page fast. Use Export CSV for all returned rows.</span>` : ""}
+        </div>
+    `;
+
     return html;
+}
+
+function copyText(button, text) {
+    navigator.clipboard.writeText(text).then(() => {
+        const old = button.textContent;
+        button.textContent = "Copied";
+        setTimeout(() => button.textContent = old, 1200);
+    });
+}
+
+function downloadCsv(name, csv) {
+    const safeName = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "ajsmgpt_result";
+    const blob = new Blob([csv], {type: "text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = safeName + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+function csvFromRows(columns, rows) {
+    const csvEscape = value => {
+        const text = formatValue(value).replaceAll('"', '""');
+        return `"${text}"`;
+    };
+
+    const lines = [];
+    lines.push(columns.map(csvEscape).join(","));
+
+    rows.forEach(row => {
+        lines.push(row.map(csvEscape).join(","));
+    });
+
+    return lines.join("\n");
 }
 
 function formatValue(value) {
@@ -577,6 +768,13 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+}
+
+function jsString(value) {
+    return JSON.stringify(String(value))
+        .replaceAll("<", "\\u003C")
+        .replaceAll(">", "\\u003E")
+        .replaceAll("&", "\\u0026");
 }
 
 function scrollBottom() {

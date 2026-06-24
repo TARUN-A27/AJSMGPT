@@ -42,11 +42,113 @@ def _like_item(q: str) -> str | None:
     return None
 
 
+
+def _supplier_name(q: str) -> str | None:
+    ql = _clean(q)
+
+    m = re.search(r"\bsupplier\s+([a-z0-9\s.&,\-]+)$", ql)
+    if m:
+        name = m.group(1).strip()
+        if name:
+            return name.upper()
+
+    m = re.search(r"\bfrom\s+supplier\s+([a-z0-9\s.&,\-]+)", ql)
+    if m:
+        name = m.group(1).strip()
+        if name:
+            return name.upper()
+
+    return None
+
+
+
+
+def _last_n_limit(q: str, default: int = 1) -> int:
+    m = re.search(r"\blast\s+(\d+)\b", q)
+    if not m:
+        return default
+
+    try:
+        value = int(m.group(1))
+    except ValueError:
+        return default
+
+    return max(1, min(value, 50))
+
+
+def _clean_material_name(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    item = value.strip(" .,-_/\\")
+    item = re.sub(r"\s+", " ", item).strip()
+
+    # Remove common trailing words if captured accidentally.
+    item = re.sub(r"\b(qty|quantity|purchase|purchases|rate|price|details)\b.*$", "", item, flags=re.I).strip()
+
+    if not item:
+        return None
+
+    return item.upper()
+
+
+def _material_from_item_phrase(q: str) -> str | None:
+    patterns = [
+        r"\bof\s+the\s+item\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bitem\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+    ]
+
+    for pattern in patterns:
+        m = re.search(pattern, q, flags=re.I)
+        if m:
+            return _clean_material_name(m.group(1))
+
+    return None
+
+
+def _material_from_last_supply(q: str) -> str | None:
+    patterns = [
+        r"\blast\s+supply\s+(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\blast\s+purchase\s+(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+    ]
+
+    for pattern in patterns:
+        m = re.search(pattern, q, flags=re.I)
+        if m:
+            return _clean_material_name(m.group(1))
+
+    return _material_from_item_phrase(q)
+
+
+def _material_from_last_purchase_qty(q: str) -> str | None:
+    item = _material_from_item_phrase(q)
+    if item:
+        return item
+
+    patterns = [
+        r"\blast\s+(?:\d+\s+)?purchase\s+(?:qty|quantity)\s+(?:purchase\s+)?(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+    ]
+
+    for pattern in patterns:
+        m = re.search(pattern, q, flags=re.I)
+        if m:
+            return _clean_material_name(m.group(1))
+
+    return None
+
 def _item_filter(alias: str, item: str | None) -> str:
     if not item:
         return ""
     safe_item = item.replace("'", "''")
     return f" AND UPPER({alias}.ITEM_NAME) LIKE '%{safe_item}%'"
+
+
+
+def _supplier_filter(supplier: str | None) -> str:
+    if not supplier:
+        return ""
+    safe_supplier = supplier.replace("'", "''")
+    return f" AND UPPER(P.PARTYNAME) LIKE '%{safe_supplier}%' "
 
 
 def _po_base_select(where: str = "", order_by: str = "PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC", limit: int = 100) -> str:
@@ -173,13 +275,74 @@ def _result(intent: str, sql: str, confidence: float = 0.96) -> dict[str, Any]:
 
 def match_purchase_analytics_template(question: str) -> dict[str, Any] | None:
     q = _clean(question)
+
+    # Approved patch: Last N purchase quantity/details by material
+    # Example: "Last 3 purchase qty purchase of the item Keyboard"
+    material_for_last_n = _material_from_last_purchase_qty(q)
+    if (
+        "last" in q
+        and "purchase" in q
+        and ("qty" in q or "quantity" in q)
+        and material_for_last_n
+    ):
+        sql = _po_base_select(
+            where=_item_filter("INV", material_for_last_n),
+            order_by="PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+            limit=_last_n_limit(q, default=1),
+        )
+        return _result("purchase_last_n_purchases_by_material", sql)
+
+    # Approved patch: Last supply by material
+    # Example: "last supply of mouse"
+    material_for_last_supply = _material_from_last_supply(q)
+    if (
+        "last" in q
+        and "supply" in q
+        and material_for_last_supply
+    ):
+        sql = _po_base_select(
+            where=_item_filter("INV", material_for_last_supply),
+            order_by="PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+            limit=1,
+        )
+        return _result("purchase_last_supply_by_material", sql)
+
     item = _like_item(q)
+    supplier = _supplier_name(q)
+
+    # 0. First supply / first purchase from supplier
+    if supplier and ("first supply" in q or "first purchase" in q or "first order" in q):
+        where = _supplier_filter(supplier)
+        return _result(
+            "purchase_first_supply_by_supplier",
+            _po_base_select(
+                where=where,
+                order_by="PO.ORDERDATE ASC NULLS LAST, PO.ORDERNO ASC",
+                limit=1,
+            ),
+        )
+
+    # 0B. Last supply / last purchase from supplier
+    if supplier and ("last supply" in q or "last purchase" in q or "last order" in q):
+        where = _supplier_filter(supplier)
+        return _result(
+            "purchase_last_supply_by_supplier",
+            _po_base_select(
+                where=where,
+                order_by="PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+                limit=1,
+            ),
+        )
 
     # 1. Item price / last purchase supplier / last purchase date / last purchase rate
     if item and (
         "price" in q
         or "last purchased" in q
         or "last purchase" in q
+        or "last supply" in q
+        or "last supplied" in q
+        or "supply of" in q
+        or "supplier of" in q
         or "purchased supplier" in q
         or "purchased date" in q
         or "purchased rate" in q

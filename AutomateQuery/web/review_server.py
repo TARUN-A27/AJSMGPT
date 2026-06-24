@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import html
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -9,766 +9,40 @@ from typing import Any
 from urllib.parse import parse_qs, quote
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 
 AUTOMATE_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = AUTOMATE_DIR.parent
 REPORTS_DIR = AUTOMATE_DIR / "reports"
+TEMPLATES_DIR = AUTOMATE_DIR / "web" / "templates"
+STATIC_DIR = AUTOMATE_DIR / "web" / "static"
 
 GENERATED_EVAL_JSON = REPORTS_DIR / "generated_eval_candidates.json"
 REVIEWED_EVAL_JSON = REPORTS_DIR / "reviewed_eval_candidates.json"
 APPROVED_EVAL_JSON = REPORTS_DIR / "approved_eval_tests.json"
 ROUTER_FIX_JSON = REPORTS_DIR / "router_fix_candidates.json"
 QUESTION_BANK_JSON = REPORTS_DIR / "question_bank.json"
+ROUTER_PATCH_JSON = REPORTS_DIR / "router_patch_candidates.json"
+REVIEWED_ROUTER_PATCH_JSON = REPORTS_DIR / "reviewed_router_patch_candidates.json"
+APPROVED_ROUTER_PATCH_JSON = REPORTS_DIR / "approved_router_patches.json"
 LAST_PIPELINE_LOG = REPORTS_DIR / "last_pipeline_run.txt"
 APPROVED_TEST_RUN_LOG = REPORTS_DIR / "approved_eval_test_run.txt"
+ROUTER_PATCH_VERIFY_JSON = REPORTS_DIR / "router_patch_verification_results.json"
 
 app = FastAPI(title="AutomateQuery UI")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-BASE_CSS = """
-:root {
-    --bg: #0f0f0f;
-    --panel: #171717;
-    --panel-2: #1f1f1f;
-    --text: #f5f5f5;
-    --muted: #a3a3a3;
-    --line: #2f2f2f;
-    --soft-line: #262626;
-    --white: #ffffff;
-    --black: #000000;
-    --hover: #242424;
-    --danger-bg: #2a1515;
-    --danger-text: #ffb4b4;
-    --ok-bg: #132417;
-    --ok-text: #b8f7c4;
-    --warn-bg: #292313;
-    --warn-text: #ffe2a3;
-}
 
-* {
-    box-sizing: border-box;
-}
+def to_pretty_json(value: Any) -> str:
+    return json.dumps(value or {}, indent=2, ensure_ascii=False)
 
-body {
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.45;
-}
 
-header {
-    background: #0f0f0f;
-    border-bottom: 1px solid var(--line);
-    padding: 20px 24px 14px 24px;
-}
-
-.header-inner {
-    max-width: 1450px;
-    margin: 0 auto;
-}
-
-header h1 {
-    margin: 0 0 6px 0;
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    color: var(--white);
-}
-
-header p {
-    margin: 0 0 16px 0;
-    color: var(--muted);
-    font-size: 14px;
-}
-
-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-nav a {
-    color: var(--text);
-    text-decoration: none;
-    padding: 9px 14px;
-    border-radius: 999px;
-    background: transparent;
-    border: 1px solid var(--line);
-    font-weight: 700;
-    font-size: 14px;
-    transition: 0.15s ease;
-}
-
-nav a:hover {
-    background: var(--hover);
-    border-color: #555;
-}
-
-nav a.active {
-    background: var(--white);
-    color: var(--black);
-    border-color: var(--white);
-}
-
-.container {
-    max-width: 1450px;
-    margin: 28px auto;
-    padding: 0 22px 40px 22px;
-}
-
-.summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px;
-    margin-bottom: 24px;
-}
-
-.summary-box {
-    background: linear-gradient(180deg, var(--panel-2), var(--panel));
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 18px;
-    min-height: 96px;
-}
-
-.summary-box strong {
-    display: block;
-    font-size: 30px;
-    line-height: 1;
-    margin-bottom: 10px;
-    color: var(--white);
-    letter-spacing: -0.04em;
-}
-
-.click-filter {
-    cursor: pointer;
-    transition: transform 0.12s ease, border-color 0.12s ease;
-}
-
-.click-filter:hover {
-    transform: translateY(-1px);
-    border-color: #777 !important;
-}
-
-.card,
-.candidate-card,
-.dashboard-card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 20px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: none;
-}
-
-.card:hover,
-.candidate-card:hover,
-.dashboard-card:hover,
-.summary-box:hover {
-    border-color: #4a4a4a;
-}
-
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
-}
-
-.dashboard-card h2 {
-    margin: 0 0 10px 0;
-    color: var(--white);
-    font-size: 21px;
-    letter-spacing: -0.02em;
-}
-
-.dashboard-card p {
-    color: var(--muted);
-    margin: 8px 0;
-}
-
-.dashboard-card a {
-    display: inline-block;
-    background: var(--white);
-    color: var(--black);
-    text-decoration: none;
-    padding: 10px 15px;
-    border-radius: 999px;
-    font-weight: 800;
-    margin-top: 12px;
-}
-
-.dashboard-card a:hover {
-    background: #e5e5e5;
-}
-
-.candidate-top,
-.card-header {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
-}
-
-.candidate-id,
-.source,
-.tag,
-.badge {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    padding: 5px 10px;
-    font-size: 12px;
-    font-weight: 800;
-    border: 1px solid var(--line);
-    background: var(--panel-2);
-    color: var(--text);
-}
-
-.source {
-    background: var(--danger-bg);
-    color: var(--danger-text);
-    border-color: #4b2424;
-}
-
-h2 {
-    margin-top: 0;
-    color: var(--white);
-    font-size: 22px;
-    letter-spacing: -0.025em;
-}
-
-h3 {
-    margin-bottom: 8px;
-    color: var(--white);
-    font-size: 16px;
-}
-
-p {
-    color: var(--text);
-}
-
-.meta-grid,
-.grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    margin: 16px 0;
-}
-
-label {
-    display: block;
-    font-weight: 800;
-    color: var(--muted);
-    margin-bottom: 6px;
-    font-size: 13px;
-}
-
-code {
-    background: #0b0b0b;
-    color: var(--text);
-    border: 1px solid var(--line);
-    padding: 4px 7px;
-    border-radius: 8px;
-    font-size: 13px;
-    word-break: break-word;
-}
-
-ul {
-    padding-left: 22px;
-}
-
-li {
-    margin-bottom: 8px;
-}
-
-.problem,
-.pending {
-    background: var(--warn-bg);
-    color: var(--warn-text);
-    border-color: #4f3f18;
-}
-
-.danger,
-.reject-status {
-    background: var(--danger-bg);
-    color: var(--danger-text);
-    border-color: #4b2424;
-}
-
-.approved,
-.ok {
-    background: var(--ok-bg);
-    color: var(--ok-text);
-    border-color: #244b2b;
-}
-
-.muted {
-    color: var(--muted);
-}
-
-pre {
-    background: #050505;
-    color: var(--text);
-    padding: 14px;
-    border-radius: 14px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    border: 1px solid var(--line);
-}
-
-details {
-    margin-top: 14px;
-    background: var(--panel-2);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 12px;
-}
-
-summary {
-    cursor: pointer;
-    font-weight: 800;
-    color: var(--white);
-}
-
-textarea {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 12px;
-    border-radius: 14px;
-    border: 1px solid var(--line);
-    background: #0b0b0b;
-    color: var(--text);
-    font-family: inherit;
-    resize: vertical;
-}
-
-textarea:focus {
-    outline: none;
-    border-color: #777;
-}
-
-.actions,
-.toolbar {
-    display: flex;
-    gap: 12px;
-    margin-top: 16px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-}
-
-button {
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 10px 16px;
-    cursor: pointer;
-    font-weight: 800;
-    background: var(--panel-2);
-    color: var(--text);
-    transition: 0.15s ease;
-}
-
-button:hover {
-    background: var(--hover);
-    border-color: #555;
-}
-
-.approve,
-.export,
-.sync {
-    background: var(--white);
-    color: var(--black);
-    border-color: var(--white);
-}
-
-.approve:hover,
-.export:hover,
-.sync:hover {
-    background: #e5e5e5;
-}
-
-.reject {
-    background: var(--danger-bg);
-    color: var(--danger-text);
-    border-color: #4b2424;
-}
-
-.secondary {
-    background: var(--panel-2);
-    color: var(--text);
-}
-
-.message {
-    background: #101f14;
-    color: var(--ok-text);
-    padding: 13px 16px;
-    border-radius: 14px;
-    margin-bottom: 18px;
-    border: 1px solid #244b2b;
-}
-
-.filter-toolbar {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 18px;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 14px;
-}
-
-.filter-label {
-    color: var(--muted);
-    font-size: 14px;
-    font-weight: 800;
-}
-
-.active-filter-text {
-    display: inline-flex;
-    min-height: 34px;
-    align-items: center;
-    border: 1px solid var(--line);
-    background: #050505;
-    color: var(--text);
-    border-radius: 999px;
-    padding: 7px 12px;
-    font-size: 13px;
-    font-weight: 800;
-}
-
-.filter-clear-btn {
-    background: var(--panel-2);
-    color: var(--text);
-    border: 1px solid var(--line);
-}
-
-.filter-hidden {
-    display: none !important;
-}
-
-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    overflow: hidden;
-}
-
-th,
-td {
-    padding: 12px;
-    border-bottom: 1px solid var(--soft-line);
-    text-align: left;
-    vertical-align: top;
-    font-size: 14px;
-    white-space: normal;
-}
-
-th {
-    background: #050505;
-    color: var(--white);
-    font-weight: 800;
-}
-
-td {
-    color: var(--text);
-}
-
-td:nth-child(3) {
-    min-width: 260px;
-}
-
-tr:hover {
-    background: #1b1b1b;
-}
-
-tr:last-child td {
-    border-bottom: none;
-}
-
-.empty {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    padding: 24px;
-    border-radius: 18px;
-}
-
-.safety {
-    margin-top: 30px;
-    font-size: 14px;
-    color: var(--muted);
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 16px;
-}
-
-.loading-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(8px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
-.loading-box {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 22px;
-    padding: 28px 34px;
-    min-width: 260px;
-    text-align: center;
-    color: var(--text);
-    box-shadow: 0 20px 80px rgba(0,0,0,0.35);
-}
-
-.spinner {
-    width: 34px;
-    height: 34px;
-    border: 3px solid #333;
-    border-top-color: var(--white);
-    border-radius: 50%;
-    margin: 0 auto 14px auto;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.loaded-toast {
-    position: fixed;
-    right: 22px;
-    bottom: 22px;
-    background: var(--white);
-    color: var(--black);
-    border-radius: 999px;
-    padding: 11px 16px;
-    font-weight: 900;
-    z-index: 10000;
-    opacity: 0;
-    transform: translateY(12px);
-    transition: 0.22s ease;
-    pointer-events: none;
-}
-
-.loaded-toast.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-a {
-    color: var(--white);
-}
-
-::selection {
-    background: var(--white);
-    color: var(--black);
-}
-
-@media (max-width: 1000px) {
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .meta-grid,
-    .grid {
-        grid-template-columns: 1fr;
-    }
-
-    header {
-        padding: 18px 18px 12px 18px;
-    }
-
-    .container {
-        padding: 0 14px 32px 14px;
-    }
-
-    table {
-        display: block;
-        overflow-x: auto;
-    }
-}
-"""
-
-
-BASE_JS = """
-<script>
-(function () {
-    function showOverlay(text) {
-        var overlay = document.getElementById("loadingOverlay");
-        var loadingText = document.getElementById("loadingText");
-        if (loadingText) {
-            loadingText.textContent = text || "Loading...";
-        }
-        if (overlay) {
-            overlay.style.display = "flex";
-        }
-    }
-
-    function hideOverlay() {
-        var overlay = document.getElementById("loadingOverlay");
-        if (overlay) {
-            overlay.style.display = "none";
-        }
-    }
-
-    function showToast(text) {
-        var toast = document.getElementById("loadedToast");
-        if (!toast) return;
-        toast.textContent = text || "✓ Loaded";
-        toast.classList.add("show");
-        setTimeout(function () {
-            toast.classList.remove("show");
-        }, 1200);
-    }
-
-    function getFilterItems() {
-        return Array.prototype.slice.call(document.querySelectorAll(".filter-item"));
-    }
-
-    function setActiveFilter(text) {
-        var label = document.getElementById("activeFilterText");
-        if (label) {
-            label.textContent = text || "No filter";
-        }
-    }
-
-    function clearFilter() {
-        getFilterItems().forEach(function (item) {
-            item.classList.remove("filter-hidden");
-        });
-        setActiveFilter("No filter");
-        showToast("✓ Filter cleared");
-    }
-
-    function applyFilter(type, value, label) {
-        var items = getFilterItems();
-        var matched = 0;
-        value = String(value || "").toLowerCase();
-
-        items.forEach(function (item) {
-            var isMatch = true;
-
-            if (type === "category") {
-                isMatch = String(item.dataset.category || "").toLowerCase() === value;
-            } else if (type === "status") {
-                isMatch = String(item.dataset.status || "").toLowerCase() === value;
-            } else if (type === "problem") {
-                isMatch = String(item.dataset.problems || "").toLowerCase().indexOf(value) !== -1;
-            } else if (type === "fallback") {
-                isMatch = String(item.dataset.fallback || "").toLowerCase() === value;
-            } else if (type === "wrong-table") {
-                isMatch = String(item.dataset.wrongTable || "").toLowerCase() === value;
-            } else if (type === "review-required") {
-                isMatch = String(item.dataset.reviewRequired || "").toLowerCase() === value;
-            } else if (type === "text") {
-                isMatch = String(item.dataset.search || item.textContent || "").toLowerCase().indexOf(value) !== -1;
-            }
-
-            item.classList.toggle("filter-hidden", !isMatch);
-            if (isMatch) matched += 1;
-        });
-
-        setActiveFilter("Filter: " + label + " (" + matched + ")");
-        showToast("✓ Filter applied");
-    }
-
-    window.addEventListener("load", function () {
-        hideOverlay();
-        showToast("✓ Loaded");
-    });
-
-    document.addEventListener("submit", function (event) {
-        var form = event.target;
-        var action = form.getAttribute("action") || "";
-
-        if (action.indexOf("run-pipeline") !== -1) {
-            showOverlay("Running automation pipeline...");
-        } else if (action.indexOf("run-approved-tests") !== -1) {
-            showOverlay("Running approved eval tests...");
-        } else if (action.indexOf("export-approved") !== -1) {
-            showOverlay("Exporting approved tests...");
-        } else if (action.indexOf("sync") !== -1) {
-            showOverlay("Syncing review file...");
-        } else if (action.indexOf("approve") !== -1) {
-            showOverlay("Approving candidate...");
-        } else if (action.indexOf("reject") !== -1) {
-            showOverlay("Rejecting candidate...");
-        } else if (action.indexOf("note") !== -1) {
-            showOverlay("Saving note...");
-        } else {
-            showOverlay("Loading...");
-        }
-    });
-
-    document.addEventListener("click", function (event) {
-        var clearBtn = event.target.closest("[data-filter-clear]");
-        if (clearBtn) {
-            clearFilter();
-            return;
-        }
-
-        var filterEl = event.target.closest("[data-filter-category], [data-filter-status], [data-filter-problem], [data-filter-fallback], [data-filter-wrong-table], [data-filter-review-required], [data-filter-text]");
-        if (filterEl) {
-            event.preventDefault();
-
-            if (filterEl.dataset.filterCategory) {
-                applyFilter("category", filterEl.dataset.filterCategory, filterEl.dataset.filterCategory);
-                return;
-            }
-
-            if (filterEl.dataset.filterStatus) {
-                applyFilter("status", filterEl.dataset.filterStatus, filterEl.textContent.trim());
-                return;
-            }
-
-            if (filterEl.dataset.filterProblem) {
-                applyFilter("problem", filterEl.dataset.filterProblem, filterEl.dataset.filterProblem);
-                return;
-            }
-
-            if (filterEl.dataset.filterFallback) {
-                applyFilter("fallback", filterEl.dataset.filterFallback, "Fallback Used");
-                return;
-            }
-
-            if (filterEl.dataset.filterWrongTable) {
-                applyFilter("wrong-table", filterEl.dataset.filterWrongTable, "Wrong Table Detected");
-                return;
-            }
-
-            if (filterEl.dataset.filterReviewRequired) {
-                applyFilter("review-required", filterEl.dataset.filterReviewRequired, "Review Required");
-                return;
-            }
-
-            if (filterEl.dataset.filterText) {
-                applyFilter("text", filterEl.dataset.filterText, filterEl.dataset.filterText);
-                return;
-            }
-        }
-
-        var link = event.target.closest("a");
-        if (link && link.getAttribute("href") && !link.getAttribute("href").startsWith("#")) {
-            showOverlay("Loading page...");
-        }
-    });
-})();
-</script>
-"""
+templates.env.filters["to_pretty_json"] = to_pretty_json
 
 
 def read_json(path: Path) -> Any:
@@ -792,18 +66,10 @@ def as_list(data: Any) -> list[dict[str, Any]]:
     return []
 
 
-def esc(value: Any) -> str:
-    return html.escape(str(value if value is not None else ""))
-
-
 async def read_form(request: Request) -> dict[str, str]:
     body = await request.body()
     parsed = parse_qs(body.decode("utf-8"))
-
-    return {
-        key: values[0] if values else ""
-        for key, values in parsed.items()
-    }
+    return {key: values[0] if values else "" for key, values in parsed.items()}
 
 
 def make_eval_key(record: dict[str, Any]) -> tuple[Any, ...]:
@@ -819,11 +85,7 @@ def sync_review_file() -> list[dict[str, Any]]:
     generated_candidates = as_list(read_json(GENERATED_EVAL_JSON))
     existing_reviewed = as_list(read_json(REVIEWED_EVAL_JSON))
 
-    reviewed_by_key = {
-        make_eval_key(record): record
-        for record in existing_reviewed
-    }
-
+    reviewed_by_key = {make_eval_key(record): record for record in existing_reviewed}
     final_reviewed: list[dict[str, Any]] = []
 
     for candidate in generated_candidates:
@@ -853,7 +115,6 @@ def sync_review_file() -> list[dict[str, Any]]:
 
 def export_approved_tests() -> list[dict[str, Any]]:
     reviewed = as_list(read_json(REVIEWED_EVAL_JSON))
-
     approved_tests: list[dict[str, Any]] = []
 
     for record in reviewed:
@@ -904,11 +165,100 @@ def update_candidate(
     return found
 
 
-def run_automation_pipeline() -> tuple[bool, str]:
-    script_path = AUTOMATE_DIR / "scripts" / "auto_improve_from_logs.py"
+def sync_router_patch_review_file() -> list[dict[str, Any]]:
+    patch_candidates = as_list(read_json(ROUTER_PATCH_JSON))
+    existing_reviewed = as_list(read_json(REVIEWED_ROUTER_PATCH_JSON))
+
+    reviewed_by_patch_id = {
+        item.get("patch_id"): item
+        for item in existing_reviewed
+        if item.get("patch_id")
+    }
+
+    final_reviewed: list[dict[str, Any]] = []
+
+    for patch in patch_candidates:
+        patch_id = patch.get("patch_id")
+
+        if patch_id in reviewed_by_patch_id:
+            existing = reviewed_by_patch_id[patch_id]
+            patch["approved"] = existing.get("approved", False)
+            patch["review_note"] = existing.get("review_note", "")
+            patch["review_status"] = existing.get("review_status", "waiting_for_human_review")
+        else:
+            patch["approved"] = False
+            patch["review_note"] = ""
+            patch["review_status"] = "waiting_for_human_review"
+
+        patch["auto_apply_allowed"] = False
+        final_reviewed.append(patch)
+
+    write_json(REVIEWED_ROUTER_PATCH_JSON, final_reviewed)
+    return final_reviewed
+
+
+def export_approved_router_patches() -> list[dict[str, Any]]:
+    reviewed = as_list(read_json(REVIEWED_ROUTER_PATCH_JSON))
+    approved: list[dict[str, Any]] = []
+
+    for patch in reviewed:
+        if patch.get("approved") is not True:
+            continue
+
+        approved.append(
+            {
+                "patch_id": patch.get("patch_id"),
+                "title": patch.get("title"),
+                "target_router_file": patch.get("target_router_file"),
+                "intent_name": patch.get("intent_name"),
+                "question_patterns": patch.get("question_patterns", []),
+                "suggested_extraction": patch.get("suggested_extraction", {}),
+                "suggested_sql_logic": patch.get("suggested_sql_logic", []),
+                "expected_sql_contains": patch.get("expected_sql_contains", []),
+                "review_note": patch.get("review_note", ""),
+                "auto_apply_allowed": False,
+            }
+        )
+
+    write_json(APPROVED_ROUTER_PATCH_JSON, approved)
+    return approved
+
+
+def update_router_patch(
+    patch_id: str,
+    *,
+    approved: bool | None = None,
+    review_status: str | None = None,
+    review_note: str | None = None,
+) -> bool:
+    reviewed = sync_router_patch_review_file()
+    found = False
+
+    for patch in reviewed:
+        if str(patch.get("patch_id")) != patch_id:
+            continue
+
+        if approved is not None:
+            patch["approved"] = approved
+
+        if review_status is not None:
+            patch["review_status"] = review_status
+
+        if review_note is not None:
+            patch["review_note"] = review_note
+
+        patch["auto_apply_allowed"] = False
+        found = True
+
+    write_json(REVIEWED_ROUTER_PATCH_JSON, reviewed)
+    return found
+
+
+def run_script(script_name: str, log_path: Path, timeout: int = 180) -> tuple[bool, str]:
+    script_path = AUTOMATE_DIR / "scripts" / script_name
 
     if not script_path.exists():
-        return False, f"Pipeline script not found: {script_path}"
+        return False, f"Script not found: {script_path}"
 
     try:
         result = subprocess.run(
@@ -916,10 +266,10 @@ def run_automation_pipeline() -> tuple[bool, str]:
             cwd=str(PROJECT_ROOT),
             text=True,
             capture_output=True,
-            timeout=180,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        return False, "Pipeline timed out after 180 seconds."
+        return False, f"{script_name} timed out after {timeout} seconds."
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -932,97 +282,264 @@ def run_automation_pipeline() -> tuple[bool, str]:
         + result.stderr
     )
 
-    LAST_PIPELINE_LOG.write_text(log_text, encoding="utf-8")
+    log_path.write_text(log_text, encoding="utf-8")
 
     if result.returncode != 0:
-        return False, "Pipeline failed. Check AutomateQuery/reports/last_pipeline_run.txt"
+        return False, f"{script_name} failed. Check {log_path.name}"
 
-    return True, "Pipeline completed safely. Reports refreshed."
+    return True, f"{script_name} completed successfully."
 
 
 
-def run_approved_eval_test_script() -> tuple[bool, str]:
-    script_path = AUTOMATE_DIR / "scripts" / "run_approved_eval_tests.py"
+def first_list_value(value: Any, default: str = "") -> str:
+    if isinstance(value, list) and value:
+        return str(value[0])
+    if isinstance(value, str):
+        return value
+    return default
 
-    if not script_path.exists():
-        return False, f"Approved eval test script not found: {script_path}"
+
+def clean_sql_token(value: str) -> str:
+    value = str(value or "").strip().upper()
+    return value.replace("'", "''")
+
+
+def material_filter_sql(material_value: str) -> str:
+    material_value = clean_sql_token(material_value)
+    if material_value:
+        return f"AND UPPER(INV.ITEM_NAME) LIKE '%{material_value}%'"
+    return "-- material filter pending human review"
+
+
+def supplier_filter_sql(supplier_value: str) -> str:
+    supplier_value = clean_sql_token(supplier_value)
+    if supplier_value.isdigit():
+        return f"AND PO.SUP_CODE = '{supplier_value}'"
+    if supplier_value:
+        return f"AND UPPER(P.PARTYNAME) LIKE '%{supplier_value}%'"
+    return "-- supplier filter pending human review"
+
+
+def build_router_patch_sql_preview(patch: dict[str, Any]) -> str:
+    intent = str(patch.get("intent_name") or "")
+    extraction = patch.get("suggested_extraction") or {}
+
+    material_value = first_list_value(extraction.get("material_name"), "MOUSE")
+    supplier_value = first_list_value(
+        extraction.get("supplier_name_or_code") or extraction.get("party_code"),
+        "PRIME COMPU SYSTEMS",
+    )
+    year_value = first_list_value(extraction.get("year"), "")
+
+    if intent == "purchase_last_supply_by_material":
+        return f"""SELECT *
+FROM (
+    SELECT
+        PO.ORDERNO,
+        PO.ORDERDATE,
+        PO.SUP_CODE,
+        P.PARTYNAME AS SUPPLIER_NAME,
+        PO.ITEM_CODE,
+        INV.ITEM_NAME,
+        PO.QTY,
+        PO.RATE,
+        PO.NET,
+        PO.INVQTY,
+        (NVL(PO.QTY, 0) - NVL(PO.INVQTY, 0)) AS RECEIPT_PENDING_QTY,
+        PO.STATUS
+    FROM INVENTORY.PURCHASEORDER PO
+    JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+    LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
+    WHERE 1 = 1
+      {material_filter_sql(material_value)}
+    ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC
+)
+WHERE ROWNUM <= 1"""
+
+    if intent == "purchase_first_supply_by_supplier":
+        order_line = "ORDER BY PO.ORDERDATE ASC NULLS LAST, PO.ORDERNO ASC"
+        supplier_filter = supplier_filter_sql(supplier_value)
+    elif intent == "purchase_last_supply_by_supplier":
+        order_line = "ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC"
+        supplier_filter = supplier_filter_sql(supplier_value)
+    else:
+        order_line = ""
+        supplier_filter = ""
+
+    if intent in {"purchase_first_supply_by_supplier", "purchase_last_supply_by_supplier"}:
+        return f"""SELECT *
+FROM (
+    SELECT
+        PO.ORDERNO,
+        PO.ORDERDATE,
+        PO.SUP_CODE,
+        P.PARTYNAME AS SUPPLIER_NAME,
+        PO.ITEM_CODE,
+        INV.ITEM_NAME,
+        PO.QTY,
+        PO.RATE,
+        PO.NET,
+        PO.INVQTY,
+        (NVL(PO.QTY, 0) - NVL(PO.INVQTY, 0)) AS RECEIPT_PENDING_QTY,
+        PO.STATUS
+    FROM INVENTORY.PURCHASEORDER PO
+    JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+    LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
+    WHERE 1 = 1
+      {supplier_filter}
+    {order_line}
+)
+WHERE ROWNUM <= 1"""
+
+    if intent == "purchase_last_n_purchases_by_material":
+        limit_value = "3"
+
+        raw_limits = extraction.get("limit") or []
+        if isinstance(raw_limits, list):
+            for value in raw_limits:
+                value = str(value)
+                if value.startswith("N="):
+                    limit_value = value.replace("N=", "").strip()
+                    break
+
+        if not str(limit_value).isdigit():
+            limit_value = "3"
+
+        return f"""SELECT *
+FROM (
+    SELECT
+        PO.ORDERNO,
+        PO.ORDERDATE,
+        PO.ITEM_CODE,
+        INV.ITEM_NAME,
+        PO.QTY,
+        PO.RATE,
+        PO.NET,
+        PO.SUP_CODE,
+        P.PARTYNAME AS SUPPLIER_NAME,
+        PO.STATUS
+    FROM INVENTORY.PURCHASEORDER PO
+    JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+    LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
+    WHERE 1 = 1
+      {material_filter_sql(material_value)}
+    ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC
+)
+WHERE ROWNUM <= {limit_value}"""
+
+
+    if intent == "purchase_rate_by_material":
+        year_filter = ""
+        if str(year_value).isdigit():
+            year_filter = f"AND EXTRACT(YEAR FROM PO.ORDERDATE) = {year_value}"
+
+        return f"""SELECT *
+FROM (
+    SELECT
+        PO.ORDERNO,
+        PO.ORDERDATE,
+        PO.SUP_CODE,
+        P.PARTYNAME AS SUPPLIER_NAME,
+        PO.ITEM_CODE,
+        INV.ITEM_NAME,
+        PO.QTY,
+        PO.RATE,
+        PO.NET,
+        PO.STATUS
+    FROM INVENTORY.PURCHASEORDER PO
+    JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+    LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
+    WHERE 1 = 1
+      {material_filter_sql(material_value)}
+      {year_filter}
+    ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC
+)
+WHERE ROWNUM <= 20"""
+
+    return "-- SQL preview requires table verification before code generation."
+
+
+def clean_for_json(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(k): clean_for_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [clean_for_json(item) for item in value]
+    if isinstance(value, tuple):
+        return [clean_for_json(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def read_router_patch_verifications() -> dict[str, Any]:
+    data = read_json(ROUTER_PATCH_VERIFY_JSON)
+    return data if isinstance(data, dict) else {}
+
+
+def write_router_patch_verifications(data: dict[str, Any]) -> None:
+    write_json(ROUTER_PATCH_VERIFY_JSON, data)
+
+
+def enrich_router_patches_for_ui(patches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    verifications = read_router_patch_verifications()
+    enriched = []
+
+    for patch in patches:
+        patch_copy = dict(patch)
+        patch_id = str(patch_copy.get("patch_id") or "")
+        patch_copy["generated_sql_preview"] = build_router_patch_sql_preview(patch_copy)
+        patch_copy["verify_result"] = verifications.get(patch_id)
+        enriched.append(patch_copy)
+
+    return enriched
+
+
+def verify_router_patch(patch_id: str) -> tuple[bool, str]:
+    patches = sync_router_patch_review_file()
+    selected_patch = None
+
+    for patch in patches:
+        if str(patch.get("patch_id")) == patch_id:
+            selected_patch = patch
+            break
+
+    if selected_patch is None:
+        return False, "Router patch not found."
+
+    question_patterns = selected_patch.get("question_patterns") or []
+    if not question_patterns:
+        return False, "No question available for verification."
+
+    question = str(question_patterns[0]).strip()
+
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from app.query_engine import answer_question  # noqa: E402
 
     try:
-        result = subprocess.run(
-            [sys.executable, str(script_path)],
-            cwd=str(PROJECT_ROOT),
-            text=True,
-            capture_output=True,
-            timeout=180,
-        )
-    except subprocess.TimeoutExpired:
-        return False, "Approved eval tests timed out after 180 seconds."
+        result = clean_for_json(answer_question(question))
+    except Exception as exc:
+        result = {
+            "success": False,
+            "error": str(exc),
+            "error_type": type(exc).__name__,
+        }
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    verifications = read_router_patch_verifications()
+    verifications[patch_id] = {
+        "patch_id": patch_id,
+        "question": question,
+        "success": result.get("success"),
+        "source": result.get("source"),
+        "intent": result.get("intent"),
+        "row_count": result.get("row_count"),
+        "sql": result.get("sql"),
+        "answer": result.get("answer"),
+        "error": result.get("error"),
+        "raw_result": result,
+    }
 
-    log_text = (
-        "COMMAND: "
-        + " ".join([sys.executable, str(script_path)])
-        + "\n\nSTDOUT:\n"
-        + result.stdout
-        + "\n\nSTDERR:\n"
-        + result.stderr
-    )
-
-    APPROVED_TEST_RUN_LOG.write_text(log_text, encoding="utf-8")
-
-    if result.returncode != 0:
-        return False, "Approved eval tests failed. Check approved_eval_test_run.txt"
-
-    return True, "Approved eval tests passed."
-
-
-def page_layout(title: str, body: str, active: str = "", message: str = "") -> str:
-    message_html = f"<div class='message'>{esc(message)}</div>" if message else ""
-
-    def nav_class(name: str) -> str:
-        return "active" if active == name else ""
-
-    return f"""
-    <!doctype html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>{esc(title)}</title>
-        <style>{BASE_CSS}</style>
-    </head>
-    <body>
-        <div id="loadingOverlay" class="loading-overlay">
-            <div class="loading-box">
-                <div class="spinner"></div>
-                <div id="loadingText">Loading...</div>
-            </div>
-        </div>
-
-        <div id="loadedToast" class="loaded-toast">✓ Loaded</div>
-
-        <header>
-            <div class="header-inner">
-                <h1>{esc(title)}</h1>
-                <p>Safe local review dashboard for AJSMGPT log improvements.</p>
-                <nav>
-                    <a class="{nav_class('dashboard')}" href="/">Dashboard</a>
-                    <a class="{nav_class('question_bank')}" href="/question-bank">Question Bank</a>
-                    <a class="{nav_class('router_candidates')}" href="/router-candidates">Router Candidates</a>
-                    <a class="{nav_class('eval_review')}" href="/eval-review">Eval Approval</a>
-                </nav>
-            </div>
-        </header>
-
-        <div class="container">
-            {message_html}
-            {body}
-        </div>
-
-        {BASE_JS}
-    </body>
-    </html>
-    """
+    write_router_patch_verifications(verifications)
+    return True, "Verify output loaded."
 
 
 @app.get("/health", response_class=PlainTextResponse)
@@ -1030,13 +547,142 @@ async def health() -> str:
     return "AutomateQuery UI is running"
 
 
+@app.get("/")
+async def dashboard(request: Request):
+    question_bank = as_list(read_json(QUESTION_BANK_JSON))
+    router_candidates = as_list(read_json(ROUTER_FIX_JSON))
+    generated_eval = as_list(read_json(GENERATED_EVAL_JSON))
+    reviewed_eval = sync_review_file()
+    approved_eval = as_list(read_json(APPROVED_EVAL_JSON))
+    router_patches = sync_router_patch_review_file()
+
+    approved_count = sum(1 for item in reviewed_eval if item.get("approved") is True)
+
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "title": "AutomateQuery Dashboard",
+            "active": "dashboard",
+            "message": request.query_params.get("message", ""),
+            "unique_questions": len(question_bank),
+            "review_questions": sum(1 for item in question_bank if item.get("needs_review")),
+            "router_problem_count": len(router_candidates),
+            "wrong_table_count": sum(1 for c in router_candidates if c.get("wrong_tables_detected")),
+            "router_patch_count": len(router_patches),
+            "generated_eval_count": len(generated_eval),
+            "approved_count": approved_count,
+            "pending_count": len(reviewed_eval) - approved_count,
+            "approved_eval_count": len(approved_eval),
+        },
+    )
+
+
+@app.get("/question-bank")
+async def question_bank_page(request: Request):
+    bank = as_list(read_json(QUESTION_BANK_JSON))
+
+    category_counts: dict[str, int] = {}
+    for item in bank:
+        category = str(item.get("category") or "unknown")
+        category_counts[category] = category_counts.get(category, 0) + 1
+
+    return templates.TemplateResponse(
+        request,
+        "question_bank.html",
+        {
+            "title": "AutomateQuery Question Bank",
+            "active": "question_bank",
+            "items": bank,
+            "total": len(bank),
+            "review_count": sum(1 for item in bank if item.get("needs_review")),
+            "ok_count": sum(1 for item in bank if not item.get("needs_review")),
+            "category_counts": sorted(category_counts.items()),
+        },
+    )
+
+
+@app.get("/router-candidates")
+async def router_candidates_page(request: Request):
+    candidates = as_list(read_json(ROUTER_FIX_JSON))
+
+    return templates.TemplateResponse(
+        request,
+        "router_candidates.html",
+        {
+            "title": "AutomateQuery Router Candidates",
+            "active": "router_candidates",
+            "candidates": candidates,
+            "total": len(candidates),
+            "review_required": sum(
+                1
+                for c in candidates
+                if ((c.get("suggestion") or {}).get("suggested_intent_name") == "REVIEW_REQUIRED")
+            ),
+            "wrong_table_count": sum(1 for c in candidates if c.get("wrong_tables_detected")),
+            "fallback_count": sum(
+                1
+                for c in candidates
+                if "fallback_used" in (c.get("problem_types") or [])
+            ),
+        },
+    )
+
+
+@app.get("/router-patches")
+async def router_patches_page(request: Request):
+    patches = enrich_patch_questions_for_ui(enrich_router_patches_for_ui(sync_router_patch_review_file()))
+
+    return templates.TemplateResponse(
+        request,
+        "router_patches.html",
+        {
+            "title": "AutomateQuery Router Patches",
+            "active": "router_patches",
+            "message": request.query_params.get("message", ""),
+            "patches": patches,
+            "total": len(patches),
+            "approved_count": sum(1 for p in patches if p.get("approved") is True),
+            "review_count": sum(1 for p in patches if p.get("approved") is not True),
+            "high_count": sum(1 for p in patches if p.get("priority") == "high"),
+            "medium_count": sum(1 for p in patches if p.get("priority") == "medium"),
+        },
+    )
+
+
+@app.get("/eval-review")
+async def eval_review_page(request: Request):
+    reviewed = sync_review_file()
+
+    approved_count = sum(1 for record in reviewed if record.get("approved") is True)
+
+    return templates.TemplateResponse(
+        request,
+        "eval_review.html",
+        {
+            "title": "AutomateQuery Eval Approval",
+            "active": "eval_review",
+            "message": request.query_params.get("message", ""),
+            "records": reviewed,
+            "total_count": len(reviewed),
+            "approved_count": approved_count,
+            "pending_count": len(reviewed) - approved_count,
+        },
+    )
+
+
+@app.get("/approval")
+async def approval_alias(request: Request):
+    return await eval_review_page(request)
+
+
 @app.post("/run-pipeline")
 async def run_pipeline() -> RedirectResponse:
-    ok, message = run_automation_pipeline()
-    return RedirectResponse(
-        url=f"/?message={quote(message)}",
-        status_code=303,
+    ok, message = run_script(
+        "auto_improve_from_logs.py",
+        LAST_PIPELINE_LOG,
     )
+    return RedirectResponse(url=f"/?message={quote(message)}", status_code=303)
 
 
 @app.get("/pipeline-log", response_class=PlainTextResponse)
@@ -1047,530 +693,210 @@ async def pipeline_log() -> str:
     return LAST_PIPELINE_LOG.read_text(encoding="utf-8")
 
 
-@app.get("/", response_class=HTMLResponse)
-async def dashboard() -> HTMLResponse:
-    question_bank = as_list(read_json(QUESTION_BANK_JSON))
-    router_candidates = as_list(read_json(ROUTER_FIX_JSON))
-    generated_eval = as_list(read_json(GENERATED_EVAL_JSON))
-    reviewed_eval = sync_review_file()
-    approved_eval = as_list(read_json(APPROVED_EVAL_JSON))
-
-    unique_questions = len(question_bank)
-    review_questions = sum(1 for item in question_bank if item.get("needs_review"))
-    router_problem_count = len(router_candidates)
-    wrong_table_count = sum(1 for c in router_candidates if c.get("wrong_tables_detected"))
-    approved_count = sum(1 for item in reviewed_eval if item.get("approved") is True)
-    pending_count = len(reviewed_eval) - approved_count
-
-    body = f"""
-    <div class="summary">
-        <div class="summary-box">
-            <strong>{unique_questions}</strong>
-            Unique Questions
-        </div>
-        <div class="summary-box">
-            <strong>{review_questions}</strong>
-            Questions Need Review
-        </div>
-        <div class="summary-box">
-            <strong>{router_problem_count}</strong>
-            Router Problem Candidates
-        </div>
-        <div class="summary-box">
-            <strong>{wrong_table_count}</strong>
-            Wrong Table Detections
-        </div>
-        <div class="summary-box">
-            <strong>{len(generated_eval)}</strong>
-            Generated Eval Candidates
-        </div>
-        <div class="summary-box">
-            <strong>{approved_count}</strong>
-            Approved Eval Tests
-        </div>
-        <div class="summary-box">
-            <strong>{pending_count}</strong>
-            Pending Eval Reviews
-        </div>
-        <div class="summary-box">
-            <strong>{len(approved_eval)}</strong>
-            Exported Approved Tests
-        </div>
-    </div>
-
-    <div class="toolbar">
-        <form method="post" action="/run-pipeline">
-            <button type="submit" class="sync">Run Automation Pipeline</button>
-        </form>
-
-        <form method="get" action="/pipeline-log">
-            <button type="submit" class="secondary">View Last Pipeline Log</button>
-        </form>
-    </div>
-
-    <div class="dashboard-grid">
-        <div class="dashboard-card">
-            <h2>Question Bank</h2>
-            <p>View all unique user questions grouped by category.</p>
-            <p>Use this to understand the full question coverage.</p>
-            <a href="/question-bank">Open Question Bank</a>
-        </div>
-
-        <div class="dashboard-card">
-            <h2>Router Candidates</h2>
-            <p>View suspicious fallback, slow, failed, zero-row, or wrong-table questions.</p>
-            <p>Use this to decide next router improvements.</p>
-            <a href="/router-candidates">Open Router Candidates</a>
-        </div>
-
-        <div class="dashboard-card">
-            <h2>Eval Approval</h2>
-            <p>Approve generated regression test candidates after human review.</p>
-            <p>Approved tests are exported to approved_eval_tests.json.</p>
-            <a href="/eval-review">Open Eval Approval</a>
-        </div>
-    </div>
-
-    <div class="safety">
-        <strong>Safety:</strong>
-        This frontend does not execute Oracle SQL and does not modify production router code.
-        It only reads and writes files inside <code>AutomateQuery/reports/</code>.
-    </div>
-    """
-
-    return HTMLResponse(page_layout("AutomateQuery Dashboard", body, active="dashboard"))
-
-
-def render_filter_toolbar() -> str:
-    return """
-    <div class="filter-toolbar">
-        <span class="filter-label">Click any field/tag to filter:</span>
-        <span id="activeFilterText" class="active-filter-text">No filter</span>
-        <button type="button" class="filter-clear-btn" data-filter-clear="1">Clear Filter</button>
-    </div>
-    """
-
-
-def render_question_bank_row(item: dict[str, Any], index: int) -> str:
-    category = str(item.get("category") or "")
-    needs_review = item.get("needs_review") is True
-    status = "review" if needs_review else "ok"
-    review_class = "danger" if needs_review else "ok"
-    review_text = "REVIEW" if needs_review else "OK"
-
-    search_text = " ".join(
-        [
-            str(item.get("question") or ""),
-            category,
-            review_text,
-            str(item.get("router_sources_seen") or ""),
-            str(item.get("intents_seen") or ""),
-        ]
-    )
-
-    return f"""
-    <tr class="filter-item"
-        data-category="{esc(category)}"
-        data-status="{esc(status)}"
-        data-search="{esc(search_text)}">
-        <td>{index}</td>
-        <td>
-            <span class="tag click-filter" data-filter-category="{esc(category)}">{esc(category)}</span>
-        </td>
-        <td>{esc(item.get("question"))}</td>
-        <td>{esc(item.get("occurrence_count"))}</td>
-        <td>
-            <span class="tag {review_class} click-filter" data-filter-status="{esc(status)}">{review_text}</span>
-        </td>
-        <td>{esc(item.get("fallback_count"))}</td>
-        <td>{esc(item.get("failed_count"))}</td>
-        <td>{esc(item.get("slow_count"))}</td>
-        <td><code class="click-filter" data-filter-text="{esc(item.get("router_sources_seen"))}">{esc(item.get("router_sources_seen"))}</code></td>
-        <td><code class="click-filter" data-filter-text="{esc(item.get("intents_seen"))}">{esc(item.get("intents_seen"))}</code></td>
-    </tr>
-    """
-
-
-@app.get("/question-bank", response_class=HTMLResponse)
-async def question_bank_page() -> HTMLResponse:
-    bank = as_list(read_json(QUESTION_BANK_JSON))
-
-    total = len(bank)
-    review_count = sum(1 for item in bank if item.get("needs_review"))
-    ok_count = total - review_count
-
-    category_counts: dict[str, int] = {}
-    for item in bank:
-        category = str(item.get("category") or "unknown")
-        category_counts[category] = category_counts.get(category, 0) + 1
-
-    category_html = "".join(
-        f"""
-        <div class="summary-box click-filter" data-filter-category="{esc(category)}">
-            <strong>{count}</strong>
-            {esc(category)}
-        </div>
-        """
-        for category, count in sorted(category_counts.items())
-    )
-
-    rows = "".join(
-        render_question_bank_row(item, index)
-        for index, item in enumerate(bank, start=1)
-    )
-
-    if not rows:
-        rows = """
-        <tr>
-            <td colspan="10">
-                No question bank found. Run:
-                <pre>./venv/bin/python3 AutomateQuery/scripts/generate_question_bank.py</pre>
-            </td>
-        </tr>
-        """
-
-    body = f"""
-    {render_filter_toolbar()}
-
-    <div class="summary">
-        <div class="summary-box click-filter" data-filter-clear="1">
-            <strong>{total}</strong>
-            Unique Questions
-        </div>
-        <div class="summary-box click-filter" data-filter-status="review">
-            <strong>{review_count}</strong>
-            Need Review
-        </div>
-        <div class="summary-box click-filter" data-filter-status="ok">
-            <strong>{ok_count}</strong>
-            OK
-        </div>
-        {category_html}
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>No</th>
-                <th>Category</th>
-                <th>Question</th>
-                <th>Count</th>
-                <th>Status</th>
-                <th>Fallback</th>
-                <th>Failed</th>
-                <th>Slow</th>
-                <th>Sources Seen</th>
-                <th>Intents Seen</th>
-            </tr>
-        </thead>
-        <tbody>
-            {rows}
-        </tbody>
-    </table>
-    """
-
-    return HTMLResponse(page_layout("AutomateQuery Question Bank", body, active="question_bank"))
-
-
-def render_router_candidate_card(candidate: dict[str, Any]) -> str:
-    suggestion = candidate.get("suggestion", {}) or {}
-
-    problems = candidate.get("problem_types", []) or []
-    wrong_tables = candidate.get("wrong_tables_detected", []) or []
-
-    fallback = "fallback_used" in problems
-    wrong_table = bool(wrong_tables)
-    review_required = suggestion.get("suggested_intent_name") == "REVIEW_REQUIRED"
-
-    problems_text = " ".join(str(p) for p in problems)
-    search_text = " ".join(
-        [
-            str(candidate.get("candidate_id") or ""),
-            str(candidate.get("question") or ""),
-            str(candidate.get("source") or ""),
-            problems_text,
-            " ".join(str(t) for t in wrong_tables),
-            str(suggestion.get("target_router_file") or ""),
-            str(suggestion.get("suggested_intent_name") or ""),
-        ]
-    )
-
-    problem_html = "".join(
-        f"<span class='tag problem click-filter' data-filter-problem='{esc(problem)}'>{esc(problem)}</span>"
-        for problem in problems
-    )
-
-    wrong_table_html = "".join(
-        f"<span class='tag danger click-filter' data-filter-text='{esc(table)}'>{esc(table)}</span>"
-        for table in wrong_tables
-    )
-
-    if not wrong_table_html:
-        wrong_table_html = "<span class='muted'>None</span>"
-
-    sql_text = candidate.get("sql") or ""
-
-    return f"""
-    <div class="candidate-card filter-item"
-        data-fallback="{str(fallback).lower()}"
-        data-wrong-table="{str(wrong_table).lower()}"
-        data-review-required="{str(review_required).lower()}"
-        data-problems="{esc(problems_text)}"
-        data-search="{esc(search_text)}">
-
-        <div class="candidate-top">
-            <span class="candidate-id click-filter" data-filter-text="{esc(candidate.get("candidate_id"))}">{esc(candidate.get("candidate_id"))}</span>
-            <span class="source click-filter" data-filter-text="{esc(candidate.get("source"))}">{esc(candidate.get("source"))}</span>
-        </div>
-
-        <h2>{esc(candidate.get("question"))}</h2>
-
-        <div class="meta-grid">
-            <div>
-                <label>Success</label>
-                <code>{esc(candidate.get("success"))}</code>
-            </div>
-            <div>
-                <label>Rows</label>
-                <code>{esc(candidate.get("row_count"))}</code>
-            </div>
-            <div>
-                <label>Elapsed MS</label>
-                <code>{esc(candidate.get("elapsed_ms"))}</code>
-            </div>
-            <div>
-                <label>Similar Count</label>
-                <code>{esc(candidate.get("similar_question_count"))}</code>
-            </div>
-        </div>
-
-        <h3>Problems</h3>
-        <div>{problem_html}</div>
-
-        <h3>Wrong Tables Detected</h3>
-        <div>{wrong_table_html}</div>
-
-        <h3>Suggested Fix</h3>
-        <div class="meta-grid">
-            <div>
-                <label>Target Router</label>
-                <code>{esc(suggestion.get("target_router_file"))}</code>
-            </div>
-            <div>
-                <label>Suggested Intent</label>
-                <code>{esc(suggestion.get("suggested_intent_name"))}</code>
-            </div>
-        </div>
-
-        <p><strong>SQL Template Pattern:</strong></p>
-        <pre>{esc(suggestion.get("suggested_sql_template_pattern"))}</pre>
-
-        <details>
-            <summary>Show logged SQL / fallback SQL</summary>
-            <pre>{esc(sql_text)}</pre>
-        </details>
-    </div>
-    """
-
-
-@app.get("/router-candidates", response_class=HTMLResponse)
-async def router_candidates_page() -> HTMLResponse:
-    candidates = as_list(read_json(ROUTER_FIX_JSON))
-
-    total = len(candidates)
-    review_required = sum(
-        1
-        for c in candidates
-        if ((c.get("suggestion") or {}).get("suggested_intent_name") == "REVIEW_REQUIRED")
-    )
-    wrong_table_count = sum(1 for c in candidates if c.get("wrong_tables_detected"))
-    fallback_count = sum(
-        1
-        for c in candidates
-        if "fallback_used" in (c.get("problem_types") or [])
-    )
-
-    cards = "".join(render_router_candidate_card(c) for c in candidates)
-
-    if not cards:
-        cards = """
-        <div class="empty">
-            No router candidates found. Run:
-            <pre>./venv/bin/python3 AutomateQuery/scripts/auto_improve_from_logs.py</pre>
-        </div>
-        """
-
-    body = f"""
-    {render_filter_toolbar()}
-
-    <div class="summary">
-        <div class="summary-box click-filter" data-filter-clear="1">
-            <strong>{total}</strong>
-            Total Candidates
-        </div>
-        <div class="summary-box click-filter" data-filter-review-required="true">
-            <strong>{review_required}</strong>
-            Review Required
-        </div>
-        <div class="summary-box click-filter" data-filter-wrong-table="true">
-            <strong>{wrong_table_count}</strong>
-            Wrong Table Detected
-        </div>
-        <div class="summary-box click-filter" data-filter-fallback="true">
-            <strong>{fallback_count}</strong>
-            Fallback Used
-        </div>
-    </div>
-
-    {cards}
-    """
-
-    return HTMLResponse(page_layout("AutomateQuery Router Candidates", body, active="router_candidates"))
-
-
-def render_eval_candidate_card(record: dict[str, Any]) -> str:
-    candidate_id = str(record.get("candidate_id", ""))
-    approved = record.get("approved") is True
-    status = str(record.get("status", "waiting_for_human_review"))
-
-    status_class = "approved" if approved else "pending"
-    status_label = "APPROVED" if approved else status.upper()
-
-    sql_parts = record.get("expected_sql_contains", [])
-    sql_html = "".join(f"<li><code>{esc(part)}</code></li>" for part in sql_parts)
-
-    approve_path = f"/approve/{quote(candidate_id)}"
-    reject_path = f"/reject/{quote(candidate_id)}"
-    note_path = f"/note/{quote(candidate_id)}"
-
-    return f"""
-    <div class="card">
-        <div class="card-header">
-            <span class="badge {status_class}">{esc(status_label)}</span>
-            <span class="candidate-id">{esc(candidate_id)}</span>
-        </div>
-
-        <h2>{esc(record.get("question"))}</h2>
-
-        <div class="grid">
-            <div>
-                <label>Expected Source</label>
-                <code>{esc(record.get("expected_source"))}</code>
-            </div>
-            <div>
-                <label>Expected Intent</label>
-                <code>{esc(record.get("expected_intent"))}</code>
-            </div>
-        </div>
-
-        <h3>Expected SQL Contains</h3>
-        <ul>{sql_html}</ul>
-
-        <form method="post" action="{note_path}" class="note-form">
-            <label>Review Note</label>
-            <textarea name="review_note" rows="3">{esc(record.get("review_note", ""))}</textarea>
-            <button type="submit" class="secondary">Save Note</button>
-        </form>
-
-        <div class="actions">
-            <form method="post" action="{approve_path}">
-                <button type="submit" class="approve">Approve</button>
-            </form>
-
-            <form method="post" action="{reject_path}">
-                <button type="submit" class="reject">Reject</button>
-            </form>
-        </div>
-    </div>
-    """
-
-
-@app.get("/eval-review", response_class=HTMLResponse)
-async def eval_review_page(request: Request) -> HTMLResponse:
-    message = request.query_params.get("message", "")
-    reviewed = sync_review_file()
-
-    total_count = len(reviewed)
-    approved_count = sum(1 for record in reviewed if record.get("approved") is True)
-    pending_count = total_count - approved_count
-
-    cards_html = "".join(render_eval_candidate_card(record) for record in reviewed)
-
-    if not cards_html:
-        cards_html = """
-        <div class="empty">
-            No review candidates found. Run:
-            <pre>./venv/bin/python3 AutomateQuery/scripts/auto_improve_from_logs.py</pre>
-        </div>
-        """
-
-    body = f"""
-    <div class="summary">
-        <div class="summary-box">
-            <strong>{total_count}</strong>
-            Total Candidates
-        </div>
-        <div class="summary-box">
-            <strong>{approved_count}</strong>
-            Approved
-        </div>
-        <div class="summary-box">
-            <strong>{pending_count}</strong>
-            Pending / Rejected
-        </div>
-    </div>
-
-    <div class="toolbar">
-        <form method="post" action="/sync">
-            <button type="submit" class="sync">Sync Review File</button>
-        </form>
-
-        <form method="post" action="/export-approved">
-            <button type="submit" class="export">Export Approved Tests</button>
-        </form>
-
-        <form method="post" action="/run-approved-tests">
-            <button type="submit" class="sync">Run Approved Tests</button>
-        </form>
-
-        <form method="get" action="/approved-test-log">
-            <button type="submit" class="secondary">View Approved Test Log</button>
-        </form>
-    </div>
-
-    {cards_html}
-
-    <div class="safety">
-        <strong>Safety:</strong>
-        This UI does not execute Oracle SQL and does not modify production router code.
-        It only updates files inside <code>AutomateQuery/reports/</code>.
-    </div>
-    """
-
-    return HTMLResponse(page_layout("AutomateQuery Eval Approval", body, active="eval_review", message=message))
-
-
-@app.get("/approval", response_class=HTMLResponse)
-async def approval_alias(request: Request) -> HTMLResponse:
-    return await eval_review_page(request)
-
-
-
-@app.post("/run-approved-tests")
-async def run_approved_tests() -> RedirectResponse:
-    ok, message = run_approved_eval_test_script()
-    return RedirectResponse(
-        url=f"/eval-review?message={quote(message)}",
-        status_code=303,
-    )
-
-
 @app.get("/approved-test-log", response_class=PlainTextResponse)
 async def approved_test_log() -> str:
     if not APPROVED_TEST_RUN_LOG.exists():
         return "No approved eval test run log found yet."
 
     return APPROVED_TEST_RUN_LOG.read_text(encoding="utf-8")
+
+
+@app.post("/router-patch/sync")
+async def router_patch_sync() -> RedirectResponse:
+    patches = sync_router_patch_review_file()
+    return RedirectResponse(
+        url=f"/router-patches?message=Router patch review file synced. Patches available: {len(patches)}",
+        status_code=303,
+    )
+
+
+
+def verify_router_patch_question(patch_id: str, question_index: int) -> tuple[bool, str, dict[str, Any]]:
+    patches = sync_router_patch_review_file()
+    selected_patch = None
+
+    for patch in patches:
+        if str(patch.get("patch_id")) == patch_id:
+            selected_patch = patch
+            break
+
+    if selected_patch is None:
+        return False, "Router patch not found.", {}
+
+    questions = selected_patch.get("question_patterns") or []
+
+    if question_index < 0 or question_index >= len(questions):
+        return False, "Question index not found.", {}
+
+    question = str(questions[question_index]).strip()
+
+    if not question:
+        return False, "Question is empty.", {}
+
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from app.query_engine import answer_question  # noqa: E402
+
+    try:
+        result = clean_for_json(answer_question(question))
+    except Exception as exc:
+        result = {
+            "success": False,
+            "error": str(exc),
+            "error_type": type(exc).__name__,
+        }
+
+    verify_record = {
+        "patch_id": patch_id,
+        "question_index": question_index,
+        "question": question,
+        "success": result.get("success"),
+        "source": result.get("source"),
+        "intent": result.get("intent"),
+        "row_count": result.get("row_count"),
+        "sql": result.get("sql"),
+        "answer": result.get("answer"),
+        "error": result.get("error"),
+        "raw_result": result,
+    }
+
+    verifications = read_router_patch_verifications()
+    key = f"{patch_id}::question::{question_index}"
+    verifications[key] = verify_record
+    write_router_patch_verifications(verifications)
+
+    return bool(result.get("success")), "Question verification completed.", verify_record
+
+
+
+def build_question_sql_preview(patch: dict[str, Any], question: str) -> str:
+    patch_copy = dict(patch)
+    extraction = dict(patch_copy.get("suggested_extraction") or {})
+
+    # For "Last 3..." show ROWNUM <= 3.
+    # For "Last purchase..." show ROWNUM <= 1.
+    if patch_copy.get("intent_name") == "purchase_last_n_purchases_by_material":
+        match = re.search(r"\blast\s+(\d+)\b", question, flags=re.I)
+        limit_value = match.group(1) if match else "1"
+        extraction["limit"] = [f"N={limit_value}"]
+
+    patch_copy["suggested_extraction"] = extraction
+
+    try:
+        return build_router_patch_sql_preview(patch_copy)
+    except Exception:
+        return str(patch.get("generated_sql_preview") or "")
+
+
+def enrich_patch_questions_for_ui(patches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    verifications = read_router_patch_verifications()
+    enriched_patches: list[dict[str, Any]] = []
+
+    for patch in patches:
+        patch_copy = dict(patch)
+        patch_id = str(patch_copy.get("patch_id") or "")
+        questions = patch_copy.get("question_patterns") or []
+
+        question_items = []
+
+        for index, question in enumerate(questions):
+            key = f"{patch_id}::question::{index}"
+            question_items.append(
+                {
+                    "index": index,
+                    "question": question,
+                    "verify_result": verifications.get(key),
+                    "expected_sql_preview": build_question_sql_preview(patch_copy, str(question)),
+                }
+            )
+
+        patch_copy["question_items"] = question_items
+        enriched_patches.append(patch_copy)
+
+    return enriched_patches
+
+
+@app.post("/router-patch/verify/{patch_id}")
+async def router_patch_verify(patch_id: str) -> RedirectResponse:
+    ok, message = verify_router_patch(patch_id)
+    return RedirectResponse(
+        url=f"/router-patches?message={quote(message)}",
+        status_code=303,
+    )
+
+
+
+@app.post("/api/router-patch/verify/{patch_id}")
+async def api_router_patch_verify(patch_id: str) -> JSONResponse:
+    ok, message = verify_router_patch(patch_id)
+    results = read_router_patch_verifications()
+    result = results.get(patch_id, {})
+
+    return JSONResponse(
+        {
+            "ok": ok,
+            "message": message,
+            "result": result,
+        }
+    )
+
+
+
+@app.post("/api/router-patch/verify-question/{patch_id}/{question_index}")
+async def api_router_patch_verify_question(patch_id: str, question_index: int) -> JSONResponse:
+    ok, message, result = verify_router_patch_question(patch_id, question_index)
+
+    return JSONResponse(
+        {
+            "ok": ok,
+            "message": message,
+            "result": result,
+        }
+    )
+
+
+@app.post("/router-patch/export-approved")
+async def router_patch_export_approved() -> RedirectResponse:
+    approved = export_approved_router_patches()
+    return RedirectResponse(
+        url=f"/router-patches?message=Approved router patches exported: {len(approved)}",
+        status_code=303,
+    )
+
+
+@app.post("/router-patch/approve/{patch_id}")
+async def router_patch_approve(patch_id: str) -> RedirectResponse:
+    found = update_router_patch(
+        patch_id,
+        approved=True,
+        review_status="approved",
+    )
+
+    message = "Router patch approved." if found else "Router patch not found."
+    return RedirectResponse(url=f"/router-patches?message={quote(message)}", status_code=303)
+
+
+@app.post("/router-patch/reject/{patch_id}")
+async def router_patch_reject(patch_id: str) -> RedirectResponse:
+    found = update_router_patch(
+        patch_id,
+        approved=False,
+        review_status="rejected",
+    )
+
+    message = "Router patch rejected." if found else "Router patch not found."
+    return RedirectResponse(url=f"/router-patches?message={quote(message)}", status_code=303)
+
+
+@app.post("/router-patch/note/{patch_id}")
+async def router_patch_save_note(patch_id: str, request: Request) -> RedirectResponse:
+    form = await read_form(request)
+    found = update_router_patch(
+        patch_id,
+        review_note=form.get("review_note", ""),
+    )
+
+    message = "Router patch note saved." if found else "Router patch not found."
+    return RedirectResponse(url=f"/router-patches?message={quote(message)}", status_code=303)
 
 
 @app.post("/sync")
@@ -1609,11 +935,9 @@ async def reject(candidate_id: str) -> RedirectResponse:
 @app.post("/note/{candidate_id}")
 async def save_note(candidate_id: str, request: Request) -> RedirectResponse:
     form = await read_form(request)
-    review_note = form.get("review_note", "")
-
     found = update_candidate(
         candidate_id,
-        review_note=review_note,
+        review_note=form.get("review_note", ""),
     )
 
     message = "Review note saved." if found else "Candidate not found."
@@ -1623,8 +947,19 @@ async def save_note(candidate_id: str, request: Request) -> RedirectResponse:
 @app.post("/export-approved")
 async def export_approved() -> RedirectResponse:
     approved_tests = export_approved_tests()
-
     return RedirectResponse(
         url=f"/eval-review?message=Approved eval tests exported: {len(approved_tests)}",
+        status_code=303,
+    )
+
+
+@app.post("/run-approved-tests")
+async def run_approved_tests() -> RedirectResponse:
+    ok, message = run_script(
+        "run_approved_eval_tests.py",
+        APPROVED_TEST_RUN_LOG,
+    )
+    return RedirectResponse(
+        url=f"/eval-review?message={quote(message)}",
         status_code=303,
     )

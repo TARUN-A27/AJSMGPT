@@ -204,7 +204,7 @@ def _known_schema_fallback_sql(question: str) -> dict[str, Any] | None:
     return None
 
 
-def answer_question(question: str) -> dict[str, Any]:
+def _answer_question_core(question: str) -> dict[str, Any]:
     request_id = new_request_id()
     set_request_id(request_id)
 
@@ -383,3 +383,51 @@ def answer_question(question: str) -> dict[str, Any]:
 if __name__ == "__main__":
     result = answer_question("show supplier details")
     print(json.dumps(result, indent=2, default=str))
+
+
+def answer_question(question: str, *args, **kwargs):
+    """
+    Public wrapper around the real query engine.
+    Logs every user question to logs/user_questions.jsonl for future tuning.
+    """
+    import time
+    from app.question_logger import log_question_event
+
+    session_id = kwargs.pop("session_id", None) or "default"
+    user_id = kwargs.pop("user_id", None)
+    client_ip = kwargs.pop("client_ip", None)
+
+    start = time.perf_counter()
+    result = None
+
+    try:
+        result = _answer_question_core(question, *args, **kwargs)
+        return result
+    except Exception as exc:
+        elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
+        log_question_event(
+            question=question,
+            result=None,
+            elapsed_ms=elapsed_ms,
+            session_id=session_id,
+            user_id=user_id,
+            client_ip=client_ip,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+        raise
+    finally:
+        if result is not None:
+            elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
+            try:
+                log_question_event(
+                    question=question,
+                    result=result,
+                    elapsed_ms=elapsed_ms,
+                    session_id=session_id,
+                    user_id=user_id,
+                    client_ip=client_ip,
+                )
+            except Exception:
+                # Logging must never break the main answer flow.
+                pass
+

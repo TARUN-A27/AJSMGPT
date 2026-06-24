@@ -11,3 +11,4 @@ logs/
 *.log
 qdrant_dumps/
 templates/*.bak
+reports/

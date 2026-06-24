@@ -68,8 +68,12 @@ def _date_column_for_sql(intent: str | None, tables_used: list[str] | None, sql:
     upper_sql = sql.upper()
 
     # Business template intents
-    if intent.startswith("pending_mrs_"):
+    if intent.startswith("mrs_due"):
+        return "M.DUEDATE", "text"
+
+    if "mrs" in intent:
         return "M.MRSDATE", "text"
+
 
     if intent.startswith("pending_po_") or intent.startswith("po_summary_"):
         return "PO.ORDERDATE", "text"

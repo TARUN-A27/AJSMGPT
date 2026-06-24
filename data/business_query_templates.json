@@ -405,6 +405,9 @@
     "intent": "grn_by_supplier_code",
     "description": "GRN details filtered by exact supplier/party code",
     "phrases": [
+      "grn for supplier",
+      "goods receipt for supplier",
+      "goods receipt note for supplier",
       "recent grn for supplier",
       "latest goods receipt note for supplier",
       "latest goods receipt for supplier",
@@ -873,6 +876,10 @@
     "intent": "pending_po_by_supplier_code",
     "description": "Pending/open purchase order details filtered by supplier code",
     "phrases": [
+      "purchase order for supplier",
+      "po for supplier",
+      "purchase order for supplier code",
+      "po for supplier code",
       "recent purchase order for supplier",
       "latest po for supplier",
       "latest purchase orders for supplier",

@@ -6,6 +6,7 @@ from typing import Any
 
 from app.backend_logger import log_event, new_request_id, set_request_id
 from app.business_template_engine import match_business_template
+from app.date_filter_engine import apply_date_filter_to_sql, strip_date_filter_phrases
 from app.oracle_client import run_safe_select
 from app.question_understanding import understand_question
 from app.answer_formatter import format_answer
@@ -216,6 +217,7 @@ def answer_question(question: str) -> dict[str, Any]:
 
     try:
         understanding = understand_question(question)
+        sql_question = strip_date_filter_phrases(question)
 
         log_event(
             request_id,
@@ -224,7 +226,7 @@ def answer_question(question: str) -> dict[str, Any]:
             understanding=understanding,
         )
 
-        template_result = match_business_template(question)
+        template_result = match_business_template(sql_question)
 
         if template_result:
             sql_result = template_result
@@ -252,13 +254,20 @@ def answer_question(question: str) -> dict[str, Any]:
             )
 
             try:
-                sql_result = _known_schema_fallback_sql(question)
+                sql_result = _known_schema_fallback_sql(sql_question)
                 if sql_result is None:
-                    sql_result = generate_select_sql_v2(question, limit=5, understanding=understanding)
+                    sql_result = generate_select_sql_v2(sql_question, limit=5, understanding=understanding)
 
                 # Ensure fallback source label
                 sql_result["source"] = sql_result.get("source") or "qwen_schema_fallback"
                 sql = sql_result.get("sql")
+                sql = apply_date_filter_to_sql(
+                    sql,
+                    question,
+                    intent=sql_result.get("intent"),
+                    tables_used=sql_result.get("tables_used"),
+                )
+                sql_result["sql"] = sql
             except Exception as gen_exc:
                 # Do not crash; return a safe user-facing message when SQL cannot be generated safely
                 log_event(
@@ -298,6 +307,14 @@ def answer_question(question: str) -> dict[str, Any]:
             "Starting safe Oracle SELECT execution",
             sql=sql,
         )
+
+        sql = apply_date_filter_to_sql(
+            sql,
+            question,
+            intent=sql_result.get("intent"),
+            tables_used=sql_result.get("tables_used"),
+        )
+        sql_result["sql"] = sql
 
         db_result = run_safe_select(sql)
 

@@ -22,6 +22,7 @@ APPROVED_EVAL_JSON = REPORTS_DIR / "approved_eval_tests.json"
 ROUTER_FIX_JSON = REPORTS_DIR / "router_fix_candidates.json"
 QUESTION_BANK_JSON = REPORTS_DIR / "question_bank.json"
 LAST_PIPELINE_LOG = REPORTS_DIR / "last_pipeline_run.txt"
+APPROVED_TEST_RUN_LOG = REPORTS_DIR / "approved_eval_test_run.txt"
 
 app = FastAPI(title="AutomateQuery UI")
 
@@ -696,6 +697,8 @@ BASE_JS = """
 
         if (action.indexOf("run-pipeline") !== -1) {
             showOverlay("Running automation pipeline...");
+        } else if (action.indexOf("run-approved-tests") !== -1) {
+            showOverlay("Running approved eval tests...");
         } else if (action.indexOf("export-approved") !== -1) {
             showOverlay("Exporting approved tests...");
         } else if (action.indexOf("sync") !== -1) {
@@ -935,6 +938,43 @@ def run_automation_pipeline() -> tuple[bool, str]:
         return False, "Pipeline failed. Check AutomateQuery/reports/last_pipeline_run.txt"
 
     return True, "Pipeline completed safely. Reports refreshed."
+
+
+
+def run_approved_eval_test_script() -> tuple[bool, str]:
+    script_path = AUTOMATE_DIR / "scripts" / "run_approved_eval_tests.py"
+
+    if not script_path.exists():
+        return False, f"Approved eval test script not found: {script_path}"
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script_path)],
+            cwd=str(PROJECT_ROOT),
+            text=True,
+            capture_output=True,
+            timeout=180,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Approved eval tests timed out after 180 seconds."
+
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    log_text = (
+        "COMMAND: "
+        + " ".join([sys.executable, str(script_path)])
+        + "\n\nSTDOUT:\n"
+        + result.stdout
+        + "\n\nSTDERR:\n"
+        + result.stderr
+    )
+
+    APPROVED_TEST_RUN_LOG.write_text(log_text, encoding="utf-8")
+
+    if result.returncode != 0:
+        return False, "Approved eval tests failed. Check approved_eval_test_run.txt"
+
+    return True, "Approved eval tests passed."
 
 
 def page_layout(title: str, body: str, active: str = "", message: str = "") -> str:
@@ -1488,6 +1528,14 @@ async def eval_review_page(request: Request) -> HTMLResponse:
         <form method="post" action="/export-approved">
             <button type="submit" class="export">Export Approved Tests</button>
         </form>
+
+        <form method="post" action="/run-approved-tests">
+            <button type="submit" class="sync">Run Approved Tests</button>
+        </form>
+
+        <form method="get" action="/approved-test-log">
+            <button type="submit" class="secondary">View Approved Test Log</button>
+        </form>
     </div>
 
     {cards_html}
@@ -1505,6 +1553,24 @@ async def eval_review_page(request: Request) -> HTMLResponse:
 @app.get("/approval", response_class=HTMLResponse)
 async def approval_alias(request: Request) -> HTMLResponse:
     return await eval_review_page(request)
+
+
+
+@app.post("/run-approved-tests")
+async def run_approved_tests() -> RedirectResponse:
+    ok, message = run_approved_eval_test_script()
+    return RedirectResponse(
+        url=f"/eval-review?message={quote(message)}",
+        status_code=303,
+    )
+
+
+@app.get("/approved-test-log", response_class=PlainTextResponse)
+async def approved_test_log() -> str:
+    if not APPROVED_TEST_RUN_LOG.exists():
+        return "No approved eval test run log found yet."
+
+    return APPROVED_TEST_RUN_LOG.read_text(encoding="utf-8")
 
 
 @app.post("/sync")

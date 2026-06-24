@@ -17,6 +17,24 @@ from app.query_engine import answer_question  # noqa: E402
 APPROVED_EVAL_JSON = AUTOMATE_DIR / "reports" / "approved_eval_tests.json"
 
 
+FORBIDDEN_SQL_WORDS = [
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "DROP",
+    "ALTER",
+    "TRUNCATE",
+    "MERGE",
+    "CREATE",
+    "GRANT",
+    "REVOKE",
+    "BEGIN",
+    "DECLARE",
+    "EXEC",
+    "EXECUTE",
+]
+
+
 def read_json(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(f"Approved eval file not found: {path}")
@@ -27,6 +45,20 @@ def read_json(path: Path) -> list[dict[str, Any]]:
         raise ValueError(f"Expected list in {path}")
 
     return data
+
+
+def assert_safe_select_sql(sql: str) -> None:
+    sql_upper = sql.upper().strip()
+
+    if not sql_upper:
+        raise AssertionError("SQL is empty.")
+
+    if not sql_upper.startswith("SELECT"):
+        raise AssertionError("Only SELECT SQL is allowed.")
+
+    for word in FORBIDDEN_SQL_WORDS:
+        if word in sql_upper:
+            raise AssertionError(f"Forbidden SQL keyword found: {word}")
 
 
 def main() -> None:
@@ -63,12 +95,16 @@ def main() -> None:
             print("SQL:", sql)
 
             assert result.get("success") is True, "Expected success=True"
+
             assert result.get("source") == expected_source, (
                 f"Expected source {expected_source}, got {result.get('source')}"
             )
+
             assert result.get("intent") == expected_intent, (
                 f"Expected intent {expected_intent}, got {result.get('intent')}"
             )
+
+            assert_safe_select_sql(sql)
 
             for token in expected_sql_contains:
                 assert token in sql, f"Missing SQL token: {token}"

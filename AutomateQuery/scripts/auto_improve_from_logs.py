@@ -29,12 +29,14 @@ def run_script(script_name: str) -> None:
 def main() -> None:
     run_script("analyze_question_logs.py")
     run_script("generate_eval_from_logs.py")
+    run_script("generate_question_bank.py")
+    run_script("create_review_eval_file.py")
 
     print("=" * 100)
     print("AutomateQuery completed safely.")
     print("No Oracle SQL was executed.")
     print("No production router code was modified.")
-    print("Review AutomateQuery/reports before applying any fix.")
+    print("Reports refreshed for Dashboard, Question Bank, Router Candidates, and Eval Approval.")
     print("=" * 100)
 
 

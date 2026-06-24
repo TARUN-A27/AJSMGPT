@@ -6,6 +6,7 @@ from typing import Any
 
 from app.backend_logger import log_event, new_request_id, set_request_id
 from app.business_template_engine import match_business_template
+from app.purchase_analytics_router import match_purchase_analytics_template
 from app.mrs_template_router import match_mrs_template
 from app.date_filter_engine import apply_date_filter_to_sql, strip_date_filter_phrases
 from app.oracle_client import run_safe_select
@@ -227,7 +228,7 @@ def answer_question(question: str) -> dict[str, Any]:
             understanding=understanding,
         )
 
-        template_result = match_mrs_template(sql_question) or match_business_template(sql_question)
+        template_result = match_purchase_analytics_template(sql_question) or match_mrs_template(sql_question) or match_business_template(sql_question)
 
         if template_result:
             sql_result = template_result

@@ -650,3 +650,32 @@ a {
 .single-question-panel button {
     width: fit-content;
 }
+
+.secondary-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 10px 14px;
+    color: var(--text);
+    text-decoration: none;
+    background: #111111;
+}
+
+.secondary-link:hover {
+    background: #1b1b1b;
+}
+
+/* Full-page loading overlay disabled */
+.loading-overlay,
+.page-loading,
+.page-loader,
+.loader-overlay,
+#loading-overlay,
+#loadingOverlay {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}

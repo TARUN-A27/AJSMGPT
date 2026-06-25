@@ -3,128 +3,153 @@ from __future__ import annotations
 import json
 import re
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 
-AUTOMATE_DIR = Path(__file__).resolve().parents[1]
-REPORTS_DIR = AUTOMATE_DIR / "reports"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPORTS_DIR = PROJECT_ROOT / "AutomateQuery" / "reports"
 
-QUESTION_BANK_JSON = REPORTS_DIR / "question_bank.json"
-ROUTER_FIX_JSON = REPORTS_DIR / "router_fix_candidates.json"
+QUESTION_BANK_PATH = REPORTS_DIR / "question_bank.json"
+ROUTER_FIX_CANDIDATES_PATH = REPORTS_DIR / "router_fix_candidates.json"
+QUESTIONS_ONLY_PATH = PROJECT_ROOT / "logs" / "questions_only.txt"
 
-ROUTER_PATCH_JSON = REPORTS_DIR / "router_patch_candidates.json"
-ROUTER_PATCH_MD = REPORTS_DIR / "router_patch_candidates.md"
+OUT_JSON = REPORTS_DIR / "router_patch_candidates.json"
+OUT_MD = REPORTS_DIR / "router_patch_candidates.md"
 
 
-def read_json(path: Path) -> Any:
+def read_json(path: Path, default: Any) -> Any:
     if not path.exists():
-        print(f"Missing file: {path}")
-        return []
-
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def write_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
 
 
-def normalize_text(value: str) -> str:
-    value = value.lower().strip()
-    value = re.sub(r"[^a-z0-9\s]", " ", value)
-    value = re.sub(r"\s+", " ", value).strip()
-    return value
+def clean_question(q: str) -> str:
+    return re.sub(r"\s+", " ", str(q or "")).strip()
 
 
-def extract_year(question: str) -> str | None:
-    match = re.search(r"\b(20\d{2})\b", question)
-    if match:
-        return match.group(1)
-    return None
+def norm(q: str) -> str:
+    return clean_question(q).lower()
 
 
-def extract_supplier_token(question: str) -> str | None:
+def add_unique(items: list[str], value: str | None) -> None:
+    value = clean_question(value or "")
+    if value and value not in items:
+        items.append(value)
+
+
+def read_questions() -> list[str]:
+    questions: list[str] = []
+
+    qb = read_json(QUESTION_BANK_PATH, [])
+    if isinstance(qb, list):
+        for row in qb:
+            if isinstance(row, dict):
+                add_unique(questions, row.get("question") or row.get("text") or row.get("q"))
+            else:
+                add_unique(questions, str(row))
+
+    fixes = read_json(ROUTER_FIX_CANDIDATES_PATH, [])
+    if isinstance(fixes, list):
+        for row in fixes:
+            if isinstance(row, dict):
+                add_unique(questions, row.get("question") or row.get("user_question") or row.get("text"))
+            else:
+                add_unique(questions, str(row))
+
+    if QUESTIONS_ONLY_PATH.exists():
+        for line in QUESTIONS_ONLY_PATH.read_text(encoding="utf-8").splitlines():
+            add_unique(questions, line.strip())
+
+    return questions
+
+
+def extract_year(q: str) -> str | None:
+    m = re.search(r"\b(20\d{2})\b", q)
+    return m.group(1) if m else None
+
+
+def normalize_material(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    s = value.strip().strip('"').strip("'").strip(" .,-_/\\")
+    s = re.sub(r"\s+", " ", s).strip()
+
+    s = re.sub(r"^(the|item|material)\s+", "", s, flags=re.I)
+    s = re.sub(
+        r"\b(latest|last|purchase|purchases|order|orders|po|no|number|qty|quantity|details|detail|rate|price|supplier|in|year)\b.*$",
+        "",
+        s,
+        flags=re.I,
+    ).strip()
+
+    if not s:
+        return None
+
+    s = s.replace("key board", "keyboard")
+    return s.upper()
+
+
+def extract_material(question: str) -> str | None:
+    q = clean_question(question)
+
+    quoted = re.search(r'"([^"]+)"', q)
+    if quoted:
+        return normalize_material(quoted.group(1))
+
     patterns = [
-        r"item\s+(.+?)(?:\s+in\s+\d{4}|$)",
-        r"of the item\s+(.+?)(?:\s+in\s+\d{4}|$)",
-        r"supplier\s+([a-zA-Z0-9&.\-\s]+)",
-        r"vendor\s+([a-zA-Z0-9&.\-\s]+)",
-        r"party\s+([a-zA-Z0-9&.\-\s]+)",
+        r"\bof\s+the\s+item\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bitem\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bpurchase\s+details\s+of\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bpurchase\s+(?:qty|quantity)\s+purchase\s+of\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\brate\s+of\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bprice\s+of\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bsupply\s+of\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bpurchase\s+of\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\bmaterial\s+([a-zA-Z0-9&.\-_/ ]+?)\s+last\s+purchased",
     ]
 
     for pattern in patterns:
-        match = re.search(pattern, question, flags=re.IGNORECASE)
-        if match:
-            value = match.group(1).strip()
-            value = re.sub(r"\s+", " ", value)
-            return value.upper()
+        m = re.search(pattern, q, flags=re.I)
+        if m:
+            material = normalize_material(m.group(1))
+            if material:
+                return material
 
     return None
 
 
-def extract_material_guess(question: str) -> str | None:
-    q = normalize_text(question)
-
-    patterns = [
-        r"rate of (.+?)(?: in \d{4}|$)",
-        r"price of (.+?)(?: in \d{4}|$)",
-        r"purchase of (.+?)(?: in \d{4}|$)",
-        r"purchase rate of (.+?)(?: in \d{4}|$)",
-        r"supply of (.+?)(?: in \d{4}|$)",
-        r"material (.+?) last purchased",
-        r"for (.+?)(?: in \d{4}|$)",
-    ]
-
-    stop_words = {
-        "the",
-        "a",
-        "an",
-        "last",
-        "latest",
-        "purchase",
-        "rate",
-        "price",
-        "material",
-        "item",
-        "mrs",
-        "supplier",
-        "who",
-        "which",
-        "what",
-        "how",
-        "many",
-        "much",
-        "cost",
-    }
-
-    for pattern in patterns:
-        match = re.search(pattern, q)
-        if match:
-            value = match.group(1).strip()
-            words = [w for w in value.split() if w not in stop_words]
-            value = " ".join(words).strip()
-            if value:
-                return value.upper()
-
-    known_materials = [
-        "mouse",
-        "keyboard",
-        "key board",
-        "monitor",
-        "computer monitor",
-        "barcode scanner",
-        "yarn",
-    ]
-
-    for material in known_materials:
-        if material in q:
-            return material.upper()
-
+def extract_supplier(question: str) -> str | None:
+    q = clean_question(question)
+    m = re.search(r"\bsupplier\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)", q, flags=re.I)
+    if m:
+        return m.group(1).strip().upper()
     return None
+
+
+def extract_empcode(question: str) -> str | None:
+    m = re.search(r"\bempcode\s+(\d+)\b", question, flags=re.I)
+    return m.group(1) if m else None
+
+
+def extract_party(question: str) -> str | None:
+    m = re.search(r"\bparty\s+([a-zA-Z0-9]+)\b", question, flags=re.I)
+    return m.group(1).upper() if m else None
+
+
+def extract_limit(question: str, default: int = 1) -> int:
+    m = re.search(r"\blast\s+(\d+)\b", question, flags=re.I)
+    if not m:
+        return default
+    return max(1, min(int(m.group(1)), 50))
 
 
 def make_patch(
+    *,
     patch_id: str,
     title: str,
     target_router_file: str,
@@ -139,535 +164,425 @@ def make_patch(
     return {
         "patch_id": patch_id,
         "title": title,
-        "status": "review_required",
-        "priority": priority,
         "target_router_file": target_router_file,
         "intent_name": intent_name,
-        "question_patterns": sorted(set(question_patterns)),
+        "question_patterns": question_patterns,
         "suggested_extraction": suggested_extraction,
         "suggested_sql_logic": suggested_sql_logic,
         "expected_sql_contains": expected_sql_contains,
+        "priority": priority,
         "reason": reason,
-        "human_review_required": True,
         "auto_apply_allowed": False,
     }
 
 
-def collect_questions() -> list[dict[str, Any]]:
-    question_bank = read_json(QUESTION_BANK_JSON)
-    router_candidates = read_json(ROUTER_FIX_JSON)
+def generate_patches(questions: list[str]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[str]] = defaultdict(list)
+    materials: dict[str, set[str]] = defaultdict(set)
+    suppliers: dict[str, set[str]] = defaultdict(set)
+    years: dict[str, set[str]] = defaultdict(set)
+    limits: dict[str, set[str]] = defaultdict(set)
+    empcodes: dict[str, set[str]] = defaultdict(set)
+    parties: dict[str, set[str]] = defaultdict(set)
 
-    rows: list[dict[str, Any]] = []
-
-    if isinstance(question_bank, list):
-        for item in question_bank:
-            question = str(item.get("question") or "").strip()
-            if question:
-                rows.append(
-                    {
-                        "question": question,
-                        "category": item.get("category"),
-                        "source_type": "question_bank",
-                        "needs_review": item.get("needs_review"),
-                        "fallback_count": item.get("fallback_count"),
-                        "failed_count": item.get("failed_count"),
-                        "slow_count": item.get("slow_count"),
-                    }
-                )
-
-    if isinstance(router_candidates, list):
-        for item in router_candidates:
-            question = str(item.get("question") or "").strip()
-            if question:
-                rows.append(
-                    {
-                        "question": question,
-                        "category": "router_candidate",
-                        "source_type": "router_fix_candidates",
-                        "problem_types": item.get("problem_types", []),
-                        "wrong_tables_detected": item.get("wrong_tables_detected", []),
-                        "source": item.get("source"),
-                    }
-                )
-
-    # Dedupe by normalized question.
-    seen: set[str] = set()
-    unique_rows: list[dict[str, Any]] = []
-
-    for row in rows:
-        key = normalize_text(row["question"])
-        if key in seen:
-            continue
-
-        seen.add(key)
-        unique_rows.append(row)
-
-    return unique_rows
-
-
-def build_patch_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    grouped_questions: dict[str, list[str]] = defaultdict(list)
-    extracted_materials: dict[str, set[str]] = defaultdict(set)
-    extracted_years: dict[str, set[str]] = defaultdict(set)
-    extracted_suppliers: dict[str, set[str]] = defaultdict(set)
-
-    for row in rows:
-        question = row["question"]
-        q = normalize_text(question)
-
+    for question in questions:
+        q = norm(question)
+        material = extract_material(question)
+        supplier = extract_supplier(question)
         year = extract_year(question)
-        material = extract_material_guess(question)
-        supplier = extract_supplier_token(question)
+        empcode = extract_empcode(question)
+        party = extract_party(question)
 
-        # Supplier first/last supply
-        if "supplier" in q and "supply" in q and "first" in q:
-            key = "purchase_first_supply_by_supplier"
-            grouped_questions[key].append(question)
-            if supplier:
-                extracted_suppliers[key].add(supplier)
-
-        if "supplier" in q and "supply" in q and ("last" in q or "latest" in q):
-            key = "purchase_last_supply_by_supplier"
-            grouped_questions[key].append(question)
-            if supplier:
-                extracted_suppliers[key].add(supplier)
-
-        # Material supply
-        if "supply of" in q and ("last" in q or "latest" in q):
-            key = "purchase_last_supply_by_material"
-            grouped_questions[key].append(question)
-            if material:
-                extracted_materials[key].add(material)
-
-                # Last N purchase quantity/details by material
+        # Last N purchase quantity/details by material.
         if (
             "last" in q
             and "purchase" in q
-            and ("qty" in q or "quantity" in q)
+            and ("qty" in q or "quantity" in q or "details" in q or "detail" in q)
             and material
         ):
             key = "purchase_last_n_purchases_by_material"
-            grouped_questions[key].append(question)
-            extracted_materials[key].add(material)
+            grouped[key].append(question)
+            materials[key].add(material)
+            limits[key].add(f"N={extract_limit(question, default=1)}")
+            continue
 
-            n_match = re.search(r"\blast\s+(\d+)\b", q)
-            if n_match:
-                extracted_years[key].add("N=" + n_match.group(1))
-
-        # Purchase rate / price by material
-        is_purchase_rate = (
-            "purchase rate" in q
-            or "purchased rate" in q
-            or "price of" in q
-            or "last purchased rate" in q
-            or "last purchase rate" in q
-            or "purchase of" in q
-        )
-
+        # Latest purchase order number/details by material.
         if (
-            is_purchase_rate
+            ("latest" in q or "last" in q)
+            and "purchase" in q
+            and ("order" in q or "po" in q)
+            and material
+            and "supplier" not in q
+        ):
+            key = "purchase_latest_order_by_material"
+            grouped[key].append(question)
+            materials[key].add(material)
+            continue
+
+        # First / last supply by supplier.
+        if "supply" in q and "supplier" in q and supplier:
+            if "first" in q:
+                key = "purchase_first_supply_by_supplier"
+            elif "last" in q or "latest" in q:
+                key = "purchase_last_supply_by_supplier"
+            else:
+                key = ""
+            if key:
+                grouped[key].append(question)
+                suppliers[key].add(supplier)
+                continue
+
+        # Last supply by material.
+        if "last" in q and "supply" in q and material and "supplier" not in q:
+            key = "purchase_last_supply_by_material"
+            grouped[key].append(question)
+            materials[key].add(material)
+            continue
+
+        # Purchase rate / price by material.
+        if (
+            "purchase" in q
+            and ("rate" in q or "price" in q or "last year purchase" in q)
             and material
             and "qty" not in q
             and "quantity" not in q
+            and "details" not in q
+            and "order" not in q
         ):
             key = "purchase_rate_by_material"
-            grouped_questions[key].append(question)
-            extracted_materials[key].add(material)
+            grouped[key].append(question)
+            materials[key].add(material)
             if year:
-                extracted_years[key].add(year)
+                years[key].add(year)
+            continue
 
-        # Latest purchase order by supplier/year
-        if "purchase order" in q and "supplier" in q:
+        # Latest purchase order by supplier/year.
+        if "purchase order" in q and "supplier" in q and supplier:
             key = "latest_purchase_order_by_supplier_year"
-            grouped_questions[key].append(question)
-            if supplier:
-                extracted_suppliers[key].add(supplier)
+            grouped[key].append(question)
+            suppliers[key].add(supplier)
             if year:
-                extracted_years[key].add(year)
+                years[key].add(year)
+            continue
 
-        # GRN by supplier/year
-        if "grn" in q and "supplier" in q:
+        # GRN by supplier/year.
+        if "grn" in q and "supplier" in q and supplier:
             key = "grn_by_supplier_year"
-            grouped_questions[key].append(question)
-            if supplier:
-                extracted_suppliers[key].add(supplier)
+            grouped[key].append(question)
+            suppliers[key].add(supplier)
             if year:
-                extracted_years[key].add(year)
+                years[key].add(year)
+            continue
 
-        # Attendance by empcode/date
-        if "attendance" in q and "empcode" in q:
+        # Attendance by empcode/date.
+        if "attendance" in q and empcode:
             key = "attendance_by_empcode_date"
-            grouped_questions[key].append(question)
-            if year:
-                extracted_years[key].add(year)
+            grouped[key].append(question)
+            empcodes[key].add(empcode)
+            continue
 
-        # Document/voucher by party/year
-        if ("document" in q or "voucher" in q) and "party" in q:
+        # Document / cashbank by party/year.
+        if ("document" in q or "cashbank" in q or "voucher" in q) and party:
             key = "document_details_by_party_year"
-            grouped_questions[key].append(question)
-            if supplier:
-                extracted_suppliers[key].add(supplier)
+            grouped[key].append(question)
+            parties[key].add(party)
             if year:
-                extracted_years[key].add(year)
+                years[key].add(year)
+            continue
 
     patches: list[dict[str, Any]] = []
 
-    if grouped_questions.get("purchase_first_supply_by_supplier"):
-        patches.append(
-            make_patch(
-                patch_id="patch_purchase_first_supply_by_supplier",
-                title="First supply by supplier",
-                target_router_file="app/purchase_analytics_router.py",
-                intent_name="purchase_first_supply_by_supplier",
-                question_patterns=grouped_questions["purchase_first_supply_by_supplier"],
-                suggested_extraction={
-                    "supplier_name_or_code": sorted(extracted_suppliers["purchase_first_supply_by_supplier"]),
-                    "ordering": "oldest first",
-                },
-                suggested_sql_logic=[
-                    "Use INVENTORY.PURCHASEORDER PO",
-                    "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
-                    "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
-                    "Filter supplier using UPPER(P.PARTYNAME) LIKE '%SUPPLIER%' or PO.SUP_CODE",
-                    "Order by PO.ORDERDATE ASC NULLS LAST, PO.ORDERNO ASC",
-                    "Return first row only using outer SELECT WHERE ROWNUM <= 1",
-                ],
-                expected_sql_contains=[
-                    "INVENTORY.PURCHASEORDER",
-                    "INVENTORY.INVITEMS",
-                    "SCM.PARTYMASTER",
-                    "ORDER BY PO.ORDERDATE ASC",
-                    "ROWNUM <= 1",
-                ],
-                priority="high",
-                reason="Repeated real user question and known fallback problem.",
-            )
-        )
+    if grouped.get("purchase_first_supply_by_supplier"):
+        patches.append(make_patch(
+            patch_id="patch_purchase_first_supply_by_supplier",
+            title="First supply by supplier",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="purchase_first_supply_by_supplier",
+            question_patterns=grouped["purchase_first_supply_by_supplier"],
+            suggested_extraction={"supplier_name": sorted(suppliers["purchase_first_supply_by_supplier"]), "ordering": "oldest first"},
+            suggested_sql_logic=[
+                "Use INVENTORY.PURCHASEORDER PO",
+                "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
+                "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
+                "Filter supplier using UPPER(P.PARTYNAME) LIKE '%SUPPLIER%'",
+                "Order by PO.ORDERDATE ASC NULLS LAST, PO.ORDERNO ASC",
+                "Return first row only using outer SELECT WHERE ROWNUM <= 1",
+            ],
+            expected_sql_contains=["INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS", "SCM.PARTYMASTER", "UPPER(P.PARTYNAME) LIKE", "ORDER BY PO.ORDERDATE ASC", "ROWNUM <= 1"],
+            priority="high",
+            reason="Real user asked first supply by supplier.",
+        ))
 
-    if grouped_questions.get("purchase_last_supply_by_supplier"):
-        patches.append(
-            make_patch(
-                patch_id="patch_purchase_last_supply_by_supplier",
-                title="Last supply by supplier",
-                target_router_file="app/purchase_analytics_router.py",
-                intent_name="purchase_last_supply_by_supplier",
-                question_patterns=grouped_questions["purchase_last_supply_by_supplier"],
-                suggested_extraction={
-                    "supplier_name_or_code": sorted(extracted_suppliers["purchase_last_supply_by_supplier"]),
-                    "ordering": "latest first",
-                },
-                suggested_sql_logic=[
-                    "Use INVENTORY.PURCHASEORDER PO",
-                    "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
-                    "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
-                    "Filter supplier using UPPER(P.PARTYNAME) LIKE '%SUPPLIER%' or PO.SUP_CODE",
-                    "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
-                    "Return first row only using outer SELECT WHERE ROWNUM <= 1",
-                ],
-                expected_sql_contains=[
-                    "INVENTORY.PURCHASEORDER",
-                    "INVENTORY.INVITEMS",
-                    "SCM.PARTYMASTER",
-                    "ORDER BY PO.ORDERDATE DESC",
-                    "ROWNUM <= 1",
-                ],
-                priority="high",
-                reason="Common supplier supply question pattern.",
-            )
-        )
+    if grouped.get("purchase_last_supply_by_supplier"):
+        patches.append(make_patch(
+            patch_id="patch_purchase_last_supply_by_supplier",
+            title="Last supply by supplier",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="purchase_last_supply_by_supplier",
+            question_patterns=grouped["purchase_last_supply_by_supplier"],
+            suggested_extraction={"supplier_name": sorted(suppliers["purchase_last_supply_by_supplier"]), "ordering": "latest first"},
+            suggested_sql_logic=[
+                "Use INVENTORY.PURCHASEORDER PO",
+                "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
+                "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
+                "Filter supplier using UPPER(P.PARTYNAME) LIKE '%SUPPLIER%'",
+                "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+                "Return first row only using outer SELECT WHERE ROWNUM <= 1",
+            ],
+            expected_sql_contains=["INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS", "SCM.PARTYMASTER", "UPPER(P.PARTYNAME) LIKE", "ORDER BY PO.ORDERDATE DESC", "ROWNUM <= 1"],
+            priority="high",
+            reason="Real user asked last supply by supplier.",
+        ))
 
-    if grouped_questions.get("purchase_last_supply_by_material"):
-        patches.append(
-            make_patch(
-                patch_id="patch_purchase_last_supply_by_material",
-                title="Last supply by material",
-                target_router_file="app/purchase_analytics_router.py",
-                intent_name="purchase_last_supply_by_material",
-                question_patterns=grouped_questions["purchase_last_supply_by_material"],
-                suggested_extraction={
-                    "material_name": sorted(extracted_materials["purchase_last_supply_by_material"]),
-                    "ordering": "latest first",
-                },
-                suggested_sql_logic=[
-                    "Use INVENTORY.PURCHASEORDER PO",
-                    "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
-                    "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
-                    "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
-                    "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
-                    "Return first row only using outer SELECT WHERE ROWNUM <= 1",
-                ],
-                expected_sql_contains=[
-                    "INVENTORY.PURCHASEORDER",
-                    "INVENTORY.INVITEMS",
-                    "SCM.PARTYMASTER",
-                    "UPPER(INV.ITEM_NAME) LIKE",
-                    "ORDER BY PO.ORDERDATE DESC",
-                    "ROWNUM <= 1",
-                ],
-                priority="high",
-                reason="User asked material supply question that should not need Qwen fallback.",
-            )
-        )
+    if grouped.get("purchase_last_supply_by_material"):
+        patches.append(make_patch(
+            patch_id="patch_purchase_last_supply_by_material",
+            title="Last supply by material",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="purchase_last_supply_by_material",
+            question_patterns=grouped["purchase_last_supply_by_material"],
+            suggested_extraction={"material_name": sorted(materials["purchase_last_supply_by_material"]), "ordering": "latest first"},
+            suggested_sql_logic=[
+                "Use INVENTORY.PURCHASEORDER PO",
+                "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
+                "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
+                "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
+                "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+                "Return first row only using outer SELECT WHERE ROWNUM <= 1",
+            ],
+            expected_sql_contains=["INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS", "SCM.PARTYMASTER", "UPPER(INV.ITEM_NAME) LIKE", "ORDER BY PO.ORDERDATE DESC", "ROWNUM <= 1"],
+            priority="high",
+            reason="Real user asked last supply by material.",
+        ))
 
-    if grouped_questions.get("purchase_last_n_purchases_by_material"):
-        patches.append(
-            make_patch(
-                patch_id="patch_purchase_last_n_purchases_by_material",
-                title="Last N purchase quantity/details by material",
-                target_router_file="app/purchase_analytics_router.py",
-                intent_name="purchase_last_n_purchases_by_material",
-                question_patterns=grouped_questions["purchase_last_n_purchases_by_material"],
-                suggested_extraction={
-                    "material_name": sorted(extracted_materials["purchase_last_n_purchases_by_material"]),
-                    "limit": sorted(extracted_years["purchase_last_n_purchases_by_material"]),
-                    "ordering": "latest first",
-                },
-                suggested_sql_logic=[
-                    "Use INVENTORY.PURCHASEORDER PO",
-                    "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
-                    "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
-                    "Extract N from phrases like 'last 3'",
-                    "Extract material from phrases like 'item Keyboard'",
-                    "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
-                    "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
-                    "Return N rows using outer SELECT WHERE ROWNUM <= N",
-                ],
-                expected_sql_contains=[
-                    "INVENTORY.PURCHASEORDER",
-                    "INVENTORY.INVITEMS",
-                    "SCM.PARTYMASTER",
-                    "UPPER(INV.ITEM_NAME) LIKE",
-                    "ORDER BY PO.ORDERDATE DESC",
-                    "ROWNUM <=",
-                ],
-                priority="high",
-                reason="HOD asked last N purchase quantity/details for a material and AJSMGPT fallback generated wrong SQL.",
-            )
-        )
+    if grouped.get("purchase_last_n_purchases_by_material"):
+        patches.append(make_patch(
+            patch_id="patch_purchase_last_n_purchases_by_material",
+            title="Last N purchase quantity/details by material",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="purchase_last_n_purchases_by_material",
+            question_patterns=grouped["purchase_last_n_purchases_by_material"],
+            suggested_extraction={
+                "material_name": sorted(materials["purchase_last_n_purchases_by_material"]),
+                "limit": sorted(limits["purchase_last_n_purchases_by_material"]),
+                "ordering": "latest first",
+            },
+            suggested_sql_logic=[
+                "Use INVENTORY.PURCHASEORDER PO",
+                "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
+                "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
+                "Extract N from phrases like 'last 3'",
+                "Extract material from phrases like quoted text or 'item Keyboard'",
+                "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
+                "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+                "Return N rows using outer SELECT WHERE ROWNUM <= N",
+            ],
+            expected_sql_contains=["INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS", "SCM.PARTYMASTER", "UPPER(INV.ITEM_NAME) LIKE", "ORDER BY PO.ORDERDATE DESC", "ROWNUM <="],
+            priority="high",
+            reason="User asked last N purchase quantity/details for a material.",
+        ))
 
-    if grouped_questions.get("purchase_rate_by_material"):
-        patches.append(
-            make_patch(
-                patch_id="patch_purchase_rate_by_material",
-                title="Purchase rate / price by material",
-                target_router_file="app/purchase_analytics_router.py",
-                intent_name="purchase_rate_by_material",
-                question_patterns=grouped_questions["purchase_rate_by_material"],
-                suggested_extraction={
-                    "material_name": sorted(extracted_materials["purchase_rate_by_material"]),
-                    "year": sorted(extracted_years["purchase_rate_by_material"]),
-                    "date_phrases": ["last year", "last one year", "in YYYY"],
-                },
-                suggested_sql_logic=[
-                    "Use INVENTORY.PURCHASEORDER PO",
-                    "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
-                    "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
-                    "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
-                    "If year exists, filter EXTRACT(YEAR FROM PO.ORDERDATE) = YYYY",
-                    "If 'last one year', filter PO.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -12)",
-                    "For latest/last rate, order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
-                    "For list all rates, return multiple purchase rows ordered latest first",
-                ],
-                expected_sql_contains=[
-                    "INVENTORY.PURCHASEORDER",
-                    "INVENTORY.INVITEMS",
-                    "UPPER(INV.ITEM_NAME) LIKE",
-                    "PO.RATE",
-                    "PO.ORDERDATE",
-                ],
-                priority="high",
-                reason="Many real user purchase rate/price questions can share one router intent family.",
-            )
-        )
+    if grouped.get("purchase_latest_order_by_material"):
+        patches.append(make_patch(
+            patch_id="patch_purchase_latest_order_by_material",
+            title="Latest purchase order number/details by material",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="purchase_latest_order_by_material",
+            question_patterns=grouped["purchase_latest_order_by_material"],
+            suggested_extraction={"material_name": sorted(materials["purchase_latest_order_by_material"]), "ordering": "latest first"},
+            suggested_sql_logic=[
+                "Use INVENTORY.PURCHASEORDER PO",
+                "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
+                "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
+                "Extract material from quoted text or item name",
+                "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
+                "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+                "Return first row using outer SELECT WHERE ROWNUM <= 1",
+            ],
+            expected_sql_contains=["INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS", "SCM.PARTYMASTER", "UPPER(INV.ITEM_NAME) LIKE", "ORDER BY PO.ORDERDATE DESC", "ROWNUM <= 1"],
+            priority="high",
+            reason="User asked latest purchase order number/details for a material.",
+        ))
 
-    if grouped_questions.get("latest_purchase_order_by_supplier_year"):
-        patches.append(
-            make_patch(
-                patch_id="patch_latest_purchase_order_by_supplier_year",
-                title="Latest purchase order by supplier and year",
-                target_router_file="app/purchase_analytics_router.py",
-                intent_name="latest_purchase_order_by_supplier_year",
-                question_patterns=grouped_questions["latest_purchase_order_by_supplier_year"],
-                suggested_extraction={
-                    "supplier_name_or_code": sorted(extracted_suppliers["latest_purchase_order_by_supplier_year"]),
-                    "year": sorted(extracted_years["latest_purchase_order_by_supplier_year"]),
-                },
-                suggested_sql_logic=[
-                    "Use INVENTORY.PURCHASEORDER PO",
-                    "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
-                    "Filter supplier by PO.SUP_CODE or UPPER(P.PARTYNAME)",
-                    "Filter year using EXTRACT(YEAR FROM PO.ORDERDATE)",
-                    "Order by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
-                    "Return first row only",
-                ],
-                expected_sql_contains=[
-                    "INVENTORY.PURCHASEORDER",
-                    "SCM.PARTYMASTER",
-                    "PO.SUP_CODE",
-                    "EXTRACT(YEAR FROM PO.ORDERDATE)",
-                    "ORDER BY PO.ORDERDATE DESC",
-                ],
-                priority="medium",
-                reason="Supplier/year purchase order questions should use deterministic router.",
-            )
-        )
+    if grouped.get("purchase_rate_by_material"):
+        patches.append(make_patch(
+            patch_id="patch_purchase_rate_by_material",
+            title="Purchase rate / price by material",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="purchase_rate_by_material",
+            question_patterns=grouped["purchase_rate_by_material"],
+            suggested_extraction={"material_name": sorted(materials["purchase_rate_by_material"]), "year": sorted(years["purchase_rate_by_material"])},
+            suggested_sql_logic=[
+                "Use INVENTORY.PURCHASEORDER PO",
+                "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
+                "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
+                "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
+                "Return latest purchase rates ordered by PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
+            ],
+            expected_sql_contains=["INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS", "SCM.PARTYMASTER", "UPPER(INV.ITEM_NAME) LIKE", "PO.RATE", "ORDER BY PO.ORDERDATE DESC"],
+            priority="high",
+            reason="Many real user purchase rate/price questions can share one router intent family.",
+        ))
 
-    if grouped_questions.get("grn_by_supplier_year"):
-        patches.append(
-            make_patch(
-                patch_id="patch_grn_by_supplier_year",
-                title="GRN by supplier and year",
-                target_router_file="app/purchase_analytics_router.py",
-                intent_name="grn_by_supplier_year",
-                question_patterns=grouped_questions["grn_by_supplier_year"],
-                suggested_extraction={
-                    "supplier_name_or_code": sorted(extracted_suppliers["grn_by_supplier_year"]),
-                    "year": sorted(extracted_years["grn_by_supplier_year"]),
-                },
-                suggested_sql_logic=[
-                    "Review actual GRN table before applying.",
-                    "Likely use purchase receipt / GRN table joined with supplier master.",
-                    "Filter supplier by code/name.",
-                    "Filter GRN date year.",
-                    "Return GRN number, date, material, quantity, supplier.",
-                ],
-                expected_sql_contains=[
-                    "REVIEW_ACTUAL_GRN_TABLE",
-                    "SUPPLIER",
-                    "GRN",
-                ],
-                priority="medium",
-                reason="GRN table names must be verified before router implementation.",
-            )
-        )
+    if grouped.get("latest_purchase_order_by_supplier_year"):
+        patches.append(make_patch(
+            patch_id="patch_latest_purchase_order_by_supplier_year",
+            title="Latest purchase order by supplier and year",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="latest_purchase_order_by_supplier_year",
+            question_patterns=grouped["latest_purchase_order_by_supplier_year"],
+            suggested_extraction={"supplier": sorted(suppliers["latest_purchase_order_by_supplier_year"]), "year": sorted(years["latest_purchase_order_by_supplier_year"])},
+            suggested_sql_logic=["Use purchase order tables and filter supplier/year."],
+            expected_sql_contains=["INVENTORY.PURCHASEORDER", "ORDER BY"],
+            priority="medium",
+            reason="User asked latest purchase order for supplier/year.",
+        ))
 
-    if grouped_questions.get("attendance_by_empcode_date"):
-        patches.append(
-            make_patch(
-                patch_id="patch_attendance_by_empcode_date",
-                title="Attendance by empcode and optional date",
-                target_router_file="NEW_ROUTER_OR_REVIEW_REQUIRED",
-                intent_name="attendance_by_empcode_date",
-                question_patterns=grouped_questions["attendance_by_empcode_date"],
-                suggested_extraction={
-                    "empcode": "extract numeric empcode",
-                    "date": "extract YYYYMMDD or date phrase if present",
-                },
-                suggested_sql_logic=[
-                    "Review attendance table names before applying.",
-                    "Filter by employee code.",
-                    "If date exists, filter attendance date.",
-                    "Return current/date attendance details.",
-                ],
-                expected_sql_contains=[
-                    "REVIEW_ATTENDANCE_TABLE",
-                    "EMPCODE",
-                ],
-                priority="medium",
-                reason="Attendance questions are currently fallback and should get a business router after schema verification.",
-            )
-        )
+    if grouped.get("grn_by_supplier_year"):
+        patches.append(make_patch(
+            patch_id="patch_grn_by_supplier_year",
+            title="GRN by supplier and year",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="grn_by_supplier_year",
+            question_patterns=grouped["grn_by_supplier_year"],
+            suggested_extraction={"supplier": sorted(suppliers["grn_by_supplier_year"]), "year": sorted(years["grn_by_supplier_year"])},
+            suggested_sql_logic=["Use INVENTORY.GRN and supplier/year filters."],
+            expected_sql_contains=["INVENTORY.GRN"],
+            priority="medium",
+            reason="User asked GRN details for supplier/year.",
+        ))
 
-    if grouped_questions.get("document_details_by_party_year"):
-        patches.append(
-            make_patch(
-                patch_id="patch_document_details_by_party_year",
-                title="Document/voucher details by party and optional year",
-                target_router_file="NEW_ROUTER_OR_REVIEW_REQUIRED",
-                intent_name="document_details_by_party_year",
-                question_patterns=grouped_questions["document_details_by_party_year"],
-                suggested_extraction={
-                    "party_code": sorted(extracted_suppliers["document_details_by_party_year"]),
-                    "year": sorted(extracted_years["document_details_by_party_year"]),
-                },
-                suggested_sql_logic=[
-                    "Review document/voucher tables before applying.",
-                    "Filter by party code/name.",
-                    "If year exists, filter document date year.",
-                    "Return document number, date, party, amount/status.",
-                ],
-                expected_sql_contains=[
-                    "REVIEW_DOCUMENT_TABLE",
-                    "PARTY",
-                ],
-                priority="medium",
-                reason="Document/party questions are fallback and need table verification.",
-            )
-        )
+    if grouped.get("attendance_by_empcode_date"):
+        patches.append(make_patch(
+            patch_id="patch_attendance_by_empcode_date",
+            title="Attendance by employee code/date",
+            target_router_file="REVIEW_REQUIRED",
+            intent_name="attendance_by_empcode_date",
+            question_patterns=grouped["attendance_by_empcode_date"],
+            suggested_extraction={"empcode": sorted(empcodes["attendance_by_empcode_date"])},
+            suggested_sql_logic=["Needs HRDNEW table verification."],
+            expected_sql_contains=["HRDNEW"],
+            priority="medium",
+            reason="Attendance questions need HRDNEW router/table verification.",
+        ))
 
-    patches.sort(key=lambda p: {"high": 0, "medium": 1, "low": 2}.get(p["priority"], 9))
+    if grouped.get("document_details_by_party_year"):
+        patches.append(make_patch(
+            patch_id="patch_document_details_by_party_year",
+            title="Document / voucher details by party/year",
+            target_router_file="REVIEW_REQUIRED",
+            intent_name="document_details_by_party_year",
+            question_patterns=grouped["document_details_by_party_year"],
+            suggested_extraction={"party": sorted(parties["document_details_by_party_year"]), "year": sorted(years["document_details_by_party_year"])},
+            suggested_sql_logic=["Needs ADMIN table verification."],
+            expected_sql_contains=["ADMIN"],
+            priority="medium",
+            reason="Document/cashbank questions need ADMIN router/table verification.",
+        ))
+
+
+    # Forced safety catch: suppliers by material/item questions.
+    # This catches cases that appear in Router Candidates because fallback used wrong table.
+    # Example: WHO are the suppliers for the item "barcode label"
+    supplier_material_questions: list[str] = []
+    supplier_material_names: set[str] = set()
+
+    for question in questions:
+        q = norm(question)
+        material = extract_material(question)
+
+        if (
+            ("supplier" in q or "suppliers" in q)
+            and ("item" in q or "material" in q)
+            and material
+            and "purchase order" not in q
+        ):
+            if question not in supplier_material_questions:
+                supplier_material_questions.append(question)
+            supplier_material_names.add(material)
+
+    already_has_supplier_material_patch = any(
+        patch.get("patch_id") == "patch_purchase_suppliers_by_material"
+        for patch in patches
+    )
+
+    if supplier_material_questions and not already_has_supplier_material_patch:
+        patches.append(make_patch(
+            patch_id="patch_purchase_suppliers_by_material",
+            title="Suppliers by material/item",
+            target_router_file="app/purchase_analytics_router.py",
+            intent_name="purchase_suppliers_by_material",
+            question_patterns=supplier_material_questions,
+            suggested_extraction={
+                "material_name": sorted(supplier_material_names),
+            },
+            suggested_sql_logic=[
+                "Use INVENTORY.PURCHASEORDER PO",
+                "Join INVENTORY.INVITEMS INV on PO.ITEM_CODE = INV.ITEM_CODE",
+                "Left join SCM.PARTYMASTER P on PO.SUP_CODE = P.PARTYCODE",
+                "Extract material from quoted text or item phrase",
+                "Filter material using UPPER(INV.ITEM_NAME) LIKE '%MATERIAL%'",
+                "Return distinct suppliers using PO.SUP_CODE and P.PARTYNAME",
+                "Do not use INVENTORY.SUPPLIER because fallback used wrong table",
+            ],
+            expected_sql_contains=[
+                "INVENTORY.PURCHASEORDER",
+                "INVENTORY.INVITEMS",
+                "SCM.PARTYMASTER",
+                "UPPER(INV.ITEM_NAME) LIKE",
+                "DISTINCT",
+                "P.PARTYNAME",
+            ],
+            priority="high",
+            reason="User asked suppliers for a material and fallback used wrong supplier table.",
+        ))
+
+
     return patches
 
 
 def write_markdown(patches: list[dict[str, Any]]) -> None:
-    lines: list[str] = []
-
-    lines.append("# AutomateQuery Router Patch Candidates")
-    lines.append("")
-    lines.append(f"Generated at: `{datetime.now().isoformat(timespec='seconds')}`")
-    lines.append("")
-    lines.append("## Safety")
-    lines.append("")
-    lines.append("- This file contains suggestions only.")
-    lines.append("- No router code was modified.")
-    lines.append("- No Oracle SQL was executed.")
-    lines.append("- Every patch requires human review.")
-    lines.append("")
-    lines.append("## Summary")
-    lines.append("")
-    lines.append(f"- Patch candidates: `{len(patches)}`")
-    lines.append("")
+    lines = [
+        "# Router Patch Candidates",
+        "",
+        f"Total candidates: {len(patches)}",
+        "",
+    ]
 
     for patch in patches:
-        lines.append(f"## {patch['patch_id']}")
-        lines.append("")
-        lines.append(f"- Title: `{patch['title']}`")
-        lines.append(f"- Priority: `{patch['priority']}`")
-        lines.append(f"- Target router: `{patch['target_router_file']}`")
-        lines.append(f"- Intent name: `{patch['intent_name']}`")
-        lines.append(f"- Status: `{patch['status']}`")
-        lines.append(f"- Auto apply allowed: `{patch['auto_apply_allowed']}`")
-        lines.append(f"- Reason: {patch['reason']}")
-        lines.append("")
-        lines.append("### Question Patterns")
-        lines.append("")
-        for question in patch["question_patterns"]:
-            lines.append(f"- `{question}`")
-        lines.append("")
-        lines.append("### Suggested Extraction")
-        lines.append("")
-        lines.append("```json")
-        lines.append(json.dumps(patch["suggested_extraction"], indent=2, ensure_ascii=False))
-        lines.append("```")
-        lines.append("")
-        lines.append("### Suggested SQL Logic")
-        lines.append("")
-        for logic in patch["suggested_sql_logic"]:
-            lines.append(f"- {logic}")
-        lines.append("")
-        lines.append("### Expected SQL Contains")
-        lines.append("")
-        for token in patch["expected_sql_contains"]:
-            lines.append(f"- `{token}`")
+        lines.extend([
+            f"## {patch['patch_id']}",
+            "",
+            f"- Title: {patch['title']}",
+            f"- Target router: `{patch['target_router_file']}`",
+            f"- Intent: `{patch['intent_name']}`",
+            f"- Priority: `{patch['priority']}`",
+            "",
+            "Questions:",
+        ])
+        for q in patch["question_patterns"]:
+            lines.append(f"- {q}")
         lines.append("")
 
-    ROUTER_PATCH_MD.write_text("\n".join(lines), encoding="utf-8")
+    OUT_MD.write_text("\n".join(lines), encoding="utf-8")
 
 
-def main() -> None:
+def main() -> int:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    rows = collect_questions()
-    patches = build_patch_candidates(rows)
+    questions = read_questions()
+    patches = generate_patches(questions)
 
-    write_json(ROUTER_PATCH_JSON, patches)
+    OUT_JSON.write_text(json.dumps(patches, indent=2, ensure_ascii=False), encoding="utf-8")
     write_markdown(patches)
 
-    print(f"Questions considered: {len(rows)}")
+    print(f"Questions considered: {len(questions)}")
     print(f"Router patch candidates: {len(patches)}")
-    print(f"Wrote: {ROUTER_PATCH_JSON}")
-    print(f"Wrote: {ROUTER_PATCH_MD}")
+    print(f"Wrote: {OUT_JSON}")
+    print(f"Wrote: {OUT_MD}")
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

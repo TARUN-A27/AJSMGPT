@@ -327,3 +327,48 @@
         }
     });
 })();
+
+/* Disable stuck full-page loading overlay.
+   We now use button-level loading only, not page-blocking loading. */
+(function () {
+    function hideFullPageLoader() {
+        var selectors = [
+            "#loading-overlay",
+            "#loadingOverlay",
+            ".loading-overlay",
+            ".page-loading",
+            ".page-loader",
+            ".loader-overlay"
+        ];
+
+        selectors.forEach(function (selector) {
+            document.querySelectorAll(selector).forEach(function (el) {
+                el.hidden = true;
+                el.style.display = "none";
+                el.style.visibility = "hidden";
+                el.style.opacity = "0";
+                el.classList.add("hidden");
+            });
+        });
+
+        document.body.classList.remove("loading", "is-loading", "page-loading", "modal-open");
+        document.documentElement.classList.remove("loading", "is-loading", "page-loading");
+    }
+
+    window.addEventListener("pageshow", hideFullPageLoader);
+    window.addEventListener("load", hideFullPageLoader);
+    document.addEventListener("DOMContentLoaded", hideFullPageLoader);
+
+    document.addEventListener("submit", function () {
+        setTimeout(hideFullPageLoader, 100);
+        setTimeout(hideFullPageLoader, 1000);
+        setTimeout(hideFullPageLoader, 3000);
+    }, true);
+
+    document.addEventListener("click", function () {
+        setTimeout(hideFullPageLoader, 100);
+        setTimeout(hideFullPageLoader, 1000);
+    }, true);
+
+    setInterval(hideFullPageLoader, 2000);
+})();

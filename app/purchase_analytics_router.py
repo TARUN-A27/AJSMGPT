@@ -121,12 +121,19 @@ def _material_from_last_supply(q: str) -> str | None:
 
 
 def _material_from_last_purchase_qty(q: str) -> str | None:
+    # Handles quoted material names:
+    # Example: Last 3 purchase details of "dell system"
+    quoted = re.search(r'"([^"]+)"', q)
+    if quoted:
+        return _clean_material_name(quoted.group(1))
+
     item = _material_from_item_phrase(q)
     if item:
         return item
 
     patterns = [
-        r"\blast\s+(?:\d+\s+)?purchase\s+(?:qty|quantity)\s+(?:purchase\s+)?(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\blast\s+(?:\d+\s+)?purchase\s+(?:qty|quantity|details|detail)\s+(?:purchase\s+)?(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\blast\s+(?:\d+\s+)?purchase\s+(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
     ]
 
     for pattern in patterns:
@@ -135,6 +142,42 @@ def _material_from_last_purchase_qty(q: str) -> str | None:
             return _clean_material_name(m.group(1))
 
     return None
+
+
+
+def _material_from_supplier_question(q: str) -> str | None:
+    # Example: WHO are the suppliers for the item "barcode label"
+    quoted = re.search(r'"([^"]+)"', q)
+    if quoted:
+        return _clean_material_name(quoted.group(1))
+
+    patterns = [
+        r"\bsuppliers?\s+(?:for|of)\s+(?:the\s+)?(?:item|material)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\b(?:item|material)\s+([a-zA-Z0-9&.\-_/ ]+?)\s+suppliers?\b",
+    ]
+
+    for pattern in patterns:
+        m = re.search(pattern, q, flags=re.I)
+        if m:
+            return _clean_material_name(m.group(1))
+
+    return _material_from_item_phrase(q)
+
+
+def _suppliers_by_material_select(material: str) -> str:
+    where = _item_filter("INV", material)
+
+    return f"""SELECT DISTINCT
+    PO.SUP_CODE,
+    P.PARTYNAME AS SUPPLIER_NAME,
+    INV.ITEM_NAME
+FROM INVENTORY.PURCHASEORDER PO
+JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
+WHERE 1 = 1
+ {where}
+  AND P.PARTYNAME IS NOT NULL
+ORDER BY P.PARTYNAME"""
 
 def _item_filter(alias: str, item: str | None) -> str:
     if not item:
@@ -276,13 +319,26 @@ def _result(intent: str, sql: str, confidence: float = 0.96) -> dict[str, Any]:
 def match_purchase_analytics_template(question: str) -> dict[str, Any] | None:
     q = _clean(question)
 
+    # Approved patch: Suppliers by material/item
+    # Example: WHO are the suppliers for the item "barcode label"
+    material_for_suppliers = _material_from_supplier_question(q)
+    if (
+        ("supplier" in q or "suppliers" in q)
+        and ("item" in q or "material" in q)
+        and material_for_suppliers
+        and "purchase order" not in q
+    ):
+        sql = _suppliers_by_material_select(material_for_suppliers)
+        return _result("purchase_suppliers_by_material", sql)
+
+
     # Approved patch: Last N purchase quantity/details by material
     # Example: "Last 3 purchase qty purchase of the item Keyboard"
     material_for_last_n = _material_from_last_purchase_qty(q)
     if (
         "last" in q
         and "purchase" in q
-        and ("qty" in q or "quantity" in q)
+        and ("qty" in q or "quantity" in q or "details" in q or "detail" in q)
         and material_for_last_n
     ):
         sql = _po_base_select(

@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+from AutomateQuery.scripts.sql_query_generator import generate_sql_for_patch_question
 from urllib.parse import parse_qs, quote
 
 from fastapi import FastAPI, Request
@@ -769,23 +771,7 @@ def verify_router_patch_question(patch_id: str, question_index: int) -> tuple[bo
 
 
 def build_question_sql_preview(patch: dict[str, Any], question: str) -> str:
-    patch_copy = dict(patch)
-    extraction = dict(patch_copy.get("suggested_extraction") or {})
-
-    # For "Last 3..." show ROWNUM <= 3.
-    # For "Last purchase..." show ROWNUM <= 1.
-    if patch_copy.get("intent_name") == "purchase_last_n_purchases_by_material":
-        match = re.search(r"\blast\s+(\d+)\b", question, flags=re.I)
-        limit_value = match.group(1) if match else "1"
-        extraction["limit"] = [f"N={limit_value}"]
-
-    patch_copy["suggested_extraction"] = extraction
-
-    try:
-        return build_router_patch_sql_preview(patch_copy)
-    except Exception:
-        return str(patch.get("generated_sql_preview") or "")
-
+    return generate_sql_for_patch_question(patch, question)
 
 def enrich_patch_questions_for_ui(patches: list[dict[str, Any]]) -> list[dict[str, Any]]:
     verifications = read_router_patch_verifications()
@@ -963,3 +949,30 @@ async def run_approved_tests() -> RedirectResponse:
         url=f"/eval-review?message={quote(message)}",
         status_code=303,
     )
+
+
+@app.post("/router-patch/apply-approved")
+async def apply_approved_router_patches() -> RedirectResponse:
+    script_path = PROJECT_ROOT / "AutomateQuery" / "scripts" / "apply_approved_router_patches.py"
+
+    subprocess.run(
+        [sys.executable, str(script_path)],
+        cwd=str(PROJECT_ROOT),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+
+    return RedirectResponse("/router-patches", status_code=303)
+
+
+@app.get("/router-patch/apply-report")
+async def router_patch_apply_report() -> PlainTextResponse:
+    report_path = PROJECT_ROOT / "AutomateQuery" / "reports" / "apply_approved_router_patches_report.json"
+
+    if not report_path.exists():
+        return PlainTextResponse("No apply report found yet.")
+
+    return PlainTextResponse(report_path.read_text(encoding="utf-8"))
+
+

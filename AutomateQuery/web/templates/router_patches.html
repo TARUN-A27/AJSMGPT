@@ -30,6 +30,14 @@
     <form method="post" action="/router-patch/export-approved">
         <button type="submit" class="export">Export Approved Router Patches</button>
     </form>
+
+    <form method="post" action="/router-patch/apply-approved">
+        <button type="submit" class="approve">Apply Approved Router Patches</button>
+    </form>
+
+    <a class="secondary-link" href="/router-patch/apply-report" target="_blank">
+        View Apply Report
+    </a>
 </div>
 
 {% for patch in patches %}

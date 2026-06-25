@@ -3,7 +3,7 @@ import threading
 import time
 import webbrowser
 
-URL = "http://127.0.0.1:8000"
+URL = "http://172.16.2.145:8000"
 
 
 def open_browser():
@@ -25,7 +25,7 @@ if __name__ == "__main__":
         "app.api:app",
         "--reload",
         "--host",
-        "127.0.0.1",
+        "0.0.0.0",
         "--port",
         "8000"
     ])

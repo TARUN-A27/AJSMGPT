@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -18,12 +17,138 @@ BACKUP_DIR = REPORTS_DIR / "backups"
 APPLY_REPORT_PATH = REPORTS_DIR / "apply_approved_router_patches_report.json"
 
 ROUTER_PATH = PROJECT_ROOT / "app" / "purchase_analytics_router.py"
-TEST_PATH = PROJECT_ROOT / "scripts" / "test_hod_purchase_questions.py"
+
+
+MASTER_ITEM_FILTER = r"""def _item_filter(alias: str, material: str | None) -> str:
+    material = _clean_material_name(material)
+
+    if not material:
+        return ""
+
+    column = f"UPPER({alias}.ITEM_NAME)"
+    phrase = material.upper().replace("'", "''")
+
+    raw_tokens = [
+        token.replace("'", "''").upper()
+        for token in re.split(r"[^A-Z0-9]+", phrase)
+        if len(token.strip()) >= 2
+    ]
+
+    if not raw_tokens:
+        return ""
+
+    tokens: list[str] = []
+    i = 0
+    while i < len(raw_tokens):
+        if raw_tokens[i] == "BAR" and i + 1 < len(raw_tokens) and raw_tokens[i + 1] == "CODE":
+            tokens.append("BARCODE")
+            i += 2
+        else:
+            tokens.append(raw_tokens[i])
+            i += 1
+
+    def token_condition(token: str) -> str:
+        if token == "BARCODE":
+            return (
+                f"({column} LIKE '%BARCODE%' "
+                f"OR {column} LIKE '%BAR CODE%' "
+                f"OR ({column} LIKE '%BAR%' AND {column} LIKE '%CODE%'))"
+            )
+
+        if token in {"LABEL", "LABELS", "LABLE", "LABLES"}:
+            return f"({column} LIKE '%LABEL%' OR {column} LIKE '%LABLE%')"
+
+        return f"{column} LIKE '%{token}%'"
+
+    exact_condition = f"{column} LIKE '%{phrase}%'"
+    token_conditions = " AND ".join(token_condition(token) for token in tokens)
+
+    return f\"\"\"  AND (
+    {exact_condition}
+    OR ({token_conditions})
+  )\"\"\"
+"""
+
 
 SUPPORTED_PATCH_IDS = {
     "patch_purchase_last_supply_by_material",
     "patch_purchase_last_n_purchases_by_material",
+    "patch_purchase_latest_order_by_material",
+    "patch_purchase_suppliers_by_material",
 }
+
+
+SUPPLIER_HELPERS = r'''
+def _supplier_material_clean(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    item = value.strip(" .,-_/\\")
+    item = item.strip('"').strip("'")
+    item = re.sub(r"\s+", " ", item).strip()
+
+    item = re.sub(
+        r"\b(supplier|suppliers|item|material|purchase|order|details|detail|qty|quantity)\b.*$",
+        "",
+        item,
+        flags=re.I,
+    ).strip()
+
+    if not item:
+        return None
+
+    return item.upper()
+
+
+def _material_from_supplier_question(q: str) -> str | None:
+    # Example: WHO are the suppliers for the item "barcode label"
+    quoted = re.search(r'"([^"]+)"', q)
+    if quoted:
+        return _supplier_material_clean(quoted.group(1))
+
+    patterns = [
+        r"\bsuppliers?\s+(?:for|of)\s+(?:the\s+)?(?:item|material)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
+        r"\b(?:item|material)\s+([a-zA-Z0-9&.\-_/ ]+?)\s+suppliers?\b",
+    ]
+
+    for pattern in patterns:
+        m = re.search(pattern, q, flags=re.I)
+        if m:
+            return _supplier_material_clean(m.group(1))
+
+    return None
+
+
+def _suppliers_by_material_select(material: str) -> str:
+    where = _item_filter("INV", material)
+
+    return f"""SELECT DISTINCT
+    PO.SUP_CODE,
+    P.PARTYNAME AS SUPPLIER_NAME,
+    INV.ITEM_NAME
+FROM INVENTORY.PURCHASEORDER PO
+JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
+WHERE 1 = 1
+ {where}
+  AND P.PARTYNAME IS NOT NULL
+ORDER BY P.PARTYNAME"""
+'''
+
+
+SUPPLIER_RULE = r'''
+    # Approved patch: Suppliers by material/item
+    material_for_suppliers = _material_from_supplier_question(q)
+    if (
+        ("supplier" in q or "suppliers" in q)
+        and ("item" in q or "material" in q)
+        and material_for_suppliers
+        and "purchase order" not in q
+    ):
+        sql = _suppliers_by_material_select(material_for_suppliers)
+        return _result("purchase_suppliers_by_material", sql)
+
+'''
 
 
 def now_stamp() -> str:
@@ -45,24 +170,21 @@ def write_report(report: dict[str, Any]) -> None:
     APPLY_REPORT_PATH.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def run_command(cmd: list[str], cwd: Path) -> tuple[bool, str]:
+def run_command(cmd: list[str]) -> tuple[bool, str]:
     completed = subprocess.run(
         cmd,
-        cwd=str(cwd),
+        cwd=str(PROJECT_ROOT),
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-
     return completed.returncode == 0, completed.stdout
 
 
 def create_backup(path: Path) -> Path:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-
     backup_path = BACKUP_DIR / f"{path.name}.bak_{now_stamp()}"
     shutil.copy2(path, backup_path)
-
     return backup_path
 
 
@@ -70,178 +192,119 @@ def restore_backup(backup_path: Path, target_path: Path) -> None:
     shutil.copy2(backup_path, target_path)
 
 
-def ensure_helpers(text: str) -> tuple[str, bool]:
-    if "def _last_n_limit(" in text:
-        return text, False
-
+def insert_before_item_filter(text: str, code: str) -> str:
     marker = "def _item_filter("
     if marker not in text:
-        raise RuntimeError("Could not find marker: def _item_filter(")
-
-    helper_code = r'''
-
-def _last_n_limit(q: str, default: int = 1) -> int:
-    m = re.search(r"\blast\s+(\d+)\b", q)
-    if not m:
-        return default
-
-    try:
-        value = int(m.group(1))
-    except ValueError:
-        return default
-
-    return max(1, min(value, 50))
+        raise RuntimeError("Could not find def _item_filter marker in purchase_analytics_router.py")
+    return text.replace(marker, code + "\n\n" + marker, 1)
 
 
-def _clean_material_name(value: str | None) -> str | None:
-    if not value:
-        return None
-
-    item = value.strip(" .,-_/\\")
-    item = re.sub(r"\s+", " ", item).strip()
-
-    # Remove common trailing words if captured accidentally.
-    item = re.sub(
-        r"\b(qty|quantity|purchase|purchases|rate|price|details)\b.*$",
-        "",
-        item,
-        flags=re.I,
-    ).strip()
-
-    if not item:
-        return None
-
-    return item.upper()
-
-
-def _material_from_item_phrase(q: str) -> str | None:
-    patterns = [
-        r"\bof\s+the\s+item\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
-        r"\bitem\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
-    ]
-
-    for pattern in patterns:
-        m = re.search(pattern, q, flags=re.I)
-        if m:
-            return _clean_material_name(m.group(1))
-
-    return None
-
-
-def _material_from_last_supply(q: str) -> str | None:
-    patterns = [
-        r"\blast\s+supply\s+(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
-        r"\blast\s+purchase\s+(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
-    ]
-
-    for pattern in patterns:
-        m = re.search(pattern, q, flags=re.I)
-        if m:
-            return _clean_material_name(m.group(1))
-
-    return _material_from_item_phrase(q)
-
-
-def _material_from_last_purchase_qty(q: str) -> str | None:
-    item = _material_from_item_phrase(q)
-    if item:
-        return item
-
-    patterns = [
-        r"\blast\s+(?:\d+\s+)?purchase\s+(?:qty|quantity)\s+(?:purchase\s+)?(?:of|for)\s+([a-zA-Z0-9&.\-_/ ]+?)(?:\s+in\s+\d{4}|$)",
-    ]
-
-    for pattern in patterns:
-        m = re.search(pattern, q, flags=re.I)
-        if m:
-            return _clean_material_name(m.group(1))
-
-    return None
-'''
-
-    return text.replace(marker, helper_code + "\n" + marker, 1), True
-
-
-def insert_rule_after_clean_question(text: str, rule_code: str) -> str:
+def insert_after_clean_question(text: str, code: str) -> str:
     func_marker = "def match_purchase_analytics_template(question: str) -> dict[str, Any] | None:"
     func_pos = text.find(func_marker)
-
     if func_pos == -1:
         raise RuntimeError("Could not find match_purchase_analytics_template function.")
 
     q_marker = "q = _clean(question)"
     q_pos = text.find(q_marker, func_pos)
-
     if q_pos == -1:
-        raise RuntimeError("Could not find q = _clean(question) inside match function.")
+        raise RuntimeError("Could not find q = _clean(question) inside match_purchase_analytics_template.")
 
     insert_pos = text.find("\n", q_pos)
-
-    if insert_pos == -1:
-        raise RuntimeError("Could not find insert position after q = _clean(question).")
-
-    return text[: insert_pos + 1] + rule_code + text[insert_pos + 1 :]
+    return text[:insert_pos + 1] + code + text[insert_pos + 1:]
 
 
-def ensure_last_n_purchase_rule(text: str) -> tuple[str, bool]:
-    if "purchase_last_n_purchases_by_material" in text:
+
+def ensure_master_item_filter(text: str) -> tuple[str, bool]:
+    import re
+
+    pattern = r'(?ms)^def _item_filter\(.*?\n(?=^def |\Z)'
+    matches = list(re.finditer(pattern, text))
+
+    if not matches:
         return text, False
 
-    rule_code = r'''
-    # Approved patch: Last N purchase quantity/details by material
-    # Example: "Last 3 purchase qty purchase of the item Keyboard"
-    material_for_last_n = _material_from_last_purchase_qty(q)
-    if (
-        "last" in q
-        and "purchase" in q
-        and ("qty" in q or "quantity" in q)
-        and material_for_last_n
-    ):
-        sql = _po_base_select(
-            where=_item_filter("INV", material_for_last_n),
-            order_by="PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
-            limit=_last_n_limit(q, default=1),
-        )
-        return _result("purchase_last_n_purchases_by_material", sql)
+    current = matches[0].group(0)
 
-'''
-
-    return insert_rule_after_clean_question(text, rule_code), True
-
-
-def ensure_last_supply_material_rule(text: str) -> tuple[str, bool]:
-    if "purchase_last_supply_by_material" in text:
+    if "BAR CODE" in current and "LABLE" in current:
         return text, False
 
-    rule_code = r'''
-    # Approved patch: Last supply by material
-    # Example: "last supply of mouse"
-    material_for_last_supply = _material_from_last_supply(q)
-    if (
-        "last" in q
-        and "supply" in q
-        and material_for_last_supply
-    ):
-        sql = _po_base_select(
-            where=_item_filter("INV", material_for_last_supply),
-            order_by="PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC",
-            limit=1,
-        )
-        return _result("purchase_last_supply_by_material", sql)
+    m = matches[0]
+    text = text[:m.start()] + MASTER_ITEM_FILTER + "\n\n" + text[m.end():]
+    return text, True
 
+def ensure_supplier_patch(text: str) -> tuple[str, bool]:
+    original = text
+
+    if "def _material_from_supplier_question(" not in text:
+        text = insert_before_item_filter(text, SUPPLIER_HELPERS)
+
+    if "purchase_suppliers_by_material" not in text:
+        text = insert_after_clean_question(text, SUPPLIER_RULE)
+
+    return text, text != original
+
+
+def supplier_router_unit_test() -> tuple[bool, str]:
+    code = r'''
+from app.purchase_analytics_router import match_purchase_analytics_template
+
+q = 'WHO are the suppliers for the item "barcode label"'
+res = match_purchase_analytics_template(q)
+
+if not res:
+    raise SystemExit("Router returned None")
+
+sql = res.get("sql") or ""
+
+print("SOURCE_ROUTER_RESULT:", res)
+print("SQL:", sql)
+
+if res.get("intent") != "purchase_suppliers_by_material":
+    raise SystemExit(f"Wrong intent: {res.get('intent')}")
+
+required = [
+    "INVENTORY.PURCHASEORDER",
+    "INVENTORY.INVITEMS",
+    "SCM.PARTYMASTER",
+    "UPPER(INV.ITEM_NAME) LIKE '%BARCODE LABEL%'",
+    "SELECT DISTINCT",
+]
+
+for item in required:
+    if item not in sql:
+        raise SystemExit(f"SQL missing: {item}")
+
+if "INVENTORY.SUPPLIER" in sql:
+    raise SystemExit("Wrong supplier table used: INVENTORY.SUPPLIER")
+
+print("Supplier by material router test passed.")
 '''
-
-    return insert_rule_after_clean_question(text, rule_code), True
+    return run_command([sys.executable, "-c", code])
 
 
 def apply_supported_patches(approved_patches: list[dict[str, Any]]) -> dict[str, Any]:
+    approved_patch_ids = {
+        str(p.get("patch_id") or "")
+        for p in approved_patches
+        if isinstance(p, dict)
+    }
+
+    supported_approved = sorted(approved_patch_ids & SUPPORTED_PATCH_IDS)
+    skipped = sorted(approved_patch_ids - SUPPORTED_PATCH_IDS)
+
     report: dict[str, Any] = {
         "success": False,
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "approved_patch_count": len(approved_patches),
         "supported_patch_ids": sorted(SUPPORTED_PATCH_IDS),
+        "supported_approved_patch_ids": supported_approved,
         "applied_patch_ids": [],
-        "skipped_patch_ids": [],
+        "skipped_patch_ids": [
+            {"patch_id": patch_id, "reason": "unsupported patch_id"}
+            for patch_id in skipped
+            if patch_id
+        ],
         "changed": False,
         "backup_path": None,
         "compile_output": "",
@@ -249,129 +312,70 @@ def apply_supported_patches(approved_patches: list[dict[str, Any]]) -> dict[str,
         "error": None,
     }
 
-    if not ROUTER_PATH.exists():
-        raise RuntimeError(f"Router file not found: {ROUTER_PATH}")
-
-    supported_patches: list[dict[str, Any]] = []
-
-    for patch in approved_patches:
-        patch_id = str(patch.get("patch_id") or "")
-        target_router_file = str(patch.get("target_router_file") or "")
-
-        if patch_id not in SUPPORTED_PATCH_IDS:
-            report["skipped_patch_ids"].append(
-                {
-                    "patch_id": patch_id,
-                    "reason": "unsupported patch_id",
-                }
-            )
-            continue
-
-        if target_router_file != "app/purchase_analytics_router.py":
-            report["skipped_patch_ids"].append(
-                {
-                    "patch_id": patch_id,
-                    "reason": f"unexpected target router: {target_router_file}",
-                }
-            )
-            continue
-
-        supported_patches.append(patch)
-
-    print(f"Read approved patches: {len(approved_patches)}")
-    print(f"Supported patches found: {len(supported_patches)}")
-
-    if not supported_patches:
+    if not supported_approved:
         report["success"] = True
         report["error"] = "No supported approved patches to apply."
+        report["finished_at"] = datetime.now().isoformat(timespec="seconds")
         return report
 
     backup_path = create_backup(ROUTER_PATH)
     report["backup_path"] = str(backup_path.relative_to(PROJECT_ROOT))
-    print(f"Backup created: {backup_path}")
 
-    original_text = ROUTER_PATH.read_text(encoding="utf-8")
-    text = original_text
+    original = ROUTER_PATH.read_text(encoding="utf-8")
+    text = original
 
-    helpers_changed = False
-    text, helpers_changed = ensure_helpers(text)
+    text, master_filter_changed = ensure_master_item_filter(text)
 
-    applied_ids: list[str] = []
+    applied: list[str] = []
 
-    approved_ids = {str(patch.get("patch_id") or "") for patch in supported_patches}
-
-    if "patch_purchase_last_n_purchases_by_material" in approved_ids:
-        text, changed = ensure_last_n_purchase_rule(text)
+    if "patch_purchase_suppliers_by_material" in approved_patch_ids:
+        text, changed = ensure_supplier_patch(text)
         if changed:
-            applied_ids.append("patch_purchase_last_n_purchases_by_material")
+            applied.append("patch_purchase_suppliers_by_material")
 
-    if "patch_purchase_last_supply_by_material" in approved_ids:
-        text, changed = ensure_last_supply_material_rule(text)
-        if changed:
-            applied_ids.append("patch_purchase_last_supply_by_material")
+    changed_anything = text != original
 
-    changed_anything = helpers_changed or text != original_text
-    report["changed"] = changed_anything
-    report["applied_patch_ids"] = applied_ids
-
-    if not changed_anything:
-        print("Router already contains supported approved patch code. No code change needed.")
-    else:
+    if changed_anything:
         ROUTER_PATH.write_text(text, encoding="utf-8")
-        print(f"Applied patch code: {applied_ids or ['helpers only']}")
 
-    compile_ok, compile_output = run_command(
-        [sys.executable, "-m", "py_compile", str(ROUTER_PATH)],
-        PROJECT_ROOT,
-    )
+    report["changed"] = changed_anything
+    report["applied_patch_ids"] = applied
+
+    compile_ok, compile_output = run_command([sys.executable, "-m", "py_compile", str(ROUTER_PATH)])
     report["compile_output"] = compile_output
 
     if not compile_ok:
         restore_backup(backup_path, ROUTER_PATH)
         report["error"] = "Compile failed. Rolled back router file."
+        report["finished_at"] = datetime.now().isoformat(timespec="seconds")
         return report
 
-    print("Compile passed.")
+    test_outputs: list[str] = []
 
-    if TEST_PATH.exists():
-        test_ok, test_output = run_command(
-            [sys.executable, str(TEST_PATH)],
-            PROJECT_ROOT,
-        )
-    else:
-        test_ok, test_output = run_command(
-            [
-                sys.executable,
-                "-c",
-                (
-                    "from app.query_engine import answer_question\n"
-                    "questions = [\n"
-                    "    'last supply of mouse',\n"
-                    "    'Last 3 purchase qty purchase of the item Keyboard',\n"
-                    "    'Last purchase qty purchase of the item Keyboard',\n"
-                    "]\n"
-                    "for q in questions:\n"
-                    "    res = answer_question(q)\n"
-                    "    print(q, res.get('success'), res.get('source'), res.get('intent'), res.get('row_count'))\n"
-                    "    assert res.get('success') is True\n"
-                    "    assert res.get('source') == 'purchase_analytics_router'\n"
-                ),
-            ],
-            PROJECT_ROOT,
-        )
+    hod_test = PROJECT_ROOT / "scripts" / "test_hod_purchase_questions.py"
+    if hod_test.exists():
+        ok, output = run_command([sys.executable, str(hod_test)])
+        test_outputs.append("===== test_hod_purchase_questions.py =====\n" + output)
+        if not ok:
+            restore_backup(backup_path, ROUTER_PATH)
+            report["test_output"] = "\n".join(test_outputs)
+            report["error"] = "HOD purchase test failed. Rolled back router file."
+            report["finished_at"] = datetime.now().isoformat(timespec="seconds")
+            return report
 
-    report["test_output"] = test_output
+    if "patch_purchase_suppliers_by_material" in approved_patch_ids:
+        ok, output = supplier_router_unit_test()
+        test_outputs.append("===== supplier_router_unit_test =====\n" + output)
+        if not ok:
+            restore_backup(backup_path, ROUTER_PATH)
+            report["test_output"] = "\n".join(test_outputs)
+            report["error"] = "Supplier router unit test failed. Rolled back router file."
+            report["finished_at"] = datetime.now().isoformat(timespec="seconds")
+            return report
 
-    if not test_ok:
-        restore_backup(backup_path, ROUTER_PATH)
-        report["error"] = "Tests failed. Rolled back router file."
-        return report
-
-    print("Tests passed.")
-
+    report["test_output"] = "\n".join(test_outputs)
     report["success"] = True
     report["finished_at"] = datetime.now().isoformat(timespec="seconds")
-
     return report
 
 
@@ -382,19 +386,7 @@ def main() -> int:
         print("approved_router_patches.json must contain a list.")
         return 1
 
-    try:
-        report = apply_supported_patches(approved_patches)
-    except Exception as exc:
-        report = {
-            "success": False,
-            "error": str(exc),
-            "error_type": type(exc).__name__,
-            "finished_at": datetime.now().isoformat(timespec="seconds"),
-        }
-        write_report(report)
-        print(f"FAILED: {exc}")
-        return 1
-
+    report = apply_supported_patches(approved_patches)
     write_report(report)
 
     if not report.get("success"):
@@ -403,8 +395,10 @@ def main() -> int:
         return 1
 
     print("Apply approved router patches completed successfully.")
+    print(f"Supported approved patches: {report.get('supported_approved_patch_ids')}")
+    print(f"Applied patch IDs: {report.get('applied_patch_ids')}")
+    print(f"Changed: {report.get('changed')}")
     print(f"Report: {APPLY_REPORT_PATH.relative_to(PROJECT_ROOT)}")
-
     return 0
 
 

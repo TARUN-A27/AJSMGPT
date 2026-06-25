@@ -73,11 +73,58 @@ def extract_limit_from_question(question: str, default: int = 1) -> int:
     return max(1, min(value, 50))
 
 
-def material_filter_sql(material: str | None) -> str:
+def material_filter_sql(material: str | None, alias: str = "INV") -> str:
     if not material:
-        return "-- MATERIAL FILTER MISSING"
+        return ""
 
-    return f"AND UPPER(INV.ITEM_NAME) LIKE {sql_literal('%' + material + '%')}"
+    material = str(material).strip().strip('"').strip("'").upper()
+    material = re.sub(r"\s+", " ", material).strip()
+
+    if not material:
+        return ""
+
+    column = f"UPPER({alias}.ITEM_NAME)"
+    phrase = material.replace("'", "''")
+
+    raw_tokens = [
+        token.replace("'", "''").upper()
+        for token in re.split(r"[^A-Z0-9]+", phrase)
+        if len(token.strip()) >= 2
+    ]
+
+    if not raw_tokens:
+        return ""
+
+    tokens: list[str] = []
+    i = 0
+    while i < len(raw_tokens):
+        if raw_tokens[i] == "BAR" and i + 1 < len(raw_tokens) and raw_tokens[i + 1] == "CODE":
+            tokens.append("BARCODE")
+            i += 2
+        else:
+            tokens.append(raw_tokens[i])
+            i += 1
+
+    def token_condition(token: str) -> str:
+        if token == "BARCODE":
+            return (
+                f"({column} LIKE '%BARCODE%' "
+                f"OR {column} LIKE '%BAR CODE%' "
+                f"OR ({column} LIKE '%BAR%' AND {column} LIKE '%CODE%'))"
+            )
+
+        if token in {"LABEL", "LABELS", "LABLE", "LABLES"}:
+            return f"({column} LIKE '%LABEL%' OR {column} LIKE '%LABLE%')"
+
+        return f"{column} LIKE '%{token}%'"
+
+    exact_condition = f"{column} LIKE '%{phrase}%'"
+    token_conditions = " AND ".join(token_condition(token) for token in tokens)
+
+    return f"""AND (
+    {exact_condition}
+    OR ({token_conditions})
+  )"""
 
 
 def purchase_order_base_sql(material: str | None, limit: int) -> str:
@@ -133,16 +180,14 @@ WHERE ROWNUM <= {limit}"""
 def suppliers_by_material_sql(material: str | None) -> str:
     return f"""SELECT DISTINCT
     PO.SUP_CODE,
-    P.PARTYNAME AS SUPPLIER_NAME,
+    NVL(P.PARTYNAME, PO.SUP_CODE) AS SUPPLIER_NAME,
     INV.ITEM_NAME
 FROM INVENTORY.PURCHASEORDER PO
 JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
 LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
 WHERE 1 = 1
   {material_filter_sql(material)}
-  AND P.PARTYNAME IS NOT NULL
 ORDER BY SUPPLIER_NAME"""
-
 
 def generate_sql_for_patch_question(patch: dict[str, Any], question: str) -> str:
     intent = str(patch.get("intent_name") or "")

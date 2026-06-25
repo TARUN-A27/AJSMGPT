@@ -169,22 +169,66 @@ def _suppliers_by_material_select(material: str) -> str:
 
     return f"""SELECT DISTINCT
     PO.SUP_CODE,
-    P.PARTYNAME AS SUPPLIER_NAME,
+    NVL(P.PARTYNAME, PO.SUP_CODE) AS SUPPLIER_NAME,
     INV.ITEM_NAME
 FROM INVENTORY.PURCHASEORDER PO
 JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
 LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
 WHERE 1 = 1
  {where}
-  AND P.PARTYNAME IS NOT NULL
-ORDER BY P.PARTYNAME"""
+ORDER BY SUPPLIER_NAME"""
 
-def _item_filter(alias: str, item: str | None) -> str:
-    if not item:
+def _item_filter(alias: str, material: str | None) -> str:
+    material = _clean_material_name(material)
+
+    if not material:
         return ""
-    safe_item = item.replace("'", "''")
-    return f" AND UPPER({alias}.ITEM_NAME) LIKE '%{safe_item}%'"
 
+    column = f"UPPER({alias}.ITEM_NAME)"
+    phrase = material.upper().replace("'", "''")
+
+    raw_tokens = [
+        token.replace("'", "''").upper()
+        for token in re.split(r"[^A-Z0-9]+", phrase)
+        if len(token.strip()) >= 2
+    ]
+
+    if not raw_tokens:
+        return ""
+
+    # Normalize user words:
+    # BARCODE should match BARCODE, BAR CODE, BAR + CODE.
+    # LABEL should match LABEL, LABELS, LABLE, LABLES.
+    tokens: list[str] = []
+    i = 0
+    while i < len(raw_tokens):
+        if raw_tokens[i] == "BAR" and i + 1 < len(raw_tokens) and raw_tokens[i + 1] == "CODE":
+            tokens.append("BARCODE")
+            i += 2
+        else:
+            tokens.append(raw_tokens[i])
+            i += 1
+
+    def token_condition(token: str) -> str:
+        if token == "BARCODE":
+            return (
+                f"({column} LIKE '%BARCODE%' "
+                f"OR {column} LIKE '%BAR CODE%' "
+                f"OR ({column} LIKE '%BAR%' AND {column} LIKE '%CODE%'))"
+            )
+
+        if token in {"LABEL", "LABELS", "LABLE", "LABLES"}:
+            return f"({column} LIKE '%LABEL%' OR {column} LIKE '%LABLE%')"
+
+        return f"{column} LIKE '%{token}%'"
+
+    exact_condition = f"{column} LIKE '%{phrase}%'"
+    token_conditions = " AND ".join(token_condition(token) for token in tokens)
+
+    return f"""  AND (
+    {exact_condition}
+    OR ({token_conditions})
+  )"""
 
 
 def _supplier_filter(supplier: str | None) -> str:

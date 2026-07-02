@@ -142,9 +142,31 @@ def extract_semantic_queries(question: str) -> list[str]:
     return final
 
 
+def has_any_word(normalized_question: str, words: set[str]) -> bool:
+    q_words = set(normalized_question.split())
+    return bool(q_words.intersection(words))
+
+
+def token_overlap_score(query: str, value: Any) -> float:
+    """
+    Boost results whose real DB value shares words with the user phrase.
+    Example: barcode chromo label -> BARCODE CHROMO LABLES 40 X 25MM
+    """
+    query_tokens = set(normalize_text(query).split())
+    value_tokens = set(normalize_text(value).split())
+
+    if not query_tokens or not value_tokens:
+        return 0.0
+
+    overlap = query_tokens.intersection(value_tokens)
+    return min(len(overlap) * 8.0, 40.0)
+
+
 def context_score(question: str, schema: Any, table: Any, column: Any, entity_type: Any) -> float:
     q = normalize_text(question)
     location = normalize_text(f"{schema or ''} {table or ''} {column or ''}")
+    etype = str(entity_type or "generic")
+
     score = 0.0
 
     for word, hints in CONTEXT_HINTS.items():
@@ -153,7 +175,37 @@ def context_score(question: str, schema: Any, table: Any, column: Any, entity_ty
                 if hint in location:
                     score += 25.0
 
-    score += ENTITY_BOOST.get(str(entity_type or "generic"), 0)
+    score += ENTITY_BOOST.get(etype, 0)
+
+    purchase_material_words = {
+        "PURCHASE", "SUPPLY", "MATERIAL", "ITEM", "QTY", "QUANTITY",
+        "GRN", "MRS", "ISSUE", "STOCK"
+    }
+
+    camera_words = {"CAMERA", "IP", "CCTV"}
+
+    document_words = {"DOCUMENT", "DOC", "VOUCHER", "CASHBANK", "CASH", "BANK"}
+
+    # For purchase/material questions, prefer material/item locations.
+    if has_any_word(q, purchase_material_words):
+        if etype == "material":
+            score += 45.0
+        if "ITEM" in location or "INVITEMS" in location or "ITEMSTOCK" in location:
+            score += 20.0
+        if etype == "camera" and not has_any_word(q, camera_words):
+            score -= 45.0
+        if "RDCMEMO" in location and not has_any_word(q, camera_words):
+            score -= 30.0
+        if etype == "generic":
+            score -= 15.0
+
+    # For document/cashbank questions, prefer document/cashbank locations.
+    if has_any_word(q, document_words):
+        if "DOCUMENT" in location:
+            score += 35.0
+        if "CASHBANK" in location:
+            score += 35.0
+
     return score
 
 
@@ -342,6 +394,7 @@ def qdrant_search(query: str, question: str, limit: int = 10) -> list[dict[str, 
             payload.get("column_name"),
             payload.get("entity_type"),
         )
+        score += token_overlap_score(query, payload.get("original_value"))
 
         results.append(
             make_result(
@@ -379,6 +432,11 @@ def resolve_question_values(question: str, final_limit: int = 20) -> dict[str, A
         candidates.extend(sqlite_fuzzy_lookup(phrase, question, limit=20))
 
     for query in semantic_queries:
+        # If query contains an exact code like ODUT001/165224/800967,
+        # do not let semantic search replace it with similar wrong codes.
+        if exact_terms and any(code.upper() in query.upper() for code in exact_terms):
+            continue
+
         try:
             candidates.extend(qdrant_search(query, question, limit=10))
         except Exception as exc:

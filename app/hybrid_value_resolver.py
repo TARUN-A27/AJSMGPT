@@ -125,11 +125,16 @@ def extract_semantic_queries(question: str) -> list[str]:
         if word.lower() not in STOP_WORDS:
             words.append(word)
 
-    queries = [q]
-
     phrase = " ".join(words).strip()
+
+    # Prefer clean entity phrase for vector search.
+    # Example:
+    #   "barcode chromo label last purchase" -> "barcode chromo label"
+    # This avoids semantic hits from generic words like purchase/details.
     if len(phrase) >= 3 and phrase.upper() != q.upper():
-        queries.append(phrase)
+        queries = [phrase]
+    else:
+        queries = [q]
 
     seen = set()
     final = []

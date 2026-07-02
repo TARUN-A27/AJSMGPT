@@ -58,6 +58,146 @@ def _safe_error_message(exc: Exception) -> str:
     return "Backend could not process this question safely. Please check the backend log."
 
 
+def _resolver_enriched_question(question: str, resolved_values: dict[str, Any]) -> str:
+    """
+    Stage 2 resolver integration.
+
+    This does not generate SQL directly.
+    It only replaces a user phrase with the best real DB value before router matching.
+
+    Example:
+        barcode chromo label last purchase
+        -> BARCODE CHROMO LABLES 40 X 25MM last purchase
+    """
+    import re
+
+    q = question or ""
+    q_upper = q.upper()
+
+    business_words = {
+        "PURCHASE", "SUPPLY", "SUPPLIER", "MATERIAL", "ITEM",
+        "QTY", "QUANTITY", "GRN", "MRS", "ISSUE", "STOCK",
+        "DOCUMENT", "CASHBANK", "VOUCHER", "PARTY", "EMPLOYEE",
+        "EMPCODE", "ATTENDANCE", "VEHICLE", "CAMERA",
+    }
+
+    results = resolved_values.get("results") or []
+    semantic_queries = resolved_values.get("semantic_queries") or []
+
+    if not results:
+        return q
+
+    # For exact code questions like ODUT001, keep original question.
+    # Existing fallbacks already use the exact code safely.
+    if resolved_values.get("exact_terms"):
+        return q
+
+    # Choose the best high-confidence real DB value.
+    best = None
+    for item in results:
+        entity_type = item.get("entity_type")
+        score = float(item.get("score") or 0)
+        value = str(item.get("resolved_value") or "").strip()
+
+        if not value:
+            continue
+
+        if entity_type in {"material", "supplier_or_party", "department", "unit", "vehicle", "employee"} and score >= 80:
+            best = item
+            break
+
+    if not best:
+        return q
+
+    resolved_value = str(best.get("resolved_value") or "").strip()
+    if not resolved_value:
+        return q
+
+    # Try replacing the clean semantic phrase first.
+    for phrase in semantic_queries:
+        phrase = str(phrase or "").strip()
+        if not phrase:
+            continue
+
+        phrase_words = set(phrase.upper().split())
+        if phrase_words and phrase_words.issubset(business_words):
+            continue
+
+        pattern = re.compile(re.escape(phrase), flags=re.IGNORECASE)
+        if pattern.search(q):
+            return pattern.sub(resolved_value, q, count=1)
+
+    # Fallback: append resolved value as a router hint.
+    return f"{q} resolved value {resolved_value}"
+
+
+
+
+def _best_resolved_material(resolved_values: dict[str, Any]) -> str | None:
+    """
+    Pick the best material value found by hybrid resolver.
+    """
+    for item in resolved_values.get("results", []) or []:
+        if item.get("entity_type") != "material":
+            continue
+
+        score = float(item.get("score") or 0)
+        value = str(item.get("resolved_value") or "").strip()
+
+        if value and score >= 80:
+            return value
+
+    return None
+
+
+def _sql_text_literal(value: str) -> str:
+    return str(value or "").replace("'", "''").strip()
+
+
+def _apply_resolved_material_to_sql(sql: str, resolved_values: dict[str, Any]) -> str:
+    """
+    If resolver found an exact material value, preserve that value in router SQL.
+
+    Example:
+        Router produced:
+            UPPER(INV.ITEM_NAME) LIKE '%BARCODE CHROMO LABLE 40 X 25MM%'
+
+        Resolver found:
+            BARCODE CHROMO LABLES 40 X 25MM
+
+        Final SQL:
+            UPPER(INV.ITEM_NAME) LIKE '%BARCODE CHROMO LABLES 40 X 25MM%'
+    """
+    import re
+
+    if not sql:
+        return sql
+
+    material = _best_resolved_material(resolved_values)
+    if not material:
+        return sql
+
+    sql_upper = sql.upper()
+
+    # Only patch purchase item-name filters. Do not touch other modules.
+    if "INV.ITEM_NAME" not in sql_upper:
+        return sql
+
+    material_sql = _sql_text_literal(material).upper()
+
+    pattern = re.compile(
+        r"UPPER\s*\(\s*INV\.ITEM_NAME\s*\)\s+LIKE\s+'%[^']*%'",
+        flags=re.IGNORECASE,
+    )
+
+    patched_sql = pattern.sub(
+        f"UPPER(INV.ITEM_NAME) LIKE '%{material_sql}%'",
+        sql,
+        count=1,
+    )
+
+    return patched_sql
+
 
 def _known_schema_fallback_sql(question: str) -> dict[str, Any] | None:
     """
@@ -221,14 +361,69 @@ def _answer_question_core(question: str) -> dict[str, Any]:
         understanding = understand_question(question)
         sql_question = strip_date_filter_phrases(question)
 
+        resolved_values = {
+            "question": sql_question,
+            "exact_terms": [],
+            "semantic_queries": [],
+            "elapsed_seconds": 0,
+            "results": [],
+            "resolver_status": "not_run",
+        }
+
+        try:
+            from app.hybrid_value_resolver import resolve_question_values
+
+            resolved_values = resolve_question_values(sql_question, final_limit=10)
+            resolved_values["resolver_status"] = "ok"
+
+            log_event(
+                request_id,
+                "hybrid_value_resolver_complete",
+                "Hybrid SQLite/Qdrant value resolver completed",
+                resolved_values_preview=_safe_preview(resolved_values),
+                elapsed_seconds=resolved_values.get("elapsed_seconds"),
+                result_count=len(resolved_values.get("results", [])),
+            )
+
+        except Exception as resolver_exc:
+            resolved_values = {
+                "question": sql_question,
+                "exact_terms": [],
+                "semantic_queries": [],
+                "elapsed_seconds": 0,
+                "results": [],
+                "resolver_status": "error",
+                "error": f"{type(resolver_exc).__name__}: {resolver_exc}",
+            }
+
+            log_event(
+                request_id,
+                "hybrid_value_resolver_failed",
+                "Hybrid value resolver failed; continuing without resolver",
+                error=resolved_values["error"],
+            )
+
         log_event(
             request_id,
             "question_understanding",
             "Question understanding generated",
             understanding=understanding,
+            resolved_values_preview=_safe_preview(resolved_values),
         )
 
-        template_result = match_purchase_analytics_template(sql_question) or match_mrs_template(sql_question) or match_business_template(sql_question)
+        router_question = _resolver_enriched_question(sql_question, resolved_values)
+
+        if router_question != sql_question:
+            log_event(
+                request_id,
+                "resolver_enriched_router_question",
+                "Router question enriched using resolved database value",
+                original_question=sql_question,
+                router_question=router_question,
+                resolved_values_preview=_safe_preview(resolved_values),
+            )
+
+        template_result = match_purchase_analytics_template(router_question) or match_mrs_template(router_question) or match_business_template(router_question)
 
         if template_result:
             sql_result = template_result
@@ -287,6 +482,20 @@ def _answer_question_core(question: str) -> dict[str, Any]:
                     "error_type": type(gen_exc).__name__,
                     "source": "qwen_schema_fallback",
                 }
+
+        sql_before_resolved_material_patch = sql
+        sql = _apply_resolved_material_to_sql(sql, resolved_values)
+        sql_result["sql"] = sql
+
+        if sql != sql_before_resolved_material_patch:
+            log_event(
+                request_id,
+                "resolved_material_sql_patch_applied",
+                "Applied exact resolved material value to generated SQL",
+                before_sql=sql_before_resolved_material_patch,
+                after_sql=sql,
+                resolved_values_preview=_safe_preview(resolved_values),
+            )
 
         log_event(
             request_id,
@@ -349,6 +558,8 @@ def _answer_question_core(question: str) -> dict[str, Any]:
             "retrieved_schema": sql_result.get("retrieved_schema", []),
             "elapsed_ms": elapsed_ms,
             "understanding": understanding,
+            "resolved_values": resolved_values,
+            "router_question": router_question,
         }
 
         result["answer"] = format_answer(result)

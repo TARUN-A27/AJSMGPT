@@ -485,3 +485,54 @@ def plan_nlp(request: AskRequest):
     question = (request.question or "").strip()
     result = plan_query_with_nlp_observation(question)
     return result
+
+
+@app.post("/nlp-router-candidate")
+def nlp_router_candidate(request: AskRequest):
+    """
+    Rasa + Duckling NLP router candidate endpoint.
+
+    Safe review mode:
+    - no SQL execution
+    - no production routing change
+    - safe_to_apply remains false by default
+    """
+    from app.nlp_router_bridge import build_nlp_router_candidate
+
+    question = (request.question or "").strip()
+    result = build_nlp_router_candidate(question)
+    return result.to_dict()
+
+
+@app.post("/nlp-router-candidate")
+def nlp_router_candidate(request: AskRequest):
+    """
+    Rasa + Duckling NLP router candidate endpoint.
+
+    Safe review mode:
+    - no SQL execution
+    - no production routing change
+    - safe_to_apply remains false by default
+    """
+    from app.nlp_router_bridge import build_nlp_router_candidate
+
+    question = (request.question or "").strip()
+    result = build_nlp_router_candidate(question)
+    return result.to_dict()
+
+
+@app.post("/nlp-router-candidate")
+def nlp_router_candidate(request: AskRequest):
+    """
+    Rasa + Duckling NLP router candidate endpoint.
+
+    Safe review mode:
+    - no SQL execution
+    - no production routing change
+    - safe_to_apply remains false by default
+    """
+    from app.nlp_router_bridge import build_nlp_router_candidate
+
+    question = (request.question or "").strip()
+    result = build_nlp_router_candidate(question)
+    return result.to_dict()

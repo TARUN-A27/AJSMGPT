@@ -1,0 +1,153 @@
+version: "3.1"
+
+nlu:
+  - intent: purchase_last_supplier_by_material
+    examples: |
+      - last supplier for [mouse](item_name)
+      - latest supplier for [keyboard](item_name)
+      - who supplied [mouse](item_name) last
+      - [mouse](item_name) last purchased supplier name
+      - [keyboard](item_name) last purchased supplier name
+      - supplier name for [barcode label](item_name)
+      - last vendor for [yarn](item_name)
+      - which supplier supplied [mouse](item_name) recently
+      - last purchase supplier for [barcode chromo label](item_name)
+      - who was the last vendor for [keyboard](item_name)
+
+  - intent: purchase_last_supply_by_supplier
+    examples: |
+      - last supply from supplier [Prime compu systems](supplier_name)
+      - first supply from supplier [Prime compu systems](supplier_name)
+      - what did [Prime compu systems](supplier_name) supply last
+      - what did [THE GALAXY](supplier_name) supply last
+      - last purchase from [THE GALAXY](supplier_name)
+      - latest purchase from vendor [THE GALAXY](supplier_name)
+      - show last order from [THE GALAXY](supplier_name)
+      - latest purchase from supplier [Prime compu systems](supplier_name)
+      - last material supplied by [Prime compu systems](supplier_name)
+
+  - intent: last_purchase_date_by_item_name
+    examples: |
+      - [barcode chromo label](item_name) last purchase
+      - last purchase of [barcode label](item_name)
+      - latest purchase of [keyboard](item_name)
+      - material [mouse](item_name) last purchased date
+      - last purchase date for [yarn](item_name)
+      - when was [mouse](item_name) purchased last
+      - latest PO for [keyboard](item_name)
+      - last purchase rate of [mouse](item_name)
+
+  - intent: purchase_last_n_purchases_by_material
+    examples: |
+      - last 3 purchases of [keyboard](item_name)
+      - last 5 purchase of [mouse](item_name)
+      - show last 10 purchases for [barcode label](item_name)
+      - last 3 purchase qty purchase of the item [Keyboard](item_name)
+      - last five purchases of [yarn](item_name)
+
+  - intent: grn_by_supplier_code
+    examples: |
+      - latest GRN for supplier [800967](supplier_code) in 2025
+      - show goods receipt for supplier [800967](supplier_code)
+      - GRN for supplier [800967](supplier_code)
+      - goods receipt for supplier [800967](supplier_code)
+      - latest goods received from supplier [800967](supplier_code)
+      - receipt pending for supplier [800967](supplier_code)
+
+  - intent: grn_received_by_item
+    examples: |
+      - last received date for [barcode chromo label](item_name)
+      - goods received for [keyboard](item_name)
+      - last GRN of [mouse](item_name)
+      - latest received material [yarn](item_name)
+      - GRN pending for [keyboard](item_name)
+
+  - intent: pending_mrs_by_item_name
+    examples: |
+      - pending MRS for [keyboard](item_name)
+      - pending MRS for [mouse](item_name)
+      - open MRS for [mouse](item_name)
+      - pending material request for [keyboard](item_name)
+      - MRS pending for [yarn](item_name)
+      - material requisition pending for [keyboard](item_name)
+
+  - intent: approved_mrs_by_item_name
+    examples: |
+      - approved MRS for [keyboard](item_name)
+      - approved material request for [mouse](item_name)
+      - show approved MRS of [yarn](item_name)
+
+  - intent: rejected_mrs_by_item_name
+    examples: |
+      - rejected MRS for [keyboard](item_name)
+      - rejected material request for [mouse](item_name)
+      - stores rejected MRS for [keyboard](item_name)
+
+  - intent: mrs_by_department
+    examples: |
+      - MRS for department [EDP](dept_name)
+      - MRS raised by department [EDP](dept_name)
+      - material request from department [GENERAL](dept_name)
+      - show MRS of department [EDP](dept_name)
+
+  - intent: mrs_by_unit
+    examples: |
+      - MRS for unit [B-Unit](unit_name)
+      - material request for unit [B-Unit](unit_name)
+      - MRS of unit [B Unit](unit_name)
+
+  - intent: stock_by_item_name
+    examples: |
+      - stock for [keyboard](item_name)
+      - stock for [mouse](item_name)
+      - current stock of [yarn](item_name)
+      - available stock of [keyboard](item_name)
+      - reserved stock for [mouse](item_name)
+      - how much stock of [keyboard](item_name)
+
+  - intent: issue_by_item_name
+    examples: |
+      - issue for [keyboard](item_name)
+      - issue details of [mouse](item_name)
+      - last issue for [yarn](item_name) in 2024
+      - last issued quantity of [keyboard](item_name)
+      - material issue for [mouse](item_name)
+
+  - intent: camera_details
+    examples: |
+      - camera details
+      - show camera ip details
+      - camera ip list
+      - active cameras in unit 5
+      - inactive camera details
+      - CCTV camera details
+
+  - intent: cashbank_voucher_details
+    examples: |
+      - cashbank voucher details for party [ODUT001](party_code)
+      - cash bank entries for party [ODUT001](party_code)
+      - voucher details [ODUT001](party_code)
+      - cashbank entries [ODUT001](party_code)
+      - payment voucher for party [ODUT001](party_code)
+
+  - intent: document_details
+    examples: |
+      - document details for party [ODUT001](party_code)
+      - documents linked with [ODUT001](party_code)
+      - documents for [ODUT001](party_code)
+      - show document details of party [ODUT001](party_code)
+
+  - intent: hrd_employee_or_attendance
+    examples: |
+      - current attendance for empcode [165224](empcode)
+      - attendance for empcode [165224](empcode)
+      - show attendance of employee [165224](empcode)
+      - department authentication for empcode [165224](empcode)
+      - dept authentication for employee [165224](empcode)
+
+  - intent: employee_by_empcode
+    examples: |
+      - show employee [165224](empcode) details
+      - employee [165224](empcode) department
+      - employee details for empcode [165224](empcode)
+      - empcode [165224](empcode) details

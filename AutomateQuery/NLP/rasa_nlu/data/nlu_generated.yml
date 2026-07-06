@@ -1,0 +1,1173 @@
+version: "3.1"
+
+nlu:
+  - intent: purchase_last_supplier_by_material
+    examples: |
+      - who was the last vendor for [mouse](item_name)
+      - who was the last vendor for [motor](item_name)
+      - who was the last vendor for [chemical](item_name)
+      - who was the last vendor for [computer](item_name)
+      - who was the last vendor for [fabric](item_name)
+      - who was the last vendor for [packing material](item_name)
+      - who was the last vendor for [printer](item_name)
+      - who was the last vendor for [yarn](item_name)
+      - who was the last vendor for [grey yarn](item_name)
+      - who was the last vendor for [bearing](item_name)
+      - who was the last vendor for [cone](item_name)
+      - who was the last vendor for [keyboard](item_name)
+      - who was the last vendor for [barcode chromo label](item_name)
+      - who was the last vendor for [oil](item_name)
+      - who was the last vendor for [barcode label](item_name)
+      - who was the last vendor for [spares](item_name)
+      - which supplier supplied [oil](item_name) recently
+      - which supplier supplied [yarn](item_name) recently
+      - which supplier supplied [cone](item_name) recently
+      - which supplier supplied [keyboard](item_name) recently
+      - which supplier supplied [chemical](item_name) recently
+      - which supplier supplied [packing material](item_name) recently
+      - which supplier supplied [fabric](item_name) recently
+      - which supplier supplied [motor](item_name) recently
+      - which supplier supplied [printer](item_name) recently
+      - which supplier supplied [bearing](item_name) recently
+      - which supplier supplied [barcode chromo label](item_name) recently
+      - which supplier supplied [computer](item_name) recently
+      - which supplier supplied [barcode label](item_name) recently
+      - which supplier supplied [spares](item_name) recently
+      - which supplier supplied [mouse](item_name) recently
+      - which supplier supplied [grey yarn](item_name) recently
+      - [barcode chromo label](item_name) last purchased supplier name
+      - [spares](item_name) last purchased supplier name
+      - [bearing](item_name) last purchased supplier name
+      - [cone](item_name) last purchased supplier name
+      - [yarn](item_name) last purchased supplier name
+      - [oil](item_name) last purchased supplier name
+      - [motor](item_name) last purchased supplier name
+      - [packing material](item_name) last purchased supplier name
+      - [mouse](item_name) last purchased supplier name
+      - [barcode label](item_name) last purchased supplier name
+      - [fabric](item_name) last purchased supplier name
+      - [grey yarn](item_name) last purchased supplier name
+      - [printer](item_name) last purchased supplier name
+      - [chemical](item_name) last purchased supplier name
+      - [keyboard](item_name) last purchased supplier name
+      - [computer](item_name) last purchased supplier name
+      - who supplied [computer](item_name) last
+      - who supplied [oil](item_name) last
+      - who supplied [barcode chromo label](item_name) last
+      - who supplied [mouse](item_name) last
+      - who supplied [barcode label](item_name) last
+      - who supplied [motor](item_name) last
+      - who supplied [bearing](item_name) last
+      - who supplied [fabric](item_name) last
+      - who supplied [cone](item_name) last
+      - who supplied [chemical](item_name) last
+      - who supplied [printer](item_name) last
+      - who supplied [packing material](item_name) last
+      - who supplied [yarn](item_name) last
+      - who supplied [spares](item_name) last
+      - who supplied [keyboard](item_name) last
+      - who supplied [grey yarn](item_name) last
+      - latest vendor for [grey yarn](item_name)
+      - latest vendor for [bearing](item_name)
+      - latest vendor for [printer](item_name)
+      - latest vendor for [spares](item_name)
+      - latest vendor for [fabric](item_name)
+      - latest vendor for [keyboard](item_name)
+      - latest vendor for [mouse](item_name)
+      - latest vendor for [oil](item_name)
+      - latest vendor for [barcode label](item_name)
+      - latest vendor for [yarn](item_name)
+      - latest vendor for [packing material](item_name)
+      - latest vendor for [computer](item_name)
+      - latest vendor for [cone](item_name)
+      - latest vendor for [motor](item_name)
+      - latest vendor for [barcode chromo label](item_name)
+      - latest vendor for [chemical](item_name)
+
+  - intent: purchase_last_supply_by_supplier
+    examples: |
+      - latest purchase from vendor [Prime compu systems](supplier_name)
+      - latest purchase from vendor [GLOBAL SUPPLIERS](supplier_name)
+      - latest purchase from vendor [MINNANU TECHNOLOGIES](supplier_name)
+      - latest purchase from vendor [SRI BALAJI TRADERS](supplier_name)
+      - latest purchase from vendor [THE GALAXY](supplier_name)
+      - latest purchase from vendor [TECHNO SYSTEMS](supplier_name)
+      - latest purchase from vendor [STAR AGENCIES](supplier_name)
+      - latest purchase from vendor [APEX ENTERPRISES](supplier_name)
+      - latest purchase from supplier [THE GALAXY](supplier_name)
+      - latest purchase from supplier [SRI BALAJI TRADERS](supplier_name)
+      - latest purchase from supplier [TECHNO SYSTEMS](supplier_name)
+      - latest purchase from supplier [STAR AGENCIES](supplier_name)
+      - latest purchase from supplier [MINNANU TECHNOLOGIES](supplier_name)
+      - latest purchase from supplier [Prime compu systems](supplier_name)
+      - latest purchase from supplier [APEX ENTERPRISES](supplier_name)
+      - latest purchase from supplier [GLOBAL SUPPLIERS](supplier_name)
+      - last supply from supplier [THE GALAXY](supplier_name)
+      - last supply from supplier [STAR AGENCIES](supplier_name)
+      - last supply from supplier [APEX ENTERPRISES](supplier_name)
+      - last supply from supplier [Prime compu systems](supplier_name)
+      - last supply from supplier [GLOBAL SUPPLIERS](supplier_name)
+      - last supply from supplier [SRI BALAJI TRADERS](supplier_name)
+      - last supply from supplier [TECHNO SYSTEMS](supplier_name)
+      - last supply from supplier [MINNANU TECHNOLOGIES](supplier_name)
+      - last purchase from [APEX ENTERPRISES](supplier_name)
+      - last purchase from [Prime compu systems](supplier_name)
+      - last purchase from [MINNANU TECHNOLOGIES](supplier_name)
+      - last purchase from [TECHNO SYSTEMS](supplier_name)
+      - last purchase from [THE GALAXY](supplier_name)
+      - last purchase from [SRI BALAJI TRADERS](supplier_name)
+      - last purchase from [GLOBAL SUPPLIERS](supplier_name)
+      - last purchase from [STAR AGENCIES](supplier_name)
+      - what did [SRI BALAJI TRADERS](supplier_name) supply first
+      - what did [Prime compu systems](supplier_name) supply first
+      - what did [APEX ENTERPRISES](supplier_name) supply first
+      - what did [THE GALAXY](supplier_name) supply first
+      - what did [GLOBAL SUPPLIERS](supplier_name) supply first
+      - what did [STAR AGENCIES](supplier_name) supply first
+      - what did [MINNANU TECHNOLOGIES](supplier_name) supply first
+      - what did [TECHNO SYSTEMS](supplier_name) supply first
+      - show last order from [STAR AGENCIES](supplier_name)
+      - show last order from [SRI BALAJI TRADERS](supplier_name)
+      - show last order from [GLOBAL SUPPLIERS](supplier_name)
+      - show last order from [APEX ENTERPRISES](supplier_name)
+      - show last order from [Prime compu systems](supplier_name)
+      - show last order from [THE GALAXY](supplier_name)
+      - show last order from [MINNANU TECHNOLOGIES](supplier_name)
+      - show last order from [TECHNO SYSTEMS](supplier_name)
+      - first material supplied by [APEX ENTERPRISES](supplier_name)
+      - first material supplied by [STAR AGENCIES](supplier_name)
+      - first material supplied by [Prime compu systems](supplier_name)
+      - first material supplied by [GLOBAL SUPPLIERS](supplier_name)
+      - first material supplied by [TECHNO SYSTEMS](supplier_name)
+      - first material supplied by [MINNANU TECHNOLOGIES](supplier_name)
+      - first material supplied by [SRI BALAJI TRADERS](supplier_name)
+      - first material supplied by [THE GALAXY](supplier_name)
+      - last material supplied by [MINNANU TECHNOLOGIES](supplier_name)
+      - last material supplied by [APEX ENTERPRISES](supplier_name)
+      - last material supplied by [Prime compu systems](supplier_name)
+      - last material supplied by [TECHNO SYSTEMS](supplier_name)
+      - last material supplied by [STAR AGENCIES](supplier_name)
+      - last material supplied by [SRI BALAJI TRADERS](supplier_name)
+      - last material supplied by [THE GALAXY](supplier_name)
+      - last material supplied by [GLOBAL SUPPLIERS](supplier_name)
+      - what did [GLOBAL SUPPLIERS](supplier_name) supply last
+      - what did [MINNANU TECHNOLOGIES](supplier_name) supply last
+      - what did [SRI BALAJI TRADERS](supplier_name) supply last
+      - what did [STAR AGENCIES](supplier_name) supply last
+      - what did [THE GALAXY](supplier_name) supply last
+      - what did [APEX ENTERPRISES](supplier_name) supply last
+      - what did [Prime compu systems](supplier_name) supply last
+      - what did [TECHNO SYSTEMS](supplier_name) supply last
+      - first supply from supplier [SRI BALAJI TRADERS](supplier_name)
+      - first supply from supplier [GLOBAL SUPPLIERS](supplier_name)
+      - first supply from supplier [APEX ENTERPRISES](supplier_name)
+      - first supply from supplier [MINNANU TECHNOLOGIES](supplier_name)
+      - first supply from supplier [STAR AGENCIES](supplier_name)
+      - first supply from supplier [TECHNO SYSTEMS](supplier_name)
+      - first supply from supplier [Prime compu systems](supplier_name)
+      - first supply from supplier [THE GALAXY](supplier_name)
+
+  - intent: last_purchase_date_by_item_name
+    examples: |
+      - material [keyboard](item_name) last purchased date
+      - material [motor](item_name) last purchased date
+      - material [printer](item_name) last purchased date
+      - material [cone](item_name) last purchased date
+      - material [fabric](item_name) last purchased date
+      - material [barcode label](item_name) last purchased date
+      - material [yarn](item_name) last purchased date
+      - material [mouse](item_name) last purchased date
+      - material [grey yarn](item_name) last purchased date
+      - material [barcode chromo label](item_name) last purchased date
+      - material [packing material](item_name) last purchased date
+      - material [spares](item_name) last purchased date
+      - material [oil](item_name) last purchased date
+      - material [computer](item_name) last purchased date
+      - material [bearing](item_name) last purchased date
+      - material [chemical](item_name) last purchased date
+      - latest purchase order for [yarn](item_name)
+      - latest purchase order for [barcode chromo label](item_name)
+      - latest purchase order for [cone](item_name)
+      - latest purchase order for [spares](item_name)
+      - latest purchase order for [fabric](item_name)
+      - latest purchase order for [chemical](item_name)
+      - latest purchase order for [packing material](item_name)
+      - latest purchase order for [motor](item_name)
+      - latest purchase order for [grey yarn](item_name)
+      - latest purchase order for [computer](item_name)
+      - latest purchase order for [printer](item_name)
+      - latest purchase order for [keyboard](item_name)
+      - latest purchase order for [bearing](item_name)
+      - latest purchase order for [oil](item_name)
+      - latest purchase order for [barcode label](item_name)
+      - latest purchase order for [mouse](item_name)
+      - last purchase rate of [yarn](item_name)
+      - last purchase rate of [bearing](item_name)
+      - last purchase rate of [fabric](item_name)
+      - last purchase rate of [chemical](item_name)
+      - last purchase rate of [mouse](item_name)
+      - last purchase rate of [barcode chromo label](item_name)
+      - last purchase rate of [packing material](item_name)
+      - last purchase rate of [cone](item_name)
+      - last purchase rate of [grey yarn](item_name)
+      - last purchase rate of [motor](item_name)
+      - last purchase rate of [printer](item_name)
+      - last purchase rate of [computer](item_name)
+      - last purchase rate of [keyboard](item_name)
+      - last purchase rate of [oil](item_name)
+      - last purchase rate of [barcode label](item_name)
+      - last purchase rate of [spares](item_name)
+      - [motor](item_name) last purchase
+      - [yarn](item_name) last purchase
+      - [grey yarn](item_name) last purchase
+      - [bearing](item_name) last purchase
+      - [barcode label](item_name) last purchase
+      - [chemical](item_name) last purchase
+      - [printer](item_name) last purchase
+      - [mouse](item_name) last purchase
+      - [keyboard](item_name) last purchase
+      - [packing material](item_name) last purchase
+      - [oil](item_name) last purchase
+      - [computer](item_name) last purchase
+      - [barcode chromo label](item_name) last purchase
+      - [spares](item_name) last purchase
+      - [fabric](item_name) last purchase
+      - [cone](item_name) last purchase
+      - latest purchase of [mouse](item_name)
+      - latest purchase of [motor](item_name)
+      - latest purchase of [cone](item_name)
+      - latest purchase of [spares](item_name)
+      - latest purchase of [fabric](item_name)
+      - latest purchase of [barcode chromo label](item_name)
+      - latest purchase of [keyboard](item_name)
+      - latest purchase of [yarn](item_name)
+      - latest purchase of [bearing](item_name)
+      - latest purchase of [packing material](item_name)
+      - latest purchase of [computer](item_name)
+      - latest purchase of [grey yarn](item_name)
+      - latest purchase of [oil](item_name)
+      - latest purchase of [chemical](item_name)
+      - latest purchase of [barcode label](item_name)
+      - latest purchase of [printer](item_name)
+
+  - intent: purchase_last_n_purchases_by_material
+    examples: |
+      - last 10 purchase qty purchase of the item [barcode chromo label](item_name)
+      - last 3 purchase qty purchase of the item [packing material](item_name)
+      - last 3 purchase qty purchase of the item [mouse](item_name)
+      - last 5 purchase qty purchase of the item [printer](item_name)
+      - last 10 purchase qty purchase of the item [oil](item_name)
+      - last 5 purchase qty purchase of the item [keyboard](item_name)
+      - last 3 purchase qty purchase of the item [spares](item_name)
+      - last 3 purchase qty purchase of the item [grey yarn](item_name)
+      - last 3 purchase qty purchase of the item [keyboard](item_name)
+      - last 10 purchase qty purchase of the item [fabric](item_name)
+      - last 10 purchase qty purchase of the item [bearing](item_name)
+      - last 5 purchase qty purchase of the item [chemical](item_name)
+      - last 3 purchase qty purchase of the item [oil](item_name)
+      - last 5 purchase qty purchase of the item [fabric](item_name)
+      - last 3 purchase qty purchase of the item [chemical](item_name)
+      - last 10 purchase qty purchase of the item [packing material](item_name)
+      - last 5 purchase qty purchase of the item [mouse](item_name)
+      - last 5 purchase qty purchase of the item [barcode label](item_name)
+      - last 3 purchase qty purchase of the item [cone](item_name)
+      - last 3 purchase qty purchase of the item [bearing](item_name)
+      - last 5 purchase qty purchase of the item [grey yarn](item_name)
+      - last 10 purchase qty purchase of the item [keyboard](item_name)
+      - last 5 purchase qty purchase of the item [yarn](item_name)
+      - last 10 purchase qty purchase of the item [mouse](item_name)
+      - last 10 purchase qty purchase of the item [yarn](item_name)
+      - last 3 purchase qty purchase of the item [printer](item_name)
+      - last 10 purchase qty purchase of the item [motor](item_name)
+      - last 10 purchase qty purchase of the item [spares](item_name)
+      - last 3 purchase qty purchase of the item [computer](item_name)
+      - last 5 purchase qty purchase of the item [computer](item_name)
+      - last 10 purchase qty purchase of the item [cone](item_name)
+      - last 10 purchase qty purchase of the item [grey yarn](item_name)
+      - last 3 purchase qty purchase of the item [yarn](item_name)
+      - last 5 purchase qty purchase of the item [oil](item_name)
+      - last 5 purchase qty purchase of the item [spares](item_name)
+      - last 10 purchase qty purchase of the item [printer](item_name)
+      - last 3 purchase qty purchase of the item [motor](item_name)
+      - last 3 purchase qty purchase of the item [barcode label](item_name)
+      - last 10 purchase qty purchase of the item [chemical](item_name)
+      - last 5 purchase qty purchase of the item [motor](item_name)
+      - last 5 purchase qty purchase of the item [bearing](item_name)
+      - last 10 purchase qty purchase of the item [computer](item_name)
+      - last 5 purchase qty purchase of the item [packing material](item_name)
+      - last 3 purchase qty purchase of the item [barcode chromo label](item_name)
+      - last 3 purchase qty purchase of the item [fabric](item_name)
+      - last 5 purchase qty purchase of the item [barcode chromo label](item_name)
+      - last 5 purchase qty purchase of the item [cone](item_name)
+      - last 10 purchase qty purchase of the item [barcode label](item_name)
+      - last 10 suppliers for [spares](item_name)
+      - last 5 suppliers for [barcode chromo label](item_name)
+      - last 5 suppliers for [motor](item_name)
+      - last 5 suppliers for [barcode label](item_name)
+      - last 3 suppliers for [chemical](item_name)
+      - last 3 suppliers for [barcode label](item_name)
+      - last 5 suppliers for [cone](item_name)
+      - last 3 suppliers for [computer](item_name)
+      - last 10 suppliers for [yarn](item_name)
+      - last 5 suppliers for [computer](item_name)
+      - last 3 suppliers for [mouse](item_name)
+      - last 5 suppliers for [printer](item_name)
+      - last 10 suppliers for [grey yarn](item_name)
+      - last 3 suppliers for [grey yarn](item_name)
+      - last 3 suppliers for [cone](item_name)
+      - last 5 suppliers for [yarn](item_name)
+      - last 5 suppliers for [grey yarn](item_name)
+      - last 5 suppliers for [fabric](item_name)
+      - last 5 suppliers for [mouse](item_name)
+      - last 5 suppliers for [spares](item_name)
+      - last 3 suppliers for [yarn](item_name)
+      - last 3 suppliers for [barcode chromo label](item_name)
+      - last 10 suppliers for [printer](item_name)
+      - last 10 suppliers for [mouse](item_name)
+      - last 10 suppliers for [computer](item_name)
+      - last 3 suppliers for [bearing](item_name)
+      - last 10 suppliers for [fabric](item_name)
+      - last 10 suppliers for [motor](item_name)
+      - last 3 suppliers for [keyboard](item_name)
+      - last 10 suppliers for [cone](item_name)
+      - last 10 suppliers for [barcode label](item_name)
+      - last 5 suppliers for [packing material](item_name)
+
+  - intent: grn_by_supplier_code
+    examples: |
+      - latest goods received from supplier [900111](supplier_code)
+      - latest goods received from supplier [911378](supplier_code)
+      - latest goods received from supplier [1013775](supplier_code)
+      - latest goods received from supplier [800151](supplier_code)
+      - latest goods received from supplier [800967](supplier_code)
+      - GRN for supplier [800151](supplier_code)
+      - GRN for supplier [1013775](supplier_code)
+      - GRN for supplier [800967](supplier_code)
+      - GRN for supplier [900111](supplier_code)
+      - GRN for supplier [911378](supplier_code)
+      - receipt pending for supplier [800151](supplier_code)
+      - receipt pending for supplier [911378](supplier_code)
+      - receipt pending for supplier [900111](supplier_code)
+      - receipt pending for supplier [800967](supplier_code)
+      - receipt pending for supplier [1013775](supplier_code)
+      - supplier [900111](supplier_code) GRN details
+      - supplier [800967](supplier_code) GRN details
+      - supplier [1013775](supplier_code) GRN details
+      - supplier [800151](supplier_code) GRN details
+      - supplier [911378](supplier_code) GRN details
+      - goods receipt note for supplier [800967](supplier_code)
+      - goods receipt note for supplier [900111](supplier_code)
+      - goods receipt note for supplier [1013775](supplier_code)
+      - goods receipt note for supplier [800151](supplier_code)
+      - goods receipt note for supplier [911378](supplier_code)
+      - goods receipt for supplier [911378](supplier_code)
+      - goods receipt for supplier [800967](supplier_code)
+      - goods receipt for supplier [900111](supplier_code)
+      - goods receipt for supplier [800151](supplier_code)
+      - goods receipt for supplier [1013775](supplier_code)
+      - GRN details supplier [1013775](supplier_code) in 2026
+      - GRN details supplier [911378](supplier_code) in 2025
+      - GRN details supplier [900111](supplier_code) in 2024
+      - GRN details supplier [800151](supplier_code) in 2025
+      - GRN details supplier [800151](supplier_code) in 2024
+      - GRN details supplier [900111](supplier_code) in 2025
+      - GRN details supplier [800151](supplier_code) in 2026
+      - GRN details supplier [900111](supplier_code) in 2026
+      - GRN details supplier [1013775](supplier_code) in 2024
+      - GRN details supplier [1013775](supplier_code) in 2025
+      - GRN details supplier [800967](supplier_code) in 2025
+      - GRN details supplier [800967](supplier_code) in 2026
+      - GRN details supplier [911378](supplier_code) in 2026
+      - GRN details supplier [911378](supplier_code) in 2024
+      - GRN details supplier [800967](supplier_code) in 2024
+      - show goods receipt for supplier [911378](supplier_code)
+      - show goods receipt for supplier [1013775](supplier_code)
+      - show goods receipt for supplier [900111](supplier_code)
+      - show goods receipt for supplier [800967](supplier_code)
+      - show goods receipt for supplier [800151](supplier_code)
+      - show latest receipt for supplier [911378](supplier_code)
+      - show latest receipt for supplier [1013775](supplier_code)
+      - show latest receipt for supplier [800151](supplier_code)
+      - show latest receipt for supplier [800967](supplier_code)
+      - show latest receipt for supplier [900111](supplier_code)
+      - latest GRN for supplier [911378](supplier_code) in 2026
+      - latest GRN for supplier [1013775](supplier_code) in 2024
+      - latest GRN for supplier [900111](supplier_code) in 2024
+      - latest GRN for supplier [900111](supplier_code) in 2025
+      - latest GRN for supplier [800967](supplier_code) in 2024
+      - latest GRN for supplier [911378](supplier_code) in 2025
+      - latest GRN for supplier [800151](supplier_code) in 2024
+      - latest GRN for supplier [800967](supplier_code) in 2025
+      - latest GRN for supplier [1013775](supplier_code) in 2025
+      - latest GRN for supplier [911378](supplier_code) in 2024
+      - latest GRN for supplier [800967](supplier_code) in 2026
+      - latest GRN for supplier [1013775](supplier_code) in 2026
+      - latest GRN for supplier [800151](supplier_code) in 2026
+      - latest GRN for supplier [900111](supplier_code) in 2026
+      - latest GRN for supplier [800151](supplier_code) in 2025
+
+  - intent: grn_received_by_item
+    examples: |
+      - GRN pending for [motor](item_name)
+      - GRN pending for [chemical](item_name)
+      - GRN pending for [yarn](item_name)
+      - GRN pending for [cone](item_name)
+      - GRN pending for [bearing](item_name)
+      - GRN pending for [computer](item_name)
+      - GRN pending for [spares](item_name)
+      - GRN pending for [barcode chromo label](item_name)
+      - GRN pending for [barcode label](item_name)
+      - GRN pending for [mouse](item_name)
+      - GRN pending for [keyboard](item_name)
+      - GRN pending for [printer](item_name)
+      - GRN pending for [fabric](item_name)
+      - GRN pending for [oil](item_name)
+      - GRN pending for [grey yarn](item_name)
+      - GRN pending for [packing material](item_name)
+      - latest goods receipt for [cone](item_name)
+      - latest goods receipt for [barcode chromo label](item_name)
+      - latest goods receipt for [motor](item_name)
+      - latest goods receipt for [keyboard](item_name)
+      - latest goods receipt for [barcode label](item_name)
+      - latest goods receipt for [chemical](item_name)
+      - latest goods receipt for [grey yarn](item_name)
+      - latest goods receipt for [yarn](item_name)
+      - latest goods receipt for [bearing](item_name)
+      - latest goods receipt for [oil](item_name)
+      - latest goods receipt for [packing material](item_name)
+      - latest goods receipt for [mouse](item_name)
+      - latest goods receipt for [printer](item_name)
+      - latest goods receipt for [spares](item_name)
+      - latest goods receipt for [computer](item_name)
+      - latest goods receipt for [fabric](item_name)
+      - last received date for [yarn](item_name)
+      - last received date for [fabric](item_name)
+      - last received date for [chemical](item_name)
+      - last received date for [computer](item_name)
+      - last received date for [bearing](item_name)
+      - last received date for [packing material](item_name)
+      - last received date for [spares](item_name)
+      - last received date for [mouse](item_name)
+      - last received date for [oil](item_name)
+      - last received date for [motor](item_name)
+      - last received date for [barcode chromo label](item_name)
+      - last received date for [barcode label](item_name)
+      - last received date for [keyboard](item_name)
+      - last received date for [cone](item_name)
+      - last received date for [printer](item_name)
+      - last received date for [grey yarn](item_name)
+      - GRN of item [mouse](item_name) in 2025
+      - GRN of item [oil](item_name) in 2024
+      - GRN of item [grey yarn](item_name) in 2024
+      - GRN of item [motor](item_name) in 2024
+      - GRN of item [fabric](item_name) in 2025
+      - GRN of item [fabric](item_name) in 2026
+      - GRN of item [barcode chromo label](item_name) in 2025
+      - GRN of item [computer](item_name) in 2024
+      - GRN of item [oil](item_name) in 2026
+      - GRN of item [barcode label](item_name) in 2026
+      - GRN of item [cone](item_name) in 2026
+      - GRN of item [spares](item_name) in 2026
+      - GRN of item [printer](item_name) in 2025
+      - GRN of item [packing material](item_name) in 2026
+      - GRN of item [computer](item_name) in 2025
+      - GRN of item [grey yarn](item_name) in 2025
+      - GRN of item [packing material](item_name) in 2024
+      - GRN of item [keyboard](item_name) in 2024
+      - GRN of item [printer](item_name) in 2026
+      - GRN of item [spares](item_name) in 2024
+      - GRN of item [motor](item_name) in 2026
+      - GRN of item [mouse](item_name) in 2024
+      - GRN of item [yarn](item_name) in 2026
+      - GRN of item [grey yarn](item_name) in 2026
+      - GRN of item [fabric](item_name) in 2024
+      - GRN of item [cone](item_name) in 2025
+      - GRN of item [packing material](item_name) in 2025
+      - GRN of item [bearing](item_name) in 2026
+      - GRN of item [motor](item_name) in 2025
+      - GRN of item [barcode label](item_name) in 2025
+      - GRN of item [computer](item_name) in 2026
+      - GRN of item [chemical](item_name) in 2024
+
+  - intent: pending_mrs_by_item_name
+    examples: |
+      - pending MRS for [computer](item_name)
+      - pending MRS for [spares](item_name)
+      - pending MRS for [keyboard](item_name)
+      - pending MRS for [chemical](item_name)
+      - pending MRS for [fabric](item_name)
+      - pending MRS for [printer](item_name)
+      - pending MRS for [motor](item_name)
+      - pending MRS for [cone](item_name)
+      - pending MRS for [packing material](item_name)
+      - pending MRS for [grey yarn](item_name)
+      - pending MRS for [mouse](item_name)
+      - pending MRS for [barcode chromo label](item_name)
+      - pending MRS for [bearing](item_name)
+      - pending MRS for [yarn](item_name)
+      - pending MRS for [barcode label](item_name)
+      - pending MRS for [oil](item_name)
+      - material requisition pending for [cone](item_name)
+      - material requisition pending for [chemical](item_name)
+      - material requisition pending for [oil](item_name)
+      - material requisition pending for [fabric](item_name)
+      - material requisition pending for [printer](item_name)
+      - material requisition pending for [bearing](item_name)
+      - material requisition pending for [mouse](item_name)
+      - material requisition pending for [computer](item_name)
+      - material requisition pending for [keyboard](item_name)
+      - material requisition pending for [yarn](item_name)
+      - material requisition pending for [barcode label](item_name)
+      - material requisition pending for [spares](item_name)
+      - material requisition pending for [grey yarn](item_name)
+      - material requisition pending for [barcode chromo label](item_name)
+      - material requisition pending for [motor](item_name)
+      - material requisition pending for [packing material](item_name)
+      - show pending MRS of [barcode label](item_name)
+      - show pending MRS of [spares](item_name)
+      - show pending MRS of [grey yarn](item_name)
+      - show pending MRS of [keyboard](item_name)
+      - show pending MRS of [barcode chromo label](item_name)
+      - show pending MRS of [packing material](item_name)
+      - show pending MRS of [fabric](item_name)
+      - show pending MRS of [bearing](item_name)
+      - show pending MRS of [yarn](item_name)
+      - show pending MRS of [printer](item_name)
+      - show pending MRS of [chemical](item_name)
+      - show pending MRS of [motor](item_name)
+      - show pending MRS of [cone](item_name)
+      - show pending MRS of [mouse](item_name)
+      - show pending MRS of [oil](item_name)
+      - show pending MRS of [computer](item_name)
+      - open MRS for [keyboard](item_name)
+      - open MRS for [grey yarn](item_name)
+      - open MRS for [oil](item_name)
+      - open MRS for [printer](item_name)
+      - open MRS for [mouse](item_name)
+      - open MRS for [cone](item_name)
+      - open MRS for [computer](item_name)
+      - open MRS for [yarn](item_name)
+      - open MRS for [motor](item_name)
+      - open MRS for [chemical](item_name)
+      - open MRS for [barcode label](item_name)
+      - open MRS for [fabric](item_name)
+      - open MRS for [spares](item_name)
+      - open MRS for [packing material](item_name)
+      - open MRS for [bearing](item_name)
+      - open MRS for [barcode chromo label](item_name)
+      - pending request for material [printer](item_name)
+      - pending request for material [computer](item_name)
+      - pending request for material [motor](item_name)
+      - pending request for material [packing material](item_name)
+      - pending request for material [grey yarn](item_name)
+      - pending request for material [barcode label](item_name)
+      - pending request for material [yarn](item_name)
+      - pending request for material [keyboard](item_name)
+      - pending request for material [bearing](item_name)
+      - pending request for material [mouse](item_name)
+      - pending request for material [oil](item_name)
+      - pending request for material [barcode chromo label](item_name)
+      - pending request for material [spares](item_name)
+      - pending request for material [cone](item_name)
+      - pending request for material [fabric](item_name)
+      - pending request for material [chemical](item_name)
+
+  - intent: approved_mrs_by_item_name
+    examples: |
+      - approved material request for [barcode label](item_name)
+      - approved material request for [grey yarn](item_name)
+      - approved material request for [computer](item_name)
+      - approved material request for [cone](item_name)
+      - approved material request for [spares](item_name)
+      - approved material request for [printer](item_name)
+      - approved material request for [chemical](item_name)
+      - approved material request for [keyboard](item_name)
+      - approved material request for [barcode chromo label](item_name)
+      - approved material request for [mouse](item_name)
+      - approved material request for [oil](item_name)
+      - approved material request for [bearing](item_name)
+      - approved material request for [yarn](item_name)
+      - approved material request for [motor](item_name)
+      - approved material request for [packing material](item_name)
+      - approved material request for [fabric](item_name)
+      - approved request of material [motor](item_name)
+      - approved request of material [chemical](item_name)
+      - approved request of material [oil](item_name)
+      - approved request of material [fabric](item_name)
+      - approved request of material [computer](item_name)
+      - approved request of material [packing material](item_name)
+      - approved request of material [grey yarn](item_name)
+      - approved request of material [barcode chromo label](item_name)
+      - approved request of material [printer](item_name)
+      - approved request of material [keyboard](item_name)
+      - approved request of material [cone](item_name)
+      - approved request of material [yarn](item_name)
+      - approved request of material [mouse](item_name)
+      - approved request of material [bearing](item_name)
+      - approved request of material [spares](item_name)
+      - approved request of material [barcode label](item_name)
+      - approved requisition for [computer](item_name)
+      - approved requisition for [fabric](item_name)
+      - approved requisition for [barcode chromo label](item_name)
+      - approved requisition for [grey yarn](item_name)
+      - approved requisition for [yarn](item_name)
+      - approved requisition for [printer](item_name)
+      - approved requisition for [motor](item_name)
+      - approved requisition for [keyboard](item_name)
+      - approved requisition for [bearing](item_name)
+      - approved requisition for [oil](item_name)
+      - approved requisition for [cone](item_name)
+      - approved requisition for [spares](item_name)
+      - approved requisition for [mouse](item_name)
+      - approved requisition for [chemical](item_name)
+      - approved requisition for [barcode label](item_name)
+      - approved requisition for [packing material](item_name)
+      - approved MRS for [mouse](item_name)
+      - approved MRS for [chemical](item_name)
+      - approved MRS for [keyboard](item_name)
+      - approved MRS for [spares](item_name)
+      - approved MRS for [printer](item_name)
+      - approved MRS for [grey yarn](item_name)
+      - approved MRS for [packing material](item_name)
+      - approved MRS for [barcode chromo label](item_name)
+      - approved MRS for [yarn](item_name)
+      - approved MRS for [fabric](item_name)
+      - approved MRS for [barcode label](item_name)
+      - approved MRS for [cone](item_name)
+      - approved MRS for [motor](item_name)
+      - approved MRS for [computer](item_name)
+      - approved MRS for [oil](item_name)
+      - approved MRS for [bearing](item_name)
+      - show approved MRS of [chemical](item_name)
+      - show approved MRS of [barcode label](item_name)
+      - show approved MRS of [motor](item_name)
+      - show approved MRS of [spares](item_name)
+      - show approved MRS of [cone](item_name)
+      - show approved MRS of [barcode chromo label](item_name)
+      - show approved MRS of [yarn](item_name)
+      - show approved MRS of [packing material](item_name)
+      - show approved MRS of [printer](item_name)
+      - show approved MRS of [keyboard](item_name)
+      - show approved MRS of [mouse](item_name)
+      - show approved MRS of [fabric](item_name)
+      - show approved MRS of [grey yarn](item_name)
+      - show approved MRS of [bearing](item_name)
+      - show approved MRS of [oil](item_name)
+      - show approved MRS of [computer](item_name)
+
+  - intent: rejected_mrs_by_item_name
+    examples: |
+      - rejected MRS for [fabric](item_name)
+      - rejected MRS for [bearing](item_name)
+      - rejected MRS for [motor](item_name)
+      - rejected MRS for [spares](item_name)
+      - rejected MRS for [keyboard](item_name)
+      - rejected MRS for [printer](item_name)
+      - rejected MRS for [cone](item_name)
+      - rejected MRS for [mouse](item_name)
+      - rejected MRS for [computer](item_name)
+      - rejected MRS for [chemical](item_name)
+      - rejected MRS for [yarn](item_name)
+      - rejected MRS for [packing material](item_name)
+      - rejected MRS for [grey yarn](item_name)
+      - rejected MRS for [oil](item_name)
+      - rejected MRS for [barcode chromo label](item_name)
+      - rejected MRS for [barcode label](item_name)
+      - MRS rejected for [bearing](item_name)
+      - MRS rejected for [printer](item_name)
+      - MRS rejected for [cone](item_name)
+      - MRS rejected for [barcode chromo label](item_name)
+      - MRS rejected for [chemical](item_name)
+      - MRS rejected for [spares](item_name)
+      - MRS rejected for [keyboard](item_name)
+      - MRS rejected for [grey yarn](item_name)
+      - MRS rejected for [barcode label](item_name)
+      - MRS rejected for [motor](item_name)
+      - MRS rejected for [oil](item_name)
+      - MRS rejected for [computer](item_name)
+      - MRS rejected for [mouse](item_name)
+      - MRS rejected for [fabric](item_name)
+      - MRS rejected for [yarn](item_name)
+      - MRS rejected for [packing material](item_name)
+      - show rejected request of [yarn](item_name)
+      - show rejected request of [bearing](item_name)
+      - show rejected request of [cone](item_name)
+      - show rejected request of [computer](item_name)
+      - show rejected request of [keyboard](item_name)
+      - show rejected request of [chemical](item_name)
+      - show rejected request of [motor](item_name)
+      - show rejected request of [mouse](item_name)
+      - show rejected request of [spares](item_name)
+      - show rejected request of [printer](item_name)
+      - show rejected request of [barcode chromo label](item_name)
+      - show rejected request of [grey yarn](item_name)
+      - show rejected request of [barcode label](item_name)
+      - show rejected request of [packing material](item_name)
+      - show rejected request of [fabric](item_name)
+      - show rejected request of [oil](item_name)
+      - rejected material request for [printer](item_name)
+      - rejected material request for [keyboard](item_name)
+      - rejected material request for [mouse](item_name)
+      - rejected material request for [bearing](item_name)
+      - rejected material request for [barcode chromo label](item_name)
+      - rejected material request for [computer](item_name)
+      - rejected material request for [grey yarn](item_name)
+      - rejected material request for [packing material](item_name)
+      - rejected material request for [barcode label](item_name)
+      - rejected material request for [motor](item_name)
+      - rejected material request for [cone](item_name)
+      - rejected material request for [oil](item_name)
+      - rejected material request for [spares](item_name)
+      - rejected material request for [yarn](item_name)
+      - rejected material request for [fabric](item_name)
+      - rejected material request for [chemical](item_name)
+      - stores rejected MRS for [printer](item_name)
+      - stores rejected MRS for [motor](item_name)
+      - stores rejected MRS for [fabric](item_name)
+      - stores rejected MRS for [grey yarn](item_name)
+      - stores rejected MRS for [bearing](item_name)
+      - stores rejected MRS for [mouse](item_name)
+      - stores rejected MRS for [yarn](item_name)
+      - stores rejected MRS for [keyboard](item_name)
+      - stores rejected MRS for [oil](item_name)
+      - stores rejected MRS for [computer](item_name)
+      - stores rejected MRS for [cone](item_name)
+      - stores rejected MRS for [packing material](item_name)
+      - stores rejected MRS for [barcode label](item_name)
+      - stores rejected MRS for [barcode chromo label](item_name)
+      - stores rejected MRS for [chemical](item_name)
+      - stores rejected MRS for [spares](item_name)
+
+  - intent: mrs_by_department
+    examples: |
+      - MRS raised by department [STORES](dept_name)
+      - MRS raised by department [EDP](dept_name)
+      - MRS raised by department [ACCOUNTS](dept_name)
+      - MRS raised by department [PRODUCTION](dept_name)
+      - MRS raised by department [GENERAL](dept_name)
+      - MRS raised by department [MAINTENANCE](dept_name)
+      - show MRS of department [MAINTENANCE](dept_name)
+      - show MRS of department [GENERAL](dept_name)
+      - show MRS of department [EDP](dept_name)
+      - show MRS of department [PRODUCTION](dept_name)
+      - show MRS of department [STORES](dept_name)
+      - show MRS of department [ACCOUNTS](dept_name)
+      - department [PRODUCTION](dept_name) MRS
+      - department [EDP](dept_name) MRS
+      - department [MAINTENANCE](dept_name) MRS
+      - department [STORES](dept_name) MRS
+      - department [GENERAL](dept_name) MRS
+      - department [ACCOUNTS](dept_name) MRS
+      - approved MRS for department [PRODUCTION](dept_name)
+      - approved MRS for department [EDP](dept_name)
+      - approved MRS for department [STORES](dept_name)
+      - approved MRS for department [GENERAL](dept_name)
+      - approved MRS for department [MAINTENANCE](dept_name)
+      - approved MRS for department [ACCOUNTS](dept_name)
+      - pending MRS for department [EDP](dept_name)
+      - pending MRS for department [PRODUCTION](dept_name)
+      - pending MRS for department [GENERAL](dept_name)
+      - pending MRS for department [MAINTENANCE](dept_name)
+      - pending MRS for department [STORES](dept_name)
+      - pending MRS for department [ACCOUNTS](dept_name)
+      - MRS for department [STORES](dept_name)
+      - MRS for department [PRODUCTION](dept_name)
+      - MRS for department [ACCOUNTS](dept_name)
+      - MRS for department [GENERAL](dept_name)
+      - MRS for department [MAINTENANCE](dept_name)
+      - MRS for department [EDP](dept_name)
+      - material request from department [MAINTENANCE](dept_name)
+      - material request from department [PRODUCTION](dept_name)
+      - material request from department [ACCOUNTS](dept_name)
+      - material request from department [GENERAL](dept_name)
+      - material request from department [EDP](dept_name)
+      - material request from department [STORES](dept_name)
+
+  - intent: mrs_by_unit
+    examples: |
+      - material request for unit [A-Unit](unit_name)
+      - material request for unit [B Unit](unit_name)
+      - material request for unit [B-Unit](unit_name)
+      - material request for unit [Main Unit](unit_name)
+      - material request for unit [Unit 5](unit_name)
+      - pending MRS in unit [Unit 5](unit_name)
+      - pending MRS in unit [B Unit](unit_name)
+      - pending MRS in unit [B-Unit](unit_name)
+      - pending MRS in unit [Main Unit](unit_name)
+      - pending MRS in unit [A-Unit](unit_name)
+      - MRS of unit [A-Unit](unit_name)
+      - MRS of unit [Unit 5](unit_name)
+      - MRS of unit [Main Unit](unit_name)
+      - MRS of unit [B-Unit](unit_name)
+      - MRS of unit [B Unit](unit_name)
+      - MRS for unit [B Unit](unit_name)
+      - MRS for unit [Unit 5](unit_name)
+      - MRS for unit [Main Unit](unit_name)
+      - MRS for unit [B-Unit](unit_name)
+      - MRS for unit [A-Unit](unit_name)
+      - unit [A-Unit](unit_name) material request
+      - unit [Main Unit](unit_name) material request
+      - unit [B Unit](unit_name) material request
+      - unit [B-Unit](unit_name) material request
+      - unit [Unit 5](unit_name) material request
+      - show MRS unit [B-Unit](unit_name)
+      - show MRS unit [Main Unit](unit_name)
+      - show MRS unit [B Unit](unit_name)
+      - show MRS unit [A-Unit](unit_name)
+      - show MRS unit [Unit 5](unit_name)
+
+  - intent: stock_by_item_name
+    examples: |
+      - item stock [yarn](item_name)
+      - item stock [printer](item_name)
+      - item stock [mouse](item_name)
+      - item stock [cone](item_name)
+      - item stock [fabric](item_name)
+      - item stock [barcode chromo label](item_name)
+      - item stock [bearing](item_name)
+      - item stock [grey yarn](item_name)
+      - item stock [oil](item_name)
+      - item stock [spares](item_name)
+      - item stock [packing material](item_name)
+      - item stock [computer](item_name)
+      - item stock [motor](item_name)
+      - item stock [keyboard](item_name)
+      - item stock [barcode label](item_name)
+      - item stock [chemical](item_name)
+      - how much stock of [barcode chromo label](item_name)
+      - how much stock of [oil](item_name)
+      - how much stock of [packing material](item_name)
+      - how much stock of [barcode label](item_name)
+      - how much stock of [bearing](item_name)
+      - how much stock of [yarn](item_name)
+      - how much stock of [cone](item_name)
+      - how much stock of [computer](item_name)
+      - how much stock of [motor](item_name)
+      - how much stock of [spares](item_name)
+      - how much stock of [fabric](item_name)
+      - how much stock of [printer](item_name)
+      - how much stock of [mouse](item_name)
+      - how much stock of [keyboard](item_name)
+      - how much stock of [chemical](item_name)
+      - how much stock of [grey yarn](item_name)
+      - balance stock of [bearing](item_name)
+      - balance stock of [motor](item_name)
+      - balance stock of [keyboard](item_name)
+      - balance stock of [printer](item_name)
+      - balance stock of [fabric](item_name)
+      - balance stock of [chemical](item_name)
+      - balance stock of [packing material](item_name)
+      - balance stock of [computer](item_name)
+      - balance stock of [barcode label](item_name)
+      - balance stock of [mouse](item_name)
+      - balance stock of [cone](item_name)
+      - balance stock of [grey yarn](item_name)
+      - balance stock of [yarn](item_name)
+      - balance stock of [spares](item_name)
+      - balance stock of [oil](item_name)
+      - balance stock of [barcode chromo label](item_name)
+      - show stock for [cone](item_name)
+      - show stock for [fabric](item_name)
+      - show stock for [barcode chromo label](item_name)
+      - show stock for [printer](item_name)
+      - show stock for [yarn](item_name)
+      - show stock for [chemical](item_name)
+      - show stock for [oil](item_name)
+      - show stock for [mouse](item_name)
+      - show stock for [motor](item_name)
+      - show stock for [packing material](item_name)
+      - show stock for [grey yarn](item_name)
+      - show stock for [spares](item_name)
+      - show stock for [barcode label](item_name)
+      - show stock for [bearing](item_name)
+      - show stock for [computer](item_name)
+      - show stock for [keyboard](item_name)
+      - reserved stock for [chemical](item_name)
+      - reserved stock for [cone](item_name)
+      - reserved stock for [spares](item_name)
+      - reserved stock for [printer](item_name)
+      - reserved stock for [yarn](item_name)
+      - reserved stock for [barcode label](item_name)
+      - reserved stock for [barcode chromo label](item_name)
+      - reserved stock for [keyboard](item_name)
+      - reserved stock for [mouse](item_name)
+      - reserved stock for [motor](item_name)
+      - reserved stock for [packing material](item_name)
+      - reserved stock for [bearing](item_name)
+      - reserved stock for [grey yarn](item_name)
+      - reserved stock for [fabric](item_name)
+      - reserved stock for [oil](item_name)
+      - reserved stock for [computer](item_name)
+
+  - intent: issue_by_item_name
+    examples: |
+      - issue quantity for [mouse](item_name)
+      - issue quantity for [cone](item_name)
+      - issue quantity for [chemical](item_name)
+      - issue quantity for [oil](item_name)
+      - issue quantity for [motor](item_name)
+      - issue quantity for [printer](item_name)
+      - issue quantity for [grey yarn](item_name)
+      - issue quantity for [barcode label](item_name)
+      - issue quantity for [computer](item_name)
+      - issue quantity for [spares](item_name)
+      - issue quantity for [packing material](item_name)
+      - issue quantity for [bearing](item_name)
+      - issue quantity for [barcode chromo label](item_name)
+      - issue quantity for [yarn](item_name)
+      - issue quantity for [keyboard](item_name)
+      - issue quantity for [fabric](item_name)
+      - issued material [computer](item_name)
+      - issued material [printer](item_name)
+      - issued material [grey yarn](item_name)
+      - issued material [bearing](item_name)
+      - issued material [spares](item_name)
+      - issued material [fabric](item_name)
+      - issued material [packing material](item_name)
+      - issued material [yarn](item_name)
+      - issued material [barcode chromo label](item_name)
+      - issued material [keyboard](item_name)
+      - issued material [motor](item_name)
+      - issued material [oil](item_name)
+      - issued material [cone](item_name)
+      - issued material [barcode label](item_name)
+      - issued material [chemical](item_name)
+      - issued material [mouse](item_name)
+      - last issue for [spares](item_name) in 2025
+      - last issue for [mouse](item_name) in 2026
+      - last issue for [barcode label](item_name) in 2025
+      - last issue for [computer](item_name) in 2026
+      - last issue for [spares](item_name) in 2024
+      - last issue for [grey yarn](item_name) in 2025
+      - last issue for [chemical](item_name) in 2025
+      - last issue for [cone](item_name) in 2025
+      - last issue for [yarn](item_name) in 2024
+      - last issue for [yarn](item_name) in 2025
+      - last issue for [motor](item_name) in 2025
+      - last issue for [barcode label](item_name) in 2024
+      - last issue for [printer](item_name) in 2024
+      - last issue for [mouse](item_name) in 2024
+      - last issue for [fabric](item_name) in 2024
+      - last issue for [cone](item_name) in 2026
+      - last issue for [barcode label](item_name) in 2026
+      - last issue for [oil](item_name) in 2024
+      - last issue for [packing material](item_name) in 2026
+      - last issue for [computer](item_name) in 2025
+      - last issue for [barcode chromo label](item_name) in 2024
+      - last issue for [spares](item_name) in 2026
+      - last issue for [chemical](item_name) in 2024
+      - last issue for [chemical](item_name) in 2026
+      - last issue for [bearing](item_name) in 2024
+      - last issue for [grey yarn](item_name) in 2026
+      - last issue for [computer](item_name) in 2024
+      - last issue for [bearing](item_name) in 2025
+      - last issue for [fabric](item_name) in 2025
+      - last issue for [grey yarn](item_name) in 2024
+      - last issue for [mouse](item_name) in 2025
+      - last issue for [printer](item_name) in 2025
+      - last issue for [printer](item_name) in 2026
+      - last issue for [barcode chromo label](item_name) in 2026
+      - last issue for [keyboard](item_name) in 2024
+      - last issue for [keyboard](item_name) in 2026
+      - last issue for [keyboard](item_name) in 2025
+      - last issue for [packing material](item_name) in 2025
+      - last issue for [oil](item_name) in 2026
+      - last issue for [packing material](item_name) in 2024
+      - last issue for [yarn](item_name) in 2026
+      - last issue for [motor](item_name) in 2026
+      - last issue for [barcode chromo label](item_name) in 2025
+      - last issue for [motor](item_name) in 2024
+      - last issue for [oil](item_name) in 2025
+      - last issue for [fabric](item_name) in 2026
+      - last issue for [cone](item_name) in 2024
+      - last issue for [bearing](item_name) in 2026
+
+  - intent: camera_details
+    examples: |
+      - list camera configuration
+      - CCTV camera details
+      - active cameras in unit 5
+      - inactive camera details
+      - show all cameras
+      - camera ip list
+      - show camera ip details
+      - camera details
+      - camera IP address details
+      - camera master details
+
+  - intent: cashbank_voucher_details
+    examples: |
+      - cashbank voucher details for party [VEN001](party_code)
+      - cashbank voucher details for party [SUP001](party_code)
+      - cashbank voucher details for party [ODUT002](party_code)
+      - cashbank voucher details for party [ABC001](party_code)
+      - cashbank voucher details for party [ODUT001](party_code)
+      - receipt voucher for party [ABC001](party_code)
+      - receipt voucher for party [SUP001](party_code)
+      - receipt voucher for party [ODUT001](party_code)
+      - receipt voucher for party [ODUT002](party_code)
+      - receipt voucher for party [VEN001](party_code)
+      - payment details party [ODUT002](party_code)
+      - payment details party [SUP001](party_code)
+      - payment details party [ABC001](party_code)
+      - payment details party [VEN001](party_code)
+      - payment details party [ODUT001](party_code)
+      - voucher details [VEN001](party_code)
+      - voucher details [ODUT001](party_code)
+      - voucher details [ABC001](party_code)
+      - voucher details [SUP001](party_code)
+      - voucher details [ODUT002](party_code)
+      - payment voucher for party [VEN001](party_code)
+      - payment voucher for party [ABC001](party_code)
+      - payment voucher for party [SUP001](party_code)
+      - payment voucher for party [ODUT002](party_code)
+      - payment voucher for party [ODUT001](party_code)
+      - cashbank transaction of [ODUT002](party_code)
+      - cashbank transaction of [SUP001](party_code)
+      - cashbank transaction of [ABC001](party_code)
+      - cashbank transaction of [VEN001](party_code)
+      - cashbank transaction of [ODUT001](party_code)
+      - cash bank entries for party [ODUT002](party_code)
+      - cash bank entries for party [ODUT001](party_code)
+      - cash bank entries for party [SUP001](party_code)
+      - cash bank entries for party [VEN001](party_code)
+      - cash bank entries for party [ABC001](party_code)
+      - cashbank entries [VEN001](party_code)
+      - cashbank entries [SUP001](party_code)
+      - cashbank entries [ODUT001](party_code)
+      - cashbank entries [ABC001](party_code)
+      - cashbank entries [ODUT002](party_code)
+      - cash bank voucher for [ABC001](party_code)
+      - cash bank voucher for [ODUT002](party_code)
+      - cash bank voucher for [ODUT001](party_code)
+      - cash bank voucher for [SUP001](party_code)
+      - cash bank voucher for [VEN001](party_code)
+      - show cashbank for party [ODUT002](party_code)
+      - show cashbank for party [ABC001](party_code)
+      - show cashbank for party [SUP001](party_code)
+      - show cashbank for party [VEN001](party_code)
+      - show cashbank for party [ODUT001](party_code)
+
+  - intent: document_details
+    examples: |
+      - documents linked with [SUP001](party_code)
+      - documents linked with [ABC001](party_code)
+      - documents linked with [VEN001](party_code)
+      - documents linked with [ODUT001](party_code)
+      - documents linked with [ODUT002](party_code)
+      - show document details of party [SUP001](party_code)
+      - show document details of party [ODUT002](party_code)
+      - show document details of party [VEN001](party_code)
+      - show document details of party [ABC001](party_code)
+      - show document details of party [ODUT001](party_code)
+      - party [ODUT002](party_code) document details
+      - party [SUP001](party_code) document details
+      - party [ABC001](party_code) document details
+      - party [VEN001](party_code) document details
+      - party [ODUT001](party_code) document details
+      - documents for [ABC001](party_code)
+      - documents for [SUP001](party_code)
+      - documents for [VEN001](party_code)
+      - documents for [ODUT002](party_code)
+      - documents for [ODUT001](party_code)
+      - show uploaded documents for [SUP001](party_code)
+      - show uploaded documents for [ODUT001](party_code)
+      - show uploaded documents for [ODUT002](party_code)
+      - show uploaded documents for [ABC001](party_code)
+      - show uploaded documents for [VEN001](party_code)
+      - document details for party [ODUT002](party_code)
+      - document details for party [VEN001](party_code)
+      - document details for party [ODUT001](party_code)
+      - document details for party [ABC001](party_code)
+      - document details for party [SUP001](party_code)
+      - document records for party [SUP001](party_code)
+      - document records for party [ODUT001](party_code)
+      - document records for party [VEN001](party_code)
+      - document records for party [ODUT002](party_code)
+      - document records for party [ABC001](party_code)
+
+  - intent: hrd_employee_or_attendance
+    examples: |
+      - attendance status of [165225](empcode)
+      - attendance status of [165224](empcode)
+      - attendance status of [100123](empcode)
+      - attendance status of [200111](empcode)
+      - attendance status of [100124](empcode)
+      - show current attendance for employee [165225](empcode)
+      - show current attendance for employee [165224](empcode)
+      - show current attendance for employee [100124](empcode)
+      - show current attendance for employee [200111](empcode)
+      - show current attendance for employee [100123](empcode)
+      - employee [100123](empcode) attendance
+      - employee [165225](empcode) attendance
+      - employee [100124](empcode) attendance
+      - employee [165224](empcode) attendance
+      - employee [200111](empcode) attendance
+      - show attendance of employee [165224](empcode)
+      - show attendance of employee [100124](empcode)
+      - show attendance of employee [165225](empcode)
+      - show attendance of employee [200111](empcode)
+      - show attendance of employee [100123](empcode)
+      - department authentication for empcode [165224](empcode)
+      - department authentication for empcode [100123](empcode)
+      - department authentication for empcode [200111](empcode)
+      - department authentication for empcode [100124](empcode)
+      - department authentication for empcode [165225](empcode)
+      - attendance for empcode [165225](empcode)
+      - attendance for empcode [165224](empcode)
+      - attendance for empcode [200111](empcode)
+      - attendance for empcode [100124](empcode)
+      - attendance for empcode [100123](empcode)
+      - today attendance for empcode [100123](empcode)
+      - today attendance for empcode [100124](empcode)
+      - today attendance for empcode [165224](empcode)
+      - today attendance for empcode [165225](empcode)
+      - today attendance for empcode [200111](empcode)
+      - dept authentication for employee [200111](empcode)
+      - dept authentication for employee [100123](empcode)
+      - dept authentication for employee [100124](empcode)
+      - dept authentication for employee [165224](empcode)
+      - dept authentication for employee [165225](empcode)
+      - current attendance for empcode [100124](empcode)
+      - current attendance for empcode [165224](empcode)
+      - current attendance for empcode [165225](empcode)
+      - current attendance for empcode [200111](empcode)
+      - current attendance for empcode [100123](empcode)
+
+  - intent: employee_by_empcode
+    examples: |
+      - employee details for empcode [100124](empcode)
+      - employee details for empcode [165224](empcode)
+      - employee details for empcode [100123](empcode)
+      - employee details for empcode [165225](empcode)
+      - employee details for empcode [200111](empcode)
+      - employee [165224](empcode) department
+      - employee [165225](empcode) department
+      - employee [100124](empcode) department
+      - employee [100123](empcode) department
+      - employee [200111](empcode) department
+      - department of employee [165224](empcode)
+      - department of employee [165225](empcode)
+      - department of employee [100124](empcode)
+      - department of employee [200111](empcode)
+      - department of employee [100123](empcode)
+      - show employee [165224](empcode) details
+      - show employee [100123](empcode) details
+      - show employee [200111](empcode) details
+      - show employee [165225](empcode) details
+      - show employee [100124](empcode) details
+      - show staff details for [165225](empcode)
+      - show staff details for [165224](empcode)
+      - show staff details for [200111](empcode)
+      - show staff details for [100124](empcode)
+      - show staff details for [100123](empcode)
+      - employee master details [165225](empcode)
+      - employee master details [165224](empcode)
+      - employee master details [200111](empcode)
+      - employee master details [100124](empcode)
+      - employee master details [100123](empcode)
+      - empcode [200111](empcode) details
+      - empcode [100123](empcode) details
+      - empcode [100124](empcode) details
+      - empcode [165224](empcode) details
+      - empcode [165225](empcode) details

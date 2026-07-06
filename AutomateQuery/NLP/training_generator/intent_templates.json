@@ -9,7 +9,15 @@
     "which supplier supplied {item_name:item_name} recently",
     "last purchase supplier for {item_name:item_name}",
     "supplier name for {item_name:item_name}",
-    "who was the last vendor for {item_name:item_name}"
+    "who was the last vendor for {item_name:item_name}",
+    "last supply of {item_name:item_name}",
+    "latest supply of {item_name:item_name}",
+    "last supplied supplier for {item_name:item_name}",
+    "who supplied {item_name:item_name}",
+    "who supplied {item_name:item_name} recently",
+    "supplier for last supply of {item_name:item_name}",
+    "last supply details of {item_name:item_name}",
+    "last supplied vendor for {item_name:item_name}"
   ],
   "purchase_last_supply_by_supplier": [
     "last supply from supplier {supplier_name:supplier_name}",

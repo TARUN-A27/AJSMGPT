@@ -12,3 +12,7 @@ logs/
 qdrant_dumps/
 templates/*.bak
 reports/
+AutomateQuery/NLP/rasa_nlu/.rasa/
+AutomateQuery/NLP/rasa_nlu/models/
+app/query_planner.py.bak_*
+app/query_planner.py.broken_*

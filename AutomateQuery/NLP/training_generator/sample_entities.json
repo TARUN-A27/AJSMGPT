@@ -1,0 +1,76 @@
+{
+  "item_name": [
+    "mouse",
+    "keyboard",
+    "barcode label",
+    "barcode chromo label",
+    "yarn",
+    "grey yarn",
+    "chemical",
+    "packing material",
+    "bearing",
+    "oil",
+    "motor",
+    "fabric",
+    "cone",
+    "spares",
+    "computer",
+    "printer"
+  ],
+  "supplier_name": [
+    "Prime compu systems",
+    "THE GALAXY",
+    "MINNANU TECHNOLOGIES",
+    "APEX ENTERPRISES",
+    "SRI BALAJI TRADERS",
+    "GLOBAL SUPPLIERS",
+    "TECHNO SYSTEMS",
+    "STAR AGENCIES"
+  ],
+  "supplier_code": [
+    "800967",
+    "911378",
+    "1013775",
+    "800151",
+    "900111"
+  ],
+  "party_code": [
+    "ODUT001",
+    "ODUT002",
+    "ABC001",
+    "SUP001",
+    "VEN001"
+  ],
+  "empcode": [
+    "165224",
+    "165225",
+    "100123",
+    "100124",
+    "200111"
+  ],
+  "dept_name": [
+    "EDP",
+    "GENERAL",
+    "STORES",
+    "MAINTENANCE",
+    "PRODUCTION",
+    "ACCOUNTS"
+  ],
+  "unit_name": [
+    "B-Unit",
+    "A-Unit",
+    "B Unit",
+    "Unit 5",
+    "Main Unit"
+  ],
+  "year": [
+    "2024",
+    "2025",
+    "2026"
+  ],
+  "limit": [
+    "3",
+    "5",
+    "10"
+  ]
+}

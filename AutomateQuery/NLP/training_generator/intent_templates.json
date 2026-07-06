@@ -1,0 +1,196 @@
+{
+  "purchase_last_supplier_by_material": [
+    "last supplier for {item_name:item_name}",
+    "latest supplier for {item_name:item_name}",
+    "who supplied {item_name:item_name} last",
+    "{item_name:item_name} last purchased supplier name",
+    "last vendor for {item_name:item_name}",
+    "latest vendor for {item_name:item_name}",
+    "which supplier supplied {item_name:item_name} recently",
+    "last purchase supplier for {item_name:item_name}",
+    "supplier name for {item_name:item_name}",
+    "who was the last vendor for {item_name:item_name}"
+  ],
+  "purchase_last_supply_by_supplier": [
+    "last supply from supplier {supplier_name:supplier_name}",
+    "first supply from supplier {supplier_name:supplier_name}",
+    "what did {supplier_name:supplier_name} supply last",
+    "what did {supplier_name:supplier_name} supply first",
+    "last purchase from {supplier_name:supplier_name}",
+    "latest purchase from vendor {supplier_name:supplier_name}",
+    "show last order from {supplier_name:supplier_name}",
+    "latest purchase from supplier {supplier_name:supplier_name}",
+    "last material supplied by {supplier_name:supplier_name}",
+    "first material supplied by {supplier_name:supplier_name}"
+  ],
+  "last_purchase_date_by_item_name": [
+    "{item_name:item_name} last purchase",
+    "last purchase of {item_name:item_name}",
+    "latest purchase of {item_name:item_name}",
+    "material {item_name:item_name} last purchased date",
+    "last purchase date for {item_name:item_name}",
+    "when was {item_name:item_name} purchased last",
+    "latest PO for {item_name:item_name}",
+    "last purchase rate of {item_name:item_name}",
+    "show recent purchase of {item_name:item_name}",
+    "latest purchase order for {item_name:item_name}"
+  ],
+  "purchase_last_n_purchases_by_material": [
+    "last {limit} purchases of {item_name:item_name}",
+    "last {limit} purchase of {item_name:item_name}",
+    "show last {limit} purchases for {item_name:item_name}",
+    "last {limit} purchase qty purchase of the item {item_name:item_name}",
+    "show recent {limit} purchases of {item_name:item_name}",
+    "latest {limit} purchase orders for {item_name:item_name}",
+    "last {limit} suppliers for {item_name:item_name}",
+    "show {limit} latest purchase details for {item_name:item_name}",
+    "last {limit} purchase details of {item_name:item_name} in {year}",
+    "show last {limit} purchase qty for {item_name:item_name} in {year}"
+  ],
+  "grn_by_supplier_code": [
+    "latest GRN for supplier {supplier_code:supplier_code} in {year}",
+    "show goods receipt for supplier {supplier_code:supplier_code}",
+    "GRN for supplier {supplier_code:supplier_code}",
+    "goods receipt for supplier {supplier_code:supplier_code}",
+    "latest goods received from supplier {supplier_code:supplier_code}",
+    "receipt pending for supplier {supplier_code:supplier_code}",
+    "GRN details supplier {supplier_code:supplier_code} in {year}",
+    "show latest receipt for supplier {supplier_code:supplier_code}",
+    "goods receipt note for supplier {supplier_code:supplier_code}",
+    "supplier {supplier_code:supplier_code} GRN details"
+  ],
+  "grn_received_by_item": [
+    "last received date for {item_name:item_name}",
+    "goods received for {item_name:item_name}",
+    "last GRN of {item_name:item_name}",
+    "latest received material {item_name:item_name}",
+    "GRN pending for {item_name:item_name}",
+    "show receipt details for {item_name:item_name}",
+    "latest goods receipt for {item_name:item_name}",
+    "received quantity of {item_name:item_name}",
+    "GRN of item {item_name:item_name} in {year}",
+    "goods received for item {item_name:item_name} in {year}"
+  ],
+  "pending_mrs_by_item_name": [
+    "pending MRS for {item_name:item_name}",
+    "open MRS for {item_name:item_name}",
+    "pending material request for {item_name:item_name}",
+    "MRS pending for {item_name:item_name}",
+    "material requisition pending for {item_name:item_name}",
+    "show pending MRS of {item_name:item_name}",
+    "pending MRS item {item_name:item_name}",
+    "pending request for material {item_name:item_name}",
+    "MRS due for {item_name:item_name} in {year}",
+    "pending MRS for {item_name:item_name} in {year}"
+  ],
+  "approved_mrs_by_item_name": [
+    "approved MRS for {item_name:item_name}",
+    "approved material request for {item_name:item_name}",
+    "show approved MRS of {item_name:item_name}",
+    "approved requisition for {item_name:item_name}",
+    "MRS approved for {item_name:item_name}",
+    "approved request of material {item_name:item_name}"
+  ],
+  "rejected_mrs_by_item_name": [
+    "rejected MRS for {item_name:item_name}",
+    "rejected material request for {item_name:item_name}",
+    "stores rejected MRS for {item_name:item_name}",
+    "MRS rejected for {item_name:item_name}",
+    "rejected requisition for {item_name:item_name}",
+    "show rejected request of {item_name:item_name}"
+  ],
+  "mrs_by_department": [
+    "MRS for department {dept_name:dept_name}",
+    "MRS raised by department {dept_name:dept_name}",
+    "material request from department {dept_name:dept_name}",
+    "show MRS of department {dept_name:dept_name}",
+    "department {dept_name:dept_name} MRS",
+    "pending MRS for department {dept_name:dept_name}",
+    "approved MRS for department {dept_name:dept_name}"
+  ],
+  "mrs_by_unit": [
+    "MRS for unit {unit_name:unit_name}",
+    "material request for unit {unit_name:unit_name}",
+    "MRS of unit {unit_name:unit_name}",
+    "pending MRS in unit {unit_name:unit_name}",
+    "unit {unit_name:unit_name} material request",
+    "show MRS unit {unit_name:unit_name}"
+  ],
+  "stock_by_item_name": [
+    "stock for {item_name:item_name}",
+    "current stock of {item_name:item_name}",
+    "available stock of {item_name:item_name}",
+    "reserved stock for {item_name:item_name}",
+    "how much stock of {item_name:item_name}",
+    "show stock for {item_name:item_name}",
+    "stock details of {item_name:item_name}",
+    "item stock {item_name:item_name}",
+    "balance stock of {item_name:item_name}",
+    "inventory stock for {item_name:item_name}"
+  ],
+  "issue_by_item_name": [
+    "issue for {item_name:item_name}",
+    "issue details of {item_name:item_name}",
+    "last issue for {item_name:item_name} in {year}",
+    "last issued quantity of {item_name:item_name}",
+    "material issue for {item_name:item_name}",
+    "show issue details for {item_name:item_name}",
+    "latest issue of {item_name:item_name}",
+    "issued material {item_name:item_name}",
+    "issue quantity for {item_name:item_name}",
+    "material issued in {year} for {item_name:item_name}"
+  ],
+  "camera_details": [
+    "camera details",
+    "show camera ip details",
+    "camera ip list",
+    "active cameras in unit 5",
+    "inactive camera details",
+    "CCTV camera details",
+    "show all cameras",
+    "camera master details",
+    "camera IP address details",
+    "list camera configuration"
+  ],
+  "cashbank_voucher_details": [
+    "cashbank voucher details for party {party_code:party_code}",
+    "cash bank entries for party {party_code:party_code}",
+    "voucher details {party_code:party_code}",
+    "cashbank entries {party_code:party_code}",
+    "payment voucher for party {party_code:party_code}",
+    "cash bank voucher for {party_code:party_code}",
+    "show cashbank for party {party_code:party_code}",
+    "cashbank transaction of {party_code:party_code}",
+    "payment details party {party_code:party_code}",
+    "receipt voucher for party {party_code:party_code}"
+  ],
+  "document_details": [
+    "document details for party {party_code:party_code}",
+    "documents linked with {party_code:party_code}",
+    "documents for {party_code:party_code}",
+    "show document details of party {party_code:party_code}",
+    "party {party_code:party_code} document details",
+    "document records for party {party_code:party_code}",
+    "show uploaded documents for {party_code:party_code}"
+  ],
+  "hrd_employee_or_attendance": [
+    "current attendance for empcode {empcode:empcode}",
+    "attendance for empcode {empcode:empcode}",
+    "show attendance of employee {empcode:empcode}",
+    "department authentication for empcode {empcode:empcode}",
+    "dept authentication for employee {empcode:empcode}",
+    "today attendance for empcode {empcode:empcode}",
+    "attendance status of {empcode:empcode}",
+    "employee {empcode:empcode} attendance",
+    "show current attendance for employee {empcode:empcode}"
+  ],
+  "employee_by_empcode": [
+    "show employee {empcode:empcode} details",
+    "employee {empcode:empcode} department",
+    "employee details for empcode {empcode:empcode}",
+    "empcode {empcode:empcode} details",
+    "employee master details {empcode:empcode}",
+    "show staff details for {empcode:empcode}",
+    "department of employee {empcode:empcode}"
+  ]
+}

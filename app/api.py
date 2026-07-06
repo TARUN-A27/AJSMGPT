@@ -468,3 +468,20 @@ def ask(request: AskRequest):
         "request_id": request_id,
         "data": result,
     }
+
+
+@app.post("/plan-nlp")
+def plan_nlp(request: AskRequest):
+    """
+    DB-free planner endpoint with Rasa + Duckling NLP observation.
+
+    Safe observe mode:
+    - current planner still decides module/routing
+    - Rasa/Duckling only adds nlp_observation
+    - no SQL execution
+    """
+    from app.query_planner_observe import plan_query_with_nlp_observation
+
+    question = (request.question or "").strip()
+    result = plan_query_with_nlp_observation(question)
+    return result

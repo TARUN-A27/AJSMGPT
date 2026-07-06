@@ -13,6 +13,11 @@ from app.oracle_client import run_safe_select
 from app.question_understanding import understand_question
 from app.answer_formatter import format_answer
 from app.sql_generator_v2 import generate_select_sql_v2
+from app.query_planner import (
+    _detect_module as planner_detect_module,
+    _match_router as planner_match_router,
+    _resolver_enriched_question as planner_resolver_enriched_question,
+)
 
 
 def _safe_preview(value, limit=1200):
@@ -177,7 +182,27 @@ def _apply_resolved_material_to_sql(sql: str, resolved_values: dict[str, Any]) -
     if not material:
         return sql
 
+    # broad_one_word_material_sql_guard:
+    # Do not replace broad one-word material filters in MRS/stock/issue style SQL.
+    # Example: pending MRS for keyboard should remain LIKE '%KEYBOARD%'.
+    semantic_queries_for_guard = [
+        str(x or "").strip()
+        for x in (resolved_values.get("semantic_queries") or [])
+    ]
+    is_broad_one_word_material = any(
+        len(re.findall(r"[A-Za-z0-9]+", phrase)) <= 1
+        for phrase in semantic_queries_for_guard
+        if phrase
+    )
+
     sql_upper = sql.upper()
+
+    if is_broad_one_word_material and any(
+        token in sql_upper
+        for token in ["MRS_TEMP", "ITEMSTOCK", "INVENTORY.STOCK", " STOCK ", "STOCK S", "PURCHASEORDER", "INVENTORY.PURCHASEORDER", " ISSUE ", " INVENTORY.ISSUE"]
+    ):
+        return sql
+
 
     # Only patch purchase item-name filters. Do not touch other modules.
     if "INV.ITEM_NAME" not in sql_upper:
@@ -411,8 +436,9 @@ def _answer_question_core(question: str) -> dict[str, Any]:
             resolved_values_preview=_safe_preview(resolved_values),
         )
 
-        router_question = _resolver_enriched_question(sql_question, resolved_values)
+        planner_module = planner_detect_module(sql_question, understanding, resolved_values)
 
+        router_question = planner_resolver_enriched_question(sql_question, resolved_values, planner_module)
         if router_question != sql_question:
             log_event(
                 request_id,
@@ -423,8 +449,17 @@ def _answer_question_core(question: str) -> dict[str, Any]:
                 resolved_values_preview=_safe_preview(resolved_values),
             )
 
-        template_result = match_purchase_analytics_template(router_question) or match_mrs_template(router_question) or match_business_template(router_question)
+        template_result = planner_match_router(
 
+            router_question,
+
+            resolved_values=resolved_values,
+
+            module=planner_module,
+
+            original_question=sql_question,
+
+        )
         if template_result:
             sql_result = template_result
             sql = sql_result["sql"]
@@ -558,6 +593,7 @@ def _answer_question_core(question: str) -> dict[str, Any]:
             "retrieved_schema": sql_result.get("retrieved_schema", []),
             "elapsed_ms": elapsed_ms,
             "understanding": understanding,
+            "planner_module": planner_module,
             "resolved_values": resolved_values,
             "router_question": router_question,
         }

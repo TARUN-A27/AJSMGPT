@@ -120,32 +120,72 @@ def extract_semantic_queries(question: str) -> list[str]:
     for code in extract_code_terms(q):
         cleaned = re.sub(re.escape(code), " ", cleaned, flags=re.IGNORECASE)
 
+    queries: list[str] = []
+
+    # Quoted entity phrase
+    for quoted in re.findall(r'"([^"]{2,80})"|\'([^\']{2,80})\'', cleaned):
+        phrase = (quoted[0] or quoted[1] or "").strip()
+        if phrase:
+            queries.append(phrase)
+
+    # Business phrase extraction.
+    # pending MRS for keyboard -> keyboard
+    # last purchase from THE GALAXY -> THE GALAXY
+    # last supply from Prime compu systems -> Prime compu systems
+    patterns = [
+        r"\bfor\s+(.+)$",
+        r"\bfrom\s+(?:supplier|vendor|party|company)?\s*(.+)$",
+        r"\bby\s+(?:supplier|vendor|party|company)?\s*(.+)$",
+        r"\bsupplier\s+(.+?)(?:\s+(?:last|first|latest|purchase|supply|details?|list)\b|$)",
+        r"\bvendor\s+(.+?)(?:\s+(?:last|first|latest|purchase|supply|details?|list)\b|$)",
+        r"\bparty\s+(.+?)(?:\s+(?:last|first|latest|purchase|supply|details?|list)\b|$)",
+        r"\bitem\s+(.+?)(?:\s+(?:last|first|latest|purchase|supply|details?|list)\b|$)",
+        r"\bmaterial\s+(.+?)(?:\s+(?:last|first|latest|purchase|supply|details?|list)\b|$)",
+        r"^(.+?)\s+(?:last|first|latest)\s+(?:supply|purchase|order)\b",
+        r"^(.+?)\s+(?:pending\s+MRS|MRS\s+pending|material\s+request\s+pending)\b",
+    ]
+
+    remove_words = (
+        r"\b(last|first|latest|purchase|purchased|supply|supplied|details?|detail|qty|quantity|"
+        r"pending|approved|rejected|due|list|order|orders|mrs|grn|issue|stock|voucher|"
+        r"show|give|please|what|did|we|was|were|by|from|for|of|the)\b"
+    )
+
+    for pattern in patterns:
+        m = re.search(pattern, cleaned, flags=re.IGNORECASE)
+        if not m:
+            continue
+
+        phrase = m.group(1).strip(" .,:;\"'")
+        phrase = re.sub(remove_words, " ", phrase, flags=re.IGNORECASE)
+        phrase = re.sub(r"\s+", " ", phrase).strip()
+
+        if len(normalize_text(phrase)) >= 3:
+            queries.append(phrase)
+
+    # Generic fallback
     words = []
     for word in re.findall(r"[A-Za-z0-9]+", cleaned):
         if word.lower() not in STOP_WORDS:
             words.append(word)
 
     phrase = " ".join(words).strip()
-
-    # Prefer clean entity phrase for vector search.
-    # Example:
-    #   "barcode chromo label last purchase" -> "barcode chromo label"
-    # This avoids semantic hits from generic words like purchase/details.
-    if len(phrase) >= 3 and phrase.upper() != q.upper():
-        queries = [phrase]
-    else:
-        queries = [q]
+    if len(phrase) >= 3:
+        queries.append(phrase)
+    elif q:
+        queries.append(q)
 
     seen = set()
     final = []
+
     for item in queries:
-        key = item.upper().strip()
+        item = item.strip()
+        key = normalize_text(item)
         if key and key not in seen:
             seen.add(key)
             final.append(item)
 
     return final
-
 
 def has_any_word(normalized_question: str, words: set[str]) -> bool:
     q_words = set(normalized_question.split())
@@ -167,6 +207,73 @@ def token_overlap_score(query: str, value: Any) -> float:
     return min(len(overlap) * 8.0, 40.0)
 
 
+
+def _location_has(location: str, tokens: set[str]) -> bool:
+    return any(token in location for token in tokens)
+
+
+def _is_narration_location(location: str) -> bool:
+    return _location_has(
+        location,
+        {
+            " NARR",
+            " UPDATEDNARR",
+            " MODIFIEDUPDATEDNARR",
+            " NARRATION",
+            " REMARK",
+            " REMARKS",
+            " DESCRIPTION",
+        },
+    )
+
+
+def _is_material_location(location: str) -> bool:
+    return _location_has(
+        location,
+        {
+            " ITEM",
+            "ITEMNAME",
+            "ITEM_NAME",
+            "INVITEMS",
+            "MATERIAL",
+            "DESCRIPT",
+        },
+    )
+
+
+def _is_supplier_location(location: str) -> bool:
+    return _location_has(
+        location,
+        {
+            "PARTYMASTER",
+            "PARTYNAME",
+            "PARTYCODE",
+            "SUPPLIER",
+            "SUP_CODE",
+            "SUPCODE",
+            "VENDOR",
+        },
+    )
+
+
+def _is_workflow_noise_location(location: str) -> bool:
+    return _location_has(
+        location,
+        {
+            "DATE",
+            "DATETIME",
+            "TIME",
+            "USER",
+            "SUBUSER",
+            "STATUS",
+            "APPROVAL",
+            "AUTH",
+            "READYFORAPPROVAL",
+            "REJECTION",
+        },
+    )
+
+
 def context_score(question: str, schema: Any, table: Any, column: Any, entity_type: Any) -> float:
     q = normalize_text(question)
     location = normalize_text(f"{schema or ''} {table or ''} {column or ''}")
@@ -182,37 +289,66 @@ def context_score(question: str, schema: Any, table: Any, column: Any, entity_ty
 
     score += ENTITY_BOOST.get(etype, 0)
 
-    purchase_material_words = {
-        "PURCHASE", "SUPPLY", "MATERIAL", "ITEM", "QTY", "QUANTITY",
-        "GRN", "MRS", "ISSUE", "STOCK"
-    }
+    supplier_words = {"SUPPLIER", "SUPPLY", "SUPPLIED", "VENDOR", "PARTY", "COMPANY", "FROM", "BY"}
+    purchase_words = {"PURCHASE", "PURCHASED", "ORDER", "PO", "LAST", "LATEST", "FIRST"}
+    material_words = {"MATERIAL", "ITEM", "MRS", "KEYBOARD", "STOCK", "ISSUE", "GRN", "PENDING", "REQUEST"}
+    admin_words = {"CASHBANK", "VOUCHER", "DOCUMENT", "DOC"}
 
-    camera_words = {"CAMERA", "IP", "CCTV"}
+    is_supplier_question = has_any_word(q, supplier_words) and has_any_word(q, purchase_words)
+    is_material_question = has_any_word(q, material_words) or has_any_word(q, {"MRS"})
+    is_admin_question = has_any_word(q, admin_words)
 
-    document_words = {"DOCUMENT", "DOC", "VOUCHER", "CASHBANK", "CASH", "BANK"}
+    # Supplier/company purchase questions should prefer SCM.PARTYMASTER.
+    if is_supplier_question and not is_admin_question:
+        if etype == "supplier_or_party":
+            score += 100.0
+        if _is_supplier_location(location):
+            score += 100.0
+        if "SCM PARTYMASTER" in location:
+            score += 80.0
+        if "PARTYNAME" in location:
+            score += 60.0
+        if _is_narration_location(location):
+            score -= 120.0
+        if "ADMIN CASHBANK" in location:
+            score -= 100.0
+        if etype == "generic" and not _is_supplier_location(location):
+            score -= 60.0
 
-    # For purchase/material questions, prefer material/item locations.
-    if has_any_word(q, purchase_material_words):
+    # MRS/material questions should prefer item/material columns, not workflow fields.
+    if is_material_question:
         if etype == "material":
-            score += 45.0
-        if "ITEM" in location or "INVITEMS" in location or "ITEMSTOCK" in location:
-            score += 20.0
-        if etype == "camera" and not has_any_word(q, camera_words):
-            score -= 45.0
-        if "RDCMEMO" in location and not has_any_word(q, camera_words):
-            score -= 30.0
-        if etype == "generic":
-            score -= 15.0
+            score += 90.0
+        if _is_material_location(location):
+            score += 80.0
+        if "INVITEMS" in location:
+            score += 60.0
+        if "ITEMNAME" in location or "ITEM_NAME" in location:
+            score += 60.0
+        if "MRS" in location and _is_material_location(location):
+            score += 35.0
+        if _is_workflow_noise_location(location):
+            score -= 160.0
+        if etype in {"employee", "generic"} and _is_workflow_noise_location(location):
+            score -= 100.0
 
-    # For document/cashbank questions, prefer document/cashbank locations.
-    if has_any_word(q, document_words):
-        if "DOCUMENT" in location:
-            score += 35.0
-        if "CASHBANK" in location:
-            score += 35.0
+    # Purchase/material questions should avoid camera/RDC memo noise unless camera asked.
+    if has_any_word(q, purchase_words | material_words):
+        if etype == "camera" and not has_any_word(q, {"CAMERA", "IP", "CCTV"}):
+            score -= 60.0
+        if "RDCMEMO" in location and not has_any_word(q, {"CAMERA", "IP", "CCTV"}):
+            score -= 45.0
+
+    # Admin questions may legitimately use ADMIN.CASHBANK/DOCUMENT.
+    if is_admin_question:
+        if "ADMIN CASHBANK" in location and has_any_word(q, {"CASHBANK", "VOUCHER"}):
+            score += 80.0
+        if "ADMIN DOCUMENT" in location and has_any_word(q, {"DOCUMENT", "DOC"}):
+            score += 80.0
+        if "ACCODE" in location or "PARTYCODE" in location:
+            score += 30.0
 
     return score
-
 
 def make_result(
     source: str,
@@ -429,37 +565,44 @@ def resolve_question_values(question: str, final_limit: int = 20) -> dict[str, A
     semantic_queries = extract_semantic_queries(question)
 
     candidates = []
+    exact_candidates = []
 
     for term in exact_terms:
-        candidates.extend(sqlite_exact_lookup(term, question, limit=50))
+        found = sqlite_exact_lookup(term, question, limit=50)
+        exact_candidates.extend(found)
+        candidates.extend(found)
 
-    for phrase in semantic_queries[1:]:
-        candidates.extend(sqlite_fuzzy_lookup(phrase, question, limit=20))
+    # SQLite fuzzy is cheap and helps supplier/material phrase matching.
+    for phrase in semantic_queries:
+        candidates.extend(sqlite_fuzzy_lookup(phrase, question, limit=25))
 
-    for query in semantic_queries:
-        # If query contains an exact code like ODUT001/165224/800967,
-        # do not let semantic search replace it with similar wrong codes.
-        if exact_terms and any(code.upper() in query.upper() for code in exact_terms):
-            continue
+    # Exact code questions should not need risky semantic Qdrant replacement.
+    # Example: ODUT001 should stay ODUT001.
+    skip_qdrant = bool(exact_terms and exact_candidates)
 
-        try:
-            candidates.extend(qdrant_search(query, question, limit=10))
-        except Exception as exc:
-            candidates.append(
-                make_result(
-                    source="qdrant_error",
-                    input_text=query,
-                    resolved_value="",
-                    normalized_value=None,
-                    entity_type=None,
-                    schema_name=None,
-                    table_name=None,
-                    column_name=None,
-                    value_count=0,
-                    score=-1,
-                    reason=str(exc),
+    if not skip_qdrant:
+        for query in semantic_queries:
+            if exact_terms and any(code.upper() in query.upper() for code in exact_terms):
+                continue
+
+            try:
+                candidates.extend(qdrant_search(query, question, limit=10))
+            except Exception as exc:
+                candidates.append(
+                    make_result(
+                        source="qdrant_error",
+                        input_text=query,
+                        resolved_value="",
+                        normalized_value=None,
+                        entity_type=None,
+                        schema_name=None,
+                        table_name=None,
+                        column_name=None,
+                        value_count=0,
+                        score=-1,
+                        reason=str(exc),
+                    )
                 )
-            )
 
     best = {}
 
@@ -486,7 +629,6 @@ def resolve_question_values(question: str, final_limit: int = 20) -> dict[str, A
         "elapsed_seconds": round(time.perf_counter() - started, 4),
         "results": results,
     }
-
 
 def main() -> int:
     parser = argparse.ArgumentParser()

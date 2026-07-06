@@ -103,6 +103,194 @@ nlu:
       - which supplier supplied [spares](item_name) recently
       - which supplier supplied [keyboard](item_name) recently
       - which supplier supplied [oil](item_name) recently
+      - which supplier supplied [mouse](item_name) recently
+      - which supplier supplied [yarn](item_name) recently
+      - which supplier supplied [cone](item_name) recently
+      - which supplier supplied [printer](item_name) recently
+      - which supplier supplied [barcode label](item_name) recently
+      - which supplier supplied [bearing](item_name) recently
+      - which supplier supplied [barcode chromo label](item_name) recently
+      - which supplier supplied [motor](item_name) recently
+      - which supplier supplied [fabric](item_name) recently
+      - which supplier supplied [packing material](item_name) recently
+      - which supplier supplied [grey yarn](item_name) recently
+      - which supplier supplied [chemical](item_name) recently
+      - last supplied vendor for [motor](item_name)
+      - last supplied vendor for [computer](item_name)
+      - last supplied vendor for [oil](item_name)
+      - last supplied vendor for [yarn](item_name)
+      - last supplied vendor for [barcode label](item_name)
+      - last supplied vendor for [mouse](item_name)
+      - last supplied vendor for [barcode chromo label](item_name)
+      - last supplied vendor for [cone](item_name)
+      - last supplied vendor for [printer](item_name)
+      - last supplied vendor for [keyboard](item_name)
+      - last supplied vendor for [chemical](item_name)
+      - last supplied vendor for [grey yarn](item_name)
+      - last supplied vendor for [spares](item_name)
+      - last supplied vendor for [fabric](item_name)
+      - last supplied vendor for [packing material](item_name)
+      - last supplied vendor for [bearing](item_name)
+      - latest supply of [computer](item_name)
+      - latest supply of [spares](item_name)
+      - latest supply of [fabric](item_name)
+      - latest supply of [barcode chromo label](item_name)
+      - latest supply of [printer](item_name)
+      - latest supply of [motor](item_name)
+      - latest supply of [bearing](item_name)
+      - latest supply of [oil](item_name)
+      - latest supply of [keyboard](item_name)
+      - latest supply of [packing material](item_name)
+      - latest supply of [yarn](item_name)
+      - latest supply of [cone](item_name)
+      - latest supply of [mouse](item_name)
+      - latest supply of [chemical](item_name)
+      - latest supply of [barcode label](item_name)
+      - latest supply of [grey yarn](item_name)
+      - latest vendor for [barcode chromo label](item_name)
+      - latest vendor for [mouse](item_name)
+      - latest vendor for [bearing](item_name)
+      - latest vendor for [computer](item_name)
+      - latest vendor for [fabric](item_name)
+      - latest vendor for [spares](item_name)
+      - latest vendor for [oil](item_name)
+      - latest vendor for [printer](item_name)
+      - latest vendor for [motor](item_name)
+      - latest vendor for [packing material](item_name)
+      - latest vendor for [chemical](item_name)
+      - latest vendor for [keyboard](item_name)
+      - latest vendor for [cone](item_name)
+      - latest vendor for [grey yarn](item_name)
+      - latest vendor for [yarn](item_name)
+      - latest vendor for [barcode label](item_name)
+      - last supply details of [keyboard](item_name)
+      - last supply details of [barcode label](item_name)
+      - last supply details of [mouse](item_name)
+      - last supply details of [barcode chromo label](item_name)
+      - last supply details of [chemical](item_name)
+      - last supply details of [fabric](item_name)
+      - last supply details of [yarn](item_name)
+      - last supply details of [computer](item_name)
+      - last supply details of [printer](item_name)
+      - last supply details of [grey yarn](item_name)
+      - last supply details of [motor](item_name)
+      - last supply details of [cone](item_name)
+      - last supply details of [packing material](item_name)
+      - last supply details of [bearing](item_name)
+      - last supply details of [oil](item_name)
+      - last supply details of [spares](item_name)
+      - last vendor for [mouse](item_name)
+      - last vendor for [cone](item_name)
+      - last vendor for [chemical](item_name)
+      - last vendor for [packing material](item_name)
+      - last vendor for [barcode label](item_name)
+      - last vendor for [motor](item_name)
+      - last vendor for [keyboard](item_name)
+      - last vendor for [oil](item_name)
+      - last vendor for [printer](item_name)
+      - last vendor for [fabric](item_name)
+      - last vendor for [yarn](item_name)
+      - last vendor for [barcode chromo label](item_name)
+      - last vendor for [grey yarn](item_name)
+      - last vendor for [bearing](item_name)
+      - last vendor for [spares](item_name)
+      - last vendor for [computer](item_name)
+      - who supplied [cone](item_name)
+      - who supplied [computer](item_name)
+      - who supplied [spares](item_name)
+      - who supplied [fabric](item_name)
+      - who supplied [barcode chromo label](item_name)
+      - who supplied [barcode label](item_name)
+      - who supplied [keyboard](item_name)
+      - who supplied [bearing](item_name)
+      - who supplied [yarn](item_name)
+      - who supplied [packing material](item_name)
+      - who supplied [printer](item_name)
+      - who supplied [oil](item_name)
+      - who supplied [motor](item_name)
+      - who supplied [chemical](item_name)
+      - who supplied [grey yarn](item_name)
+      - who supplied [mouse](item_name)
+      - latest supplier for [barcode chromo label](item_name)
+      - latest supplier for [spares](item_name)
+      - latest supplier for [bearing](item_name)
+      - latest supplier for [computer](item_name)
+      - latest supplier for [cone](item_name)
+      - latest supplier for [barcode label](item_name)
+      - latest supplier for [grey yarn](item_name)
+      - latest supplier for [motor](item_name)
+      - latest supplier for [mouse](item_name)
+      - latest supplier for [fabric](item_name)
+      - latest supplier for [keyboard](item_name)
+      - latest supplier for [yarn](item_name)
+      - latest supplier for [oil](item_name)
+      - latest supplier for [packing material](item_name)
+      - latest supplier for [printer](item_name)
+      - latest supplier for [chemical](item_name)
+      - [packing material](item_name) last purchased supplier name
+      - [motor](item_name) last purchased supplier name
+      - [fabric](item_name) last purchased supplier name
+      - [computer](item_name) last purchased supplier name
+      - [barcode chromo label](item_name) last purchased supplier name
+      - [bearing](item_name) last purchased supplier name
+      - [oil](item_name) last purchased supplier name
+      - [mouse](item_name) last purchased supplier name
+      - [cone](item_name) last purchased supplier name
+      - [keyboard](item_name) last purchased supplier name
+      - [yarn](item_name) last purchased supplier name
+      - [grey yarn](item_name) last purchased supplier name
+      - [chemical](item_name) last purchased supplier name
+      - [barcode label](item_name) last purchased supplier name
+      - [spares](item_name) last purchased supplier name
+      - [printer](item_name) last purchased supplier name
+      - who was the last vendor for [motor](item_name)
+      - who was the last vendor for [fabric](item_name)
+      - who was the last vendor for [cone](item_name)
+      - who was the last vendor for [chemical](item_name)
+      - who was the last vendor for [oil](item_name)
+      - who was the last vendor for [mouse](item_name)
+      - who was the last vendor for [spares](item_name)
+      - who was the last vendor for [printer](item_name)
+      - who was the last vendor for [barcode chromo label](item_name)
+      - who was the last vendor for [keyboard](item_name)
+      - who was the last vendor for [barcode label](item_name)
+      - who was the last vendor for [yarn](item_name)
+      - who was the last vendor for [grey yarn](item_name)
+      - who was the last vendor for [computer](item_name)
+      - who was the last vendor for [packing material](item_name)
+      - who was the last vendor for [bearing](item_name)
+      - supplier name for [cone](item_name)
+      - supplier name for [printer](item_name)
+      - supplier name for [packing material](item_name)
+      - supplier name for [motor](item_name)
+      - supplier name for [computer](item_name)
+      - supplier name for [oil](item_name)
+      - supplier name for [grey yarn](item_name)
+      - supplier name for [chemical](item_name)
+      - supplier name for [yarn](item_name)
+      - supplier name for [barcode label](item_name)
+      - supplier name for [bearing](item_name)
+      - supplier name for [spares](item_name)
+      - supplier name for [barcode chromo label](item_name)
+      - supplier name for [fabric](item_name)
+      - supplier name for [keyboard](item_name)
+      - supplier name for [mouse](item_name)
+      - supplier for last supply of [spares](item_name)
+      - supplier for last supply of [oil](item_name)
+      - supplier for last supply of [bearing](item_name)
+      - supplier for last supply of [mouse](item_name)
+      - supplier for last supply of [cone](item_name)
+      - supplier for last supply of [chemical](item_name)
+      - supplier for last supply of [printer](item_name)
+      - supplier for last supply of [fabric](item_name)
+      - supplier for last supply of [packing material](item_name)
+      - supplier for last supply of [barcode chromo label](item_name)
+      - supplier for last supply of [keyboard](item_name)
+      - supplier for last supply of [yarn](item_name)
+      - supplier for last supply of [grey yarn](item_name)
+      - supplier for last supply of [barcode label](item_name)
+      - supplier for last supply of [motor](item_name)
+      - supplier for last supply of [computer](item_name)
 
   - intent: purchase_last_supply_by_supplier
     examples: |
@@ -289,6 +477,66 @@ nlu:
       - last purchase date for [grey yarn](item_name)
       - last purchase date for [chemical](item_name)
       - last purchase date for [bearing](item_name)
+      - last purchase date for [motor](item_name)
+      - last purchase date for [packing material](item_name)
+      - last purchase date for [fabric](item_name)
+      - last purchase date for [computer](item_name)
+      - last purchase date for [keyboard](item_name)
+      - last purchase date for [mouse](item_name)
+      - last purchase date for [yarn](item_name)
+      - last purchase date for [oil](item_name)
+      - last purchase date for [cone](item_name)
+      - last purchase date for [barcode chromo label](item_name)
+      - last purchase date for [printer](item_name)
+      - last purchase date for [spares](item_name)
+      - when was [computer](item_name) purchased last
+      - when was [packing material](item_name) purchased last
+      - when was [printer](item_name) purchased last
+      - when was [fabric](item_name) purchased last
+      - when was [mouse](item_name) purchased last
+      - when was [spares](item_name) purchased last
+      - when was [motor](item_name) purchased last
+      - when was [grey yarn](item_name) purchased last
+      - when was [barcode label](item_name) purchased last
+      - when was [oil](item_name) purchased last
+      - when was [chemical](item_name) purchased last
+      - when was [bearing](item_name) purchased last
+      - when was [yarn](item_name) purchased last
+      - when was [cone](item_name) purchased last
+      - when was [keyboard](item_name) purchased last
+      - when was [barcode chromo label](item_name) purchased last
+      - last purchase of [motor](item_name)
+      - last purchase of [keyboard](item_name)
+      - last purchase of [bearing](item_name)
+      - last purchase of [grey yarn](item_name)
+      - last purchase of [barcode label](item_name)
+      - last purchase of [chemical](item_name)
+      - last purchase of [cone](item_name)
+      - last purchase of [printer](item_name)
+      - last purchase of [fabric](item_name)
+      - last purchase of [mouse](item_name)
+      - last purchase of [yarn](item_name)
+      - last purchase of [oil](item_name)
+      - last purchase of [barcode chromo label](item_name)
+      - last purchase of [computer](item_name)
+      - last purchase of [spares](item_name)
+      - last purchase of [packing material](item_name)
+      - show recent purchase of [mouse](item_name)
+      - show recent purchase of [cone](item_name)
+      - show recent purchase of [spares](item_name)
+      - show recent purchase of [chemical](item_name)
+      - show recent purchase of [keyboard](item_name)
+      - show recent purchase of [oil](item_name)
+      - show recent purchase of [packing material](item_name)
+      - show recent purchase of [motor](item_name)
+      - show recent purchase of [grey yarn](item_name)
+      - show recent purchase of [printer](item_name)
+      - show recent purchase of [bearing](item_name)
+      - show recent purchase of [barcode label](item_name)
+      - show recent purchase of [fabric](item_name)
+      - show recent purchase of [barcode chromo label](item_name)
+      - show recent purchase of [yarn](item_name)
+      - show recent purchase of [computer](item_name)
 
   - intent: purchase_last_n_purchases_by_material
     examples: |
@@ -392,6 +640,206 @@ nlu:
       - show 5 latest purchase details for [chemical](item_name)
       - show 3 latest purchase details for [oil](item_name)
       - show 5 latest purchase details for [packing material](item_name)
+      - show 5 latest purchase details for [cone](item_name)
+      - show 3 latest purchase details for [barcode label](item_name)
+      - show 10 latest purchase details for [motor](item_name)
+      - show 5 latest purchase details for [mouse](item_name)
+      - show 3 latest purchase details for [motor](item_name)
+      - show 5 latest purchase details for [fabric](item_name)
+      - show 3 latest purchase details for [printer](item_name)
+      - show 5 latest purchase details for [keyboard](item_name)
+      - show 5 latest purchase details for [printer](item_name)
+      - show 10 latest purchase details for [cone](item_name)
+      - show 10 latest purchase details for [yarn](item_name)
+      - show 3 latest purchase details for [computer](item_name)
+      - show 5 latest purchase details for [oil](item_name)
+      - show 10 latest purchase details for [packing material](item_name)
+      - show 10 latest purchase details for [fabric](item_name)
+      - show 3 latest purchase details for [keyboard](item_name)
+      - show 10 latest purchase details for [barcode chromo label](item_name)
+      - show 10 latest purchase details for [printer](item_name)
+      - show 10 latest purchase details for [grey yarn](item_name)
+      - show 3 latest purchase details for [mouse](item_name)
+      - show 5 latest purchase details for [computer](item_name)
+      - show 3 latest purchase details for [yarn](item_name)
+      - show 10 latest purchase details for [computer](item_name)
+      - show 3 latest purchase details for [spares](item_name)
+      - show 10 latest purchase details for [chemical](item_name)
+      - show 5 latest purchase details for [bearing](item_name)
+      - show 5 latest purchase details for [motor](item_name)
+      - show 10 latest purchase details for [oil](item_name)
+      - show 3 latest purchase details for [packing material](item_name)
+      - show 3 latest purchase details for [bearing](item_name)
+      - show 3 latest purchase details for [grey yarn](item_name)
+      - show 3 latest purchase details for [barcode chromo label](item_name)
+      - show 5 latest purchase details for [barcode chromo label](item_name)
+      - show 5 latest purchase details for [barcode label](item_name)
+      - show 10 latest purchase details for [mouse](item_name)
+      - show 3 latest purchase details for [chemical](item_name)
+      - show 10 latest purchase details for [bearing](item_name)
+      - show 5 latest purchase details for [spares](item_name)
+      - show 5 latest purchase details for [grey yarn](item_name)
+      - show 5 latest purchase details for [yarn](item_name)
+      - show 3 latest purchase details for [cone](item_name)
+      - show 10 latest purchase details for [keyboard](item_name)
+      - show 10 latest purchase details for [spares](item_name)
+      - show 10 latest purchase details for [barcode label](item_name)
+      - show last 3 purchases for [motor](item_name)
+      - show last 5 purchases for [yarn](item_name)
+      - show last 3 purchases for [printer](item_name)
+      - show last 5 purchases for [spares](item_name)
+      - show last 3 purchases for [computer](item_name)
+      - show last 10 purchases for [mouse](item_name)
+      - show last 3 purchases for [keyboard](item_name)
+      - show last 10 purchases for [cone](item_name)
+      - show last 10 purchases for [packing material](item_name)
+      - show last 10 purchases for [motor](item_name)
+      - show last 10 purchases for [oil](item_name)
+      - show last 10 purchases for [barcode label](item_name)
+      - show last 10 purchases for [spares](item_name)
+      - show last 5 purchases for [cone](item_name)
+      - show last 3 purchases for [bearing](item_name)
+      - show last 3 purchases for [oil](item_name)
+      - show last 10 purchases for [keyboard](item_name)
+      - show last 5 purchases for [packing material](item_name)
+      - show last 3 purchases for [packing material](item_name)
+      - show last 3 purchases for [barcode label](item_name)
+      - show last 3 purchases for [chemical](item_name)
+      - show last 10 purchases for [bearing](item_name)
+      - show last 3 purchases for [cone](item_name)
+      - show last 5 purchases for [computer](item_name)
+      - show last 5 purchases for [chemical](item_name)
+      - show last 3 purchases for [grey yarn](item_name)
+      - show last 3 purchases for [yarn](item_name)
+      - show last 5 purchases for [mouse](item_name)
+      - show last 3 purchases for [fabric](item_name)
+      - show last 10 purchases for [fabric](item_name)
+      - show last 10 purchases for [printer](item_name)
+      - show last 5 purchases for [printer](item_name)
+      - show last 10 purchases for [grey yarn](item_name)
+      - show last 3 purchases for [mouse](item_name)
+      - show last 5 purchases for [motor](item_name)
+      - show last 5 purchases for [fabric](item_name)
+      - show last 5 purchases for [grey yarn](item_name)
+      - show last 5 purchases for [barcode chromo label](item_name)
+      - show last 10 purchases for [yarn](item_name)
+      - show last 3 purchases for [barcode chromo label](item_name)
+      - show last 5 purchases for [keyboard](item_name)
+      - show last 5 purchases for [oil](item_name)
+      - show last 5 purchases for [bearing](item_name)
+      - show last 10 purchases for [chemical](item_name)
+      - show last 5 purchases for [barcode label](item_name)
+      - show last 3 purchases for [spares](item_name)
+      - show last 10 purchases for [barcode chromo label](item_name)
+      - show last 10 purchases for [computer](item_name)
+      - last 5 purchase of [packing material](item_name)
+      - last 3 purchase of [keyboard](item_name)
+      - last 5 purchase of [keyboard](item_name)
+      - last 5 purchase of [oil](item_name)
+      - last 3 purchase of [oil](item_name)
+      - last 10 purchase of [printer](item_name)
+      - last 3 purchase of [barcode label](item_name)
+      - last 10 purchase of [fabric](item_name)
+      - last 5 purchase of [spares](item_name)
+      - last 5 purchase of [bearing](item_name)
+      - last 10 purchase of [oil](item_name)
+      - last 3 purchase of [grey yarn](item_name)
+      - last 3 purchase of [bearing](item_name)
+      - last 5 purchase of [grey yarn](item_name)
+      - last 3 purchase of [chemical](item_name)
+      - last 10 purchase of [cone](item_name)
+      - last 10 purchase of [computer](item_name)
+      - last 10 purchase of [spares](item_name)
+      - last 10 purchase of [chemical](item_name)
+      - last 10 purchase of [packing material](item_name)
+      - last 10 purchase of [barcode label](item_name)
+      - last 5 purchase of [chemical](item_name)
+      - last 5 purchase of [cone](item_name)
+      - last 10 purchase of [keyboard](item_name)
+      - last 5 purchase of [fabric](item_name)
+      - last 3 purchase of [spares](item_name)
+      - last 10 purchase of [bearing](item_name)
+      - last 3 purchase of [motor](item_name)
+      - last 5 purchase of [barcode chromo label](item_name)
+      - last 3 purchase of [mouse](item_name)
+      - last 3 purchase of [fabric](item_name)
+      - last 10 purchase of [yarn](item_name)
+      - last 3 purchase of [cone](item_name)
+      - last 5 purchase of [mouse](item_name)
+      - last 3 purchase of [computer](item_name)
+      - last 3 purchase of [packing material](item_name)
+      - last 3 purchase of [barcode chromo label](item_name)
+      - last 5 purchase of [motor](item_name)
+      - last 5 purchase of [barcode label](item_name)
+      - last 5 purchase of [yarn](item_name)
+      - last 10 purchase of [barcode chromo label](item_name)
+      - last 10 purchase of [grey yarn](item_name)
+      - last 3 purchase of [printer](item_name)
+      - last 10 purchase of [mouse](item_name)
+      - last 5 purchase of [computer](item_name)
+      - last 5 purchase of [printer](item_name)
+      - last 10 purchase of [motor](item_name)
+      - last 3 purchase of [yarn](item_name)
+      - latest 10 purchase orders for [computer](item_name)
+      - latest 3 purchase orders for [cone](item_name)
+      - latest 3 purchase orders for [chemical](item_name)
+      - latest 10 purchase orders for [bearing](item_name)
+      - latest 5 purchase orders for [barcode chromo label](item_name)
+      - latest 10 purchase orders for [printer](item_name)
+      - latest 5 purchase orders for [bearing](item_name)
+      - latest 5 purchase orders for [cone](item_name)
+      - latest 3 purchase orders for [yarn](item_name)
+      - latest 5 purchase orders for [motor](item_name)
+      - latest 3 purchase orders for [bearing](item_name)
+      - latest 10 purchase orders for [fabric](item_name)
+      - latest 5 purchase orders for [grey yarn](item_name)
+      - latest 3 purchase orders for [barcode label](item_name)
+      - latest 5 purchase orders for [packing material](item_name)
+      - latest 5 purchase orders for [mouse](item_name)
+      - latest 5 purchase orders for [oil](item_name)
+      - latest 10 purchase orders for [mouse](item_name)
+      - latest 3 purchase orders for [motor](item_name)
+      - latest 10 purchase orders for [oil](item_name)
+      - latest 3 purchase orders for [fabric](item_name)
+      - latest 10 purchase orders for [grey yarn](item_name)
+      - latest 10 purchase orders for [motor](item_name)
+      - latest 3 purchase orders for [computer](item_name)
+      - latest 3 purchase orders for [oil](item_name)
+      - latest 3 purchase orders for [grey yarn](item_name)
+      - latest 3 purchase orders for [printer](item_name)
+      - latest 5 purchase orders for [printer](item_name)
+      - latest 10 purchase orders for [spares](item_name)
+      - latest 10 purchase orders for [yarn](item_name)
+      - latest 10 purchase orders for [keyboard](item_name)
+      - latest 3 purchase orders for [spares](item_name)
+      - latest 3 purchase orders for [keyboard](item_name)
+      - latest 5 purchase orders for [yarn](item_name)
+      - latest 3 purchase orders for [mouse](item_name)
+      - latest 10 purchase orders for [packing material](item_name)
+      - latest 10 purchase orders for [chemical](item_name)
+      - latest 5 purchase orders for [keyboard](item_name)
+      - latest 5 purchase orders for [barcode label](item_name)
+      - latest 5 purchase orders for [fabric](item_name)
+      - latest 10 purchase orders for [cone](item_name)
+      - latest 3 purchase orders for [packing material](item_name)
+      - latest 10 purchase orders for [barcode label](item_name)
+      - latest 5 purchase orders for [computer](item_name)
+      - latest 10 purchase orders for [barcode chromo label](item_name)
+      - latest 5 purchase orders for [spares](item_name)
+      - latest 3 purchase orders for [barcode chromo label](item_name)
+      - latest 5 purchase orders for [chemical](item_name)
+      - show last 5 purchase qty for [fabric](item_name) in 2024
+      - show last 5 purchase qty for [barcode chromo label](item_name) in 2026
+      - show last 10 purchase qty for [keyboard](item_name) in 2024
+      - show last 10 purchase qty for [grey yarn](item_name) in 2026
+      - show last 10 purchase qty for [barcode chromo label](item_name) in 2025
+      - show last 3 purchase qty for [mouse](item_name) in 2025
+      - show last 5 purchase qty for [fabric](item_name) in 2025
+      - show last 5 purchase qty for [printer](item_name) in 2025
+      - show last 10 purchase qty for [spares](item_name) in 2024
+      - show last 3 purchase qty for [motor](item_name) in 2024
+      - show last 5 purchase qty for [keyboard](item_name) in 2026
+      - show last 5 purchase qty for [bearing](item_name) in 2026
 
   - intent: grn_by_supplier_code
     examples: |
@@ -568,6 +1016,130 @@ nlu:
       - goods received for item [bearing](item_name) in 2026
       - goods received for item [yarn](item_name) in 2025
       - goods received for item [cone](item_name) in 2025
+      - goods received for item [mouse](item_name) in 2025
+      - goods received for item [computer](item_name) in 2025
+      - goods received for item [motor](item_name) in 2026
+      - goods received for item [barcode chromo label](item_name) in 2026
+      - goods received for item [spares](item_name) in 2024
+      - goods received for item [keyboard](item_name) in 2025
+      - goods received for item [motor](item_name) in 2025
+      - goods received for item [mouse](item_name) in 2024
+      - goods received for item [packing material](item_name) in 2025
+      - goods received for item [grey yarn](item_name) in 2024
+      - goods received for item [bearing](item_name) in 2025
+      - goods received for item [chemical](item_name) in 2025
+      - goods received for item [computer](item_name) in 2024
+      - goods received for item [barcode label](item_name) in 2024
+      - goods received for item [oil](item_name) in 2024
+      - goods received for item [cone](item_name) in 2026
+      - goods received for item [computer](item_name) in 2026
+      - goods received for item [fabric](item_name) in 2024
+      - goods received for item [grey yarn](item_name) in 2025
+      - goods received for item [printer](item_name) in 2024
+      - goods received for item [keyboard](item_name) in 2024
+      - goods received for item [cone](item_name) in 2024
+      - goods received for item [barcode label](item_name) in 2026
+      - goods received for item [chemical](item_name) in 2024
+      - goods received for item [fabric](item_name) in 2026
+      - goods received for item [spares](item_name) in 2026
+      - goods received for item [yarn](item_name) in 2026
+      - goods received for item [barcode label](item_name) in 2025
+      - goods received for item [spares](item_name) in 2025
+      - goods received for item [grey yarn](item_name) in 2026
+      - goods received for item [printer](item_name) in 2025
+      - goods received for item [barcode chromo label](item_name) in 2025
+      - goods received for item [oil](item_name) in 2025
+      - goods received for item [packing material](item_name) in 2024
+      - goods received for item [packing material](item_name) in 2026
+      - goods received for item [yarn](item_name) in 2024
+      - goods received for item [mouse](item_name) in 2026
+      - goods received for item [chemical](item_name) in 2026
+      - goods received for item [keyboard](item_name) in 2026
+      - goods received for item [printer](item_name) in 2026
+      - goods received for item [fabric](item_name) in 2025
+      - goods received for item [oil](item_name) in 2026
+      - goods received for item [bearing](item_name) in 2024
+      - goods received for item [motor](item_name) in 2024
+      - show receipt details for [chemical](item_name)
+      - show receipt details for [motor](item_name)
+      - show receipt details for [oil](item_name)
+      - show receipt details for [barcode chromo label](item_name)
+      - show receipt details for [printer](item_name)
+      - show receipt details for [grey yarn](item_name)
+      - show receipt details for [keyboard](item_name)
+      - show receipt details for [spares](item_name)
+      - show receipt details for [bearing](item_name)
+      - show receipt details for [yarn](item_name)
+      - show receipt details for [fabric](item_name)
+      - show receipt details for [packing material](item_name)
+      - show receipt details for [computer](item_name)
+      - show receipt details for [cone](item_name)
+      - show receipt details for [mouse](item_name)
+      - show receipt details for [barcode label](item_name)
+      - received quantity of [fabric](item_name)
+      - received quantity of [packing material](item_name)
+      - received quantity of [bearing](item_name)
+      - received quantity of [cone](item_name)
+      - received quantity of [spares](item_name)
+      - received quantity of [keyboard](item_name)
+      - received quantity of [grey yarn](item_name)
+      - received quantity of [printer](item_name)
+      - received quantity of [computer](item_name)
+      - received quantity of [mouse](item_name)
+      - received quantity of [barcode label](item_name)
+      - received quantity of [yarn](item_name)
+      - received quantity of [oil](item_name)
+      - received quantity of [chemical](item_name)
+      - received quantity of [motor](item_name)
+      - received quantity of [barcode chromo label](item_name)
+      - last GRN of [mouse](item_name)
+      - last GRN of [barcode label](item_name)
+      - last GRN of [computer](item_name)
+      - last GRN of [motor](item_name)
+      - last GRN of [chemical](item_name)
+      - last GRN of [printer](item_name)
+      - last GRN of [barcode chromo label](item_name)
+      - last GRN of [keyboard](item_name)
+      - last GRN of [packing material](item_name)
+      - last GRN of [cone](item_name)
+      - last GRN of [yarn](item_name)
+      - last GRN of [bearing](item_name)
+      - last GRN of [fabric](item_name)
+      - last GRN of [oil](item_name)
+      - last GRN of [spares](item_name)
+      - last GRN of [grey yarn](item_name)
+      - latest received material [packing material](item_name)
+      - latest received material [chemical](item_name)
+      - latest received material [printer](item_name)
+      - latest received material [computer](item_name)
+      - latest received material [mouse](item_name)
+      - latest received material [motor](item_name)
+      - latest received material [yarn](item_name)
+      - latest received material [keyboard](item_name)
+      - latest received material [bearing](item_name)
+      - latest received material [barcode label](item_name)
+      - latest received material [grey yarn](item_name)
+      - latest received material [spares](item_name)
+      - latest received material [fabric](item_name)
+      - latest received material [oil](item_name)
+      - latest received material [cone](item_name)
+      - latest received material [barcode chromo label](item_name)
+      - goods received for [barcode chromo label](item_name)
+      - goods received for [mouse](item_name)
+      - goods received for [oil](item_name)
+      - goods received for [yarn](item_name)
+      - goods received for [computer](item_name)
+      - goods received for [fabric](item_name)
+      - goods received for [grey yarn](item_name)
+      - goods received for [printer](item_name)
+      - goods received for [packing material](item_name)
+      - goods received for [chemical](item_name)
+      - goods received for [keyboard](item_name)
+      - goods received for [barcode label](item_name)
+      - goods received for [cone](item_name)
+      - goods received for [bearing](item_name)
+      - goods received for [spares](item_name)
+      - goods received for [motor](item_name)
 
   - intent: pending_mrs_by_item_name
     examples: |
@@ -671,6 +1243,130 @@ nlu:
       - MRS due for [oil](item_name) in 2026
       - MRS due for [grey yarn](item_name) in 2024
       - MRS due for [barcode chromo label](item_name) in 2024
+      - MRS due for [motor](item_name) in 2025
+      - MRS due for [cone](item_name) in 2024
+      - MRS due for [spares](item_name) in 2025
+      - MRS due for [spares](item_name) in 2026
+      - MRS due for [barcode label](item_name) in 2025
+      - MRS due for [spares](item_name) in 2024
+      - MRS due for [printer](item_name) in 2026
+      - MRS due for [oil](item_name) in 2024
+      - MRS due for [fabric](item_name) in 2025
+      - MRS due for [motor](item_name) in 2026
+      - MRS due for [barcode label](item_name) in 2026
+      - MRS due for [oil](item_name) in 2025
+      - MRS due for [motor](item_name) in 2024
+      - MRS due for [computer](item_name) in 2025
+      - MRS due for [barcode chromo label](item_name) in 2026
+      - MRS due for [barcode label](item_name) in 2024
+      - MRS due for [chemical](item_name) in 2026
+      - MRS due for [keyboard](item_name) in 2025
+      - MRS due for [chemical](item_name) in 2025
+      - MRS due for [packing material](item_name) in 2026
+      - MRS due for [grey yarn](item_name) in 2025
+      - MRS due for [bearing](item_name) in 2026
+      - MRS due for [keyboard](item_name) in 2026
+      - MRS due for [grey yarn](item_name) in 2026
+      - MRS due for [printer](item_name) in 2024
+      - MRS due for [fabric](item_name) in 2026
+      - MRS due for [fabric](item_name) in 2024
+      - MRS due for [computer](item_name) in 2026
+      - pending MRS item [chemical](item_name)
+      - pending MRS item [keyboard](item_name)
+      - pending MRS item [motor](item_name)
+      - pending MRS item [printer](item_name)
+      - pending MRS item [yarn](item_name)
+      - pending MRS item [computer](item_name)
+      - pending MRS item [spares](item_name)
+      - pending MRS item [fabric](item_name)
+      - pending MRS item [oil](item_name)
+      - pending MRS item [grey yarn](item_name)
+      - pending MRS item [cone](item_name)
+      - pending MRS item [packing material](item_name)
+      - pending MRS item [barcode chromo label](item_name)
+      - pending MRS item [barcode label](item_name)
+      - pending MRS item [bearing](item_name)
+      - pending MRS item [mouse](item_name)
+      - MRS pending for [keyboard](item_name)
+      - MRS pending for [barcode label](item_name)
+      - MRS pending for [fabric](item_name)
+      - MRS pending for [printer](item_name)
+      - MRS pending for [mouse](item_name)
+      - MRS pending for [oil](item_name)
+      - MRS pending for [motor](item_name)
+      - MRS pending for [barcode chromo label](item_name)
+      - MRS pending for [bearing](item_name)
+      - MRS pending for [chemical](item_name)
+      - MRS pending for [cone](item_name)
+      - MRS pending for [grey yarn](item_name)
+      - MRS pending for [yarn](item_name)
+      - MRS pending for [spares](item_name)
+      - MRS pending for [computer](item_name)
+      - MRS pending for [packing material](item_name)
+      - pending material request for [grey yarn](item_name)
+      - pending material request for [mouse](item_name)
+      - pending material request for [yarn](item_name)
+      - pending material request for [fabric](item_name)
+      - pending material request for [packing material](item_name)
+      - pending material request for [barcode label](item_name)
+      - pending material request for [bearing](item_name)
+      - pending material request for [keyboard](item_name)
+      - pending material request for [spares](item_name)
+      - pending material request for [oil](item_name)
+      - pending material request for [barcode chromo label](item_name)
+      - pending material request for [motor](item_name)
+      - pending material request for [cone](item_name)
+      - pending material request for [computer](item_name)
+      - pending material request for [chemical](item_name)
+      - pending material request for [printer](item_name)
+      - pending MRS for [printer](item_name) in 2024
+      - pending MRS for [computer](item_name) in 2025
+      - pending MRS for [barcode chromo label](item_name) in 2026
+      - pending MRS for [bearing](item_name) in 2026
+      - pending MRS for [oil](item_name) in 2024
+      - pending MRS for [keyboard](item_name) in 2026
+      - pending MRS for [chemical](item_name) in 2026
+      - pending MRS for [spares](item_name) in 2024
+      - pending MRS for [bearing](item_name) in 2025
+      - pending MRS for [printer](item_name) in 2026
+      - pending MRS for [oil](item_name) in 2025
+      - pending MRS for [bearing](item_name) in 2024
+      - pending MRS for [mouse](item_name) in 2025
+      - pending MRS for [barcode chromo label](item_name) in 2024
+      - pending MRS for [printer](item_name) in 2025
+      - pending MRS for [cone](item_name) in 2024
+      - pending MRS for [keyboard](item_name) in 2024
+      - pending MRS for [oil](item_name) in 2026
+      - pending MRS for [yarn](item_name) in 2024
+      - pending MRS for [motor](item_name) in 2026
+      - pending MRS for [barcode chromo label](item_name) in 2025
+      - pending MRS for [yarn](item_name) in 2025
+      - pending MRS for [motor](item_name) in 2024
+      - pending MRS for [grey yarn](item_name) in 2024
+      - pending MRS for [yarn](item_name) in 2026
+      - pending MRS for [fabric](item_name) in 2024
+      - pending MRS for [barcode label](item_name) in 2025
+      - pending MRS for [computer](item_name) in 2024
+      - pending MRS for [spares](item_name) in 2025
+      - pending MRS for [packing material](item_name) in 2024
+      - pending MRS for [grey yarn](item_name) in 2026
+      - pending MRS for [grey yarn](item_name) in 2025
+      - pending MRS for [chemical](item_name) in 2025
+      - pending MRS for [chemical](item_name) in 2024
+      - pending MRS for [barcode label](item_name) in 2024
+      - pending MRS for [cone](item_name) in 2026
+      - pending MRS for [fabric](item_name) in 2025
+      - pending MRS for [fabric](item_name) in 2026
+      - pending MRS for [mouse](item_name) in 2024
+      - pending MRS for [cone](item_name) in 2025
+      - pending MRS for [packing material](item_name) in 2026
+      - pending MRS for [spares](item_name) in 2026
+      - pending MRS for [packing material](item_name) in 2025
+      - pending MRS for [computer](item_name) in 2026
+      - pending MRS for [mouse](item_name) in 2026
+      - pending MRS for [motor](item_name) in 2025
+      - pending MRS for [barcode label](item_name) in 2026
+      - pending MRS for [keyboard](item_name) in 2025
 
   - intent: approved_mrs_by_item_name
     examples: |
@@ -1050,6 +1746,66 @@ nlu:
       - stock for [computer](item_name)
       - stock for [packing material](item_name)
       - stock for [cone](item_name)
+      - stock for [barcode chromo label](item_name)
+      - stock for [bearing](item_name)
+      - stock for [chemical](item_name)
+      - stock for [barcode label](item_name)
+      - stock for [grey yarn](item_name)
+      - stock for [oil](item_name)
+      - stock for [spares](item_name)
+      - stock for [motor](item_name)
+      - stock for [yarn](item_name)
+      - stock for [keyboard](item_name)
+      - stock for [fabric](item_name)
+      - stock for [printer](item_name)
+      - current stock of [spares](item_name)
+      - current stock of [keyboard](item_name)
+      - current stock of [packing material](item_name)
+      - current stock of [bearing](item_name)
+      - current stock of [barcode label](item_name)
+      - current stock of [yarn](item_name)
+      - current stock of [chemical](item_name)
+      - current stock of [oil](item_name)
+      - current stock of [fabric](item_name)
+      - current stock of [cone](item_name)
+      - current stock of [motor](item_name)
+      - current stock of [barcode chromo label](item_name)
+      - current stock of [mouse](item_name)
+      - current stock of [grey yarn](item_name)
+      - current stock of [printer](item_name)
+      - current stock of [computer](item_name)
+      - inventory stock for [spares](item_name)
+      - inventory stock for [keyboard](item_name)
+      - inventory stock for [printer](item_name)
+      - inventory stock for [cone](item_name)
+      - inventory stock for [yarn](item_name)
+      - inventory stock for [grey yarn](item_name)
+      - inventory stock for [mouse](item_name)
+      - inventory stock for [chemical](item_name)
+      - inventory stock for [oil](item_name)
+      - inventory stock for [computer](item_name)
+      - inventory stock for [bearing](item_name)
+      - inventory stock for [barcode label](item_name)
+      - inventory stock for [packing material](item_name)
+      - inventory stock for [barcode chromo label](item_name)
+      - inventory stock for [fabric](item_name)
+      - inventory stock for [motor](item_name)
+      - stock details of [computer](item_name)
+      - stock details of [bearing](item_name)
+      - stock details of [keyboard](item_name)
+      - stock details of [cone](item_name)
+      - stock details of [oil](item_name)
+      - stock details of [grey yarn](item_name)
+      - stock details of [motor](item_name)
+      - stock details of [chemical](item_name)
+      - stock details of [barcode chromo label](item_name)
+      - stock details of [mouse](item_name)
+      - stock details of [fabric](item_name)
+      - stock details of [barcode label](item_name)
+      - stock details of [spares](item_name)
+      - stock details of [yarn](item_name)
+      - stock details of [packing material](item_name)
+      - stock details of [printer](item_name)
 
   - intent: issue_by_item_name
     examples: |
@@ -1153,6 +1909,130 @@ nlu:
       - material issued in 2024 for [computer](item_name)
       - material issued in 2024 for [mouse](item_name)
       - material issued in 2026 for [spares](item_name)
+      - material issued in 2026 for [oil](item_name)
+      - material issued in 2024 for [spares](item_name)
+      - material issued in 2026 for [packing material](item_name)
+      - material issued in 2024 for [yarn](item_name)
+      - material issued in 2025 for [yarn](item_name)
+      - material issued in 2026 for [chemical](item_name)
+      - material issued in 2025 for [oil](item_name)
+      - material issued in 2026 for [grey yarn](item_name)
+      - material issued in 2025 for [motor](item_name)
+      - material issued in 2026 for [mouse](item_name)
+      - material issued in 2024 for [packing material](item_name)
+      - material issued in 2024 for [bearing](item_name)
+      - material issued in 2025 for [mouse](item_name)
+      - material issued in 2025 for [chemical](item_name)
+      - material issued in 2024 for [fabric](item_name)
+      - material issued in 2025 for [computer](item_name)
+      - material issued in 2026 for [fabric](item_name)
+      - material issued in 2024 for [printer](item_name)
+      - material issued in 2026 for [bearing](item_name)
+      - material issued in 2025 for [fabric](item_name)
+      - material issued in 2024 for [keyboard](item_name)
+      - material issued in 2024 for [chemical](item_name)
+      - material issued in 2025 for [grey yarn](item_name)
+      - material issued in 2024 for [barcode chromo label](item_name)
+      - material issued in 2025 for [spares](item_name)
+      - material issued in 2024 for [oil](item_name)
+      - material issued in 2024 for [barcode label](item_name)
+      - material issued in 2026 for [computer](item_name)
+      - show issue details for [keyboard](item_name)
+      - show issue details for [mouse](item_name)
+      - show issue details for [yarn](item_name)
+      - show issue details for [printer](item_name)
+      - show issue details for [bearing](item_name)
+      - show issue details for [fabric](item_name)
+      - show issue details for [motor](item_name)
+      - show issue details for [barcode chromo label](item_name)
+      - show issue details for [chemical](item_name)
+      - show issue details for [cone](item_name)
+      - show issue details for [barcode label](item_name)
+      - show issue details for [packing material](item_name)
+      - show issue details for [oil](item_name)
+      - show issue details for [spares](item_name)
+      - show issue details for [computer](item_name)
+      - show issue details for [grey yarn](item_name)
+      - issue details of [barcode label](item_name)
+      - issue details of [cone](item_name)
+      - issue details of [packing material](item_name)
+      - issue details of [computer](item_name)
+      - issue details of [fabric](item_name)
+      - issue details of [spares](item_name)
+      - issue details of [chemical](item_name)
+      - issue details of [oil](item_name)
+      - issue details of [motor](item_name)
+      - issue details of [mouse](item_name)
+      - issue details of [keyboard](item_name)
+      - issue details of [barcode chromo label](item_name)
+      - issue details of [bearing](item_name)
+      - issue details of [grey yarn](item_name)
+      - issue details of [yarn](item_name)
+      - issue details of [printer](item_name)
+      - issue for [motor](item_name)
+      - issue for [packing material](item_name)
+      - issue for [printer](item_name)
+      - issue for [oil](item_name)
+      - issue for [barcode label](item_name)
+      - issue for [computer](item_name)
+      - issue for [cone](item_name)
+      - issue for [barcode chromo label](item_name)
+      - issue for [mouse](item_name)
+      - issue for [spares](item_name)
+      - issue for [grey yarn](item_name)
+      - issue for [chemical](item_name)
+      - issue for [bearing](item_name)
+      - issue for [yarn](item_name)
+      - issue for [fabric](item_name)
+      - issue for [keyboard](item_name)
+      - latest issue of [yarn](item_name)
+      - latest issue of [grey yarn](item_name)
+      - latest issue of [bearing](item_name)
+      - latest issue of [computer](item_name)
+      - latest issue of [mouse](item_name)
+      - latest issue of [oil](item_name)
+      - latest issue of [fabric](item_name)
+      - latest issue of [chemical](item_name)
+      - latest issue of [printer](item_name)
+      - latest issue of [cone](item_name)
+      - latest issue of [packing material](item_name)
+      - latest issue of [spares](item_name)
+      - latest issue of [barcode chromo label](item_name)
+      - latest issue of [barcode label](item_name)
+      - latest issue of [motor](item_name)
+      - latest issue of [keyboard](item_name)
+      - material issue for [printer](item_name)
+      - material issue for [motor](item_name)
+      - material issue for [keyboard](item_name)
+      - material issue for [spares](item_name)
+      - material issue for [packing material](item_name)
+      - material issue for [grey yarn](item_name)
+      - material issue for [barcode label](item_name)
+      - material issue for [oil](item_name)
+      - material issue for [yarn](item_name)
+      - material issue for [mouse](item_name)
+      - material issue for [bearing](item_name)
+      - material issue for [fabric](item_name)
+      - material issue for [chemical](item_name)
+      - material issue for [cone](item_name)
+      - material issue for [computer](item_name)
+      - material issue for [barcode chromo label](item_name)
+      - last issued quantity of [spares](item_name)
+      - last issued quantity of [barcode chromo label](item_name)
+      - last issued quantity of [motor](item_name)
+      - last issued quantity of [grey yarn](item_name)
+      - last issued quantity of [yarn](item_name)
+      - last issued quantity of [mouse](item_name)
+      - last issued quantity of [oil](item_name)
+      - last issued quantity of [cone](item_name)
+      - last issued quantity of [barcode label](item_name)
+      - last issued quantity of [bearing](item_name)
+      - last issued quantity of [chemical](item_name)
+      - last issued quantity of [fabric](item_name)
+      - last issued quantity of [keyboard](item_name)
+      - last issued quantity of [printer](item_name)
+      - last issued quantity of [computer](item_name)
+      - last issued quantity of [packing material](item_name)
 
   - intent: camera_details
     examples: |

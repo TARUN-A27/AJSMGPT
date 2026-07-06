@@ -1,0 +1,29 @@
+assistant_id: ajsmgpt_nlu
+recipe: default.v1
+language: en
+
+pipeline:
+  - name: WhitespaceTokenizer
+  - name: RegexFeaturizer
+  - name: LexicalSyntacticFeaturizer
+  - name: CountVectorsFeaturizer
+  - name: CountVectorsFeaturizer
+    analyzer: char_wb
+    min_ngram: 2
+    max_ngram: 5
+  - name: DucklingEntityExtractor
+    url: http://host.docker.internal:8001
+    dimensions:
+      - time
+      - number
+      - amount-of-money
+      - duration
+    locale: en_GB
+    timezone: Asia/Kolkata
+  - name: DIETClassifier
+    epochs: 80
+    constrain_similarities: true
+  - name: EntitySynonymMapper
+  - name: FallbackClassifier
+    threshold: 0.45
+    ambiguity_threshold: 0.10

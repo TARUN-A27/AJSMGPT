@@ -1,0 +1,38 @@
+version: "3.1"
+
+intents:
+  - purchase_last_supplier_by_material
+  - purchase_last_supply_by_supplier
+  - last_purchase_date_by_item_name
+  - purchase_last_n_purchases_by_material
+  - grn_by_supplier_code
+  - grn_received_by_item
+  - pending_mrs_by_item_name
+  - approved_mrs_by_item_name
+  - rejected_mrs_by_item_name
+  - mrs_by_department
+  - mrs_by_unit
+  - stock_by_item_name
+  - issue_by_item_name
+  - camera_details
+  - cashbank_voucher_details
+  - document_details
+  - hrd_employee_or_attendance
+  - employee_by_empcode
+
+entities:
+  - item_name
+  - supplier_name
+  - supplier_code
+  - party_code
+  - empcode
+  - dept_name
+  - unit_name
+  - order_no
+  - mrs_no
+  - number
+  - time
+
+responses:
+  utter_dummy:
+    - text: "ok"

@@ -100,7 +100,7 @@ def _patch_template_sql_with_resolved_material(sql: str | None, resolved_values:
 
     if is_broad_one_word_material and any(
         token in sql_upper
-        for token in ["MRS_TEMP", "ITEMSTOCK", "INVENTORY.STOCK", " STOCK ", "STOCK S", " ISSUE ", " INVENTORY.ISSUE"]
+        for token in ["MRS_TEMP", "ITEMSTOCK", "INVENTORY.ITEMSTOCK", " STOCK ", "STOCK S", " ISSUE ", " INVENTORY.ISSUE"]
     ):
         return sql
 

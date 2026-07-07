@@ -224,6 +224,192 @@ def _apply_resolved_material_to_sql(sql: str, resolved_values: dict[str, Any]) -
     return patched_sql
 
 
+
+def _nlp_template_override(question: str) -> dict[str, Any] | None:
+    """
+    High-confidence NLP pre-router for /ask.
+
+    This does NOT generate free-form SQL.
+    It only maps already-reviewed Rasa intents/entities to deterministic SELECT templates.
+    """
+    import re
+
+    try:
+        from app.nlp_router_bridge import build_nlp_router_candidate
+        candidate = build_nlp_router_candidate(question).to_dict()
+    except Exception:
+        return None
+
+    if not candidate.get("success"):
+        return None
+
+    confidence = float(candidate.get("confidence") or 0)
+    if confidence < 0.95:
+        return None
+
+    if not candidate.get("required_entities_ok"):
+        return None
+
+    intent = candidate.get("intent")
+    entities = candidate.get("entities") or {}
+
+    def clean_like(value: str) -> str:
+        value = str(value or "").strip()
+        value = re.sub(r"[;'\"]", "", value)
+        value = re.sub(r"\s+", " ", value)
+        return value.upper()
+
+    def clean_code(value: str) -> str:
+        value = str(value or "").strip().upper()
+        value = re.sub(r"[;'\"]", "", value)
+        value = re.sub(r"\s+", "", value)
+        if not re.fullmatch(r"[A-Z0-9_-]+", value):
+            return ""
+        return value
+
+    if intent == "purchase_last_supplier_by_material":
+        item_name = clean_like(entities.get("item_name"))
+        if not item_name:
+            return None
+
+        sql = f"""
+SELECT *
+FROM (
+    SELECT
+        PO.ORDERNO,
+        PO.ORDERDATE,
+        PO.SUP_CODE,
+        P.PARTYNAME AS SUPPLIER_NAME,
+        PO.ITEM_CODE,
+        INV.ITEM_NAME,
+        PO.QTY,
+        PO.RATE,
+        PO.NET,
+        PO.INVQTY,
+        (NVL(PO.QTY, 0) - NVL(PO.INVQTY, 0)) AS RECEIPT_PENDING_QTY,
+        PO.STATUS
+    FROM INVENTORY.PURCHASEORDER PO
+    JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+    LEFT JOIN SCM.PARTYMASTER P ON PO.SUP_CODE = P.PARTYCODE
+    WHERE UPPER(INV.ITEM_NAME) LIKE '%{item_name}%'
+    ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC
+)
+WHERE ROWNUM <= 1
+""".strip()
+
+        return {
+            "question": question,
+            "sql": sql,
+            "explanation": "NLP pre-router matched purchase_last_supplier_by_material. It searches material name in INVITEMS and avoids supplier/address mis-resolution.",
+            "tables_used": ["INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS", "SCM.PARTYMASTER"],
+            "relationships_used": [
+                "INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE",
+                "INVENTORY.PURCHASEORDER.SUP_CODE = SCM.PARTYMASTER.PARTYCODE",
+            ],
+            "confidence": confidence,
+            "source": "nlp_pre_router",
+            "intent": intent,
+            "parameters": {"item_name": item_name},
+            "retrieved_schema": [],
+        }
+
+    if intent == "cashbank_voucher_details":
+        party_code = clean_code(entities.get("party_code"))
+        if not party_code:
+            return None
+
+        sql = f"""
+SELECT *
+FROM (
+    SELECT *
+    FROM ADMIN.CASHBANK
+    WHERE UPPER(ACCODE) = '{party_code}'
+)
+WHERE ROWNUM <= 100
+""".strip()
+
+        return {
+            "question": question,
+            "sql": sql,
+            "explanation": "NLP pre-router matched cashbank_voucher_details. It returns ADMIN.CASHBANK rows using ACCODE.",
+            "tables_used": ["ADMIN.CASHBANK"],
+            "relationships_used": [],
+            "confidence": confidence,
+            "source": "nlp_pre_router",
+            "intent": intent,
+            "parameters": {"party_code": party_code},
+            "retrieved_schema": ["ADMIN.CASHBANK"],
+        }
+
+    if intent == "hrd_employee_or_attendance":
+        empcode = clean_code(entities.get("empcode"))
+        if not empcode or not empcode.isdigit():
+            return None
+
+        sql = f"""
+SELECT *
+FROM (
+    SELECT *
+    FROM HRDNEW.CURRENTATTENDANCE
+    WHERE EMPCODE = {empcode}
+)
+WHERE ROWNUM <= 100
+""".strip()
+
+        return {
+            "question": question,
+            "sql": sql,
+            "explanation": "NLP pre-router matched hrd_employee_or_attendance. It uses HRDNEW.CURRENTATTENDANCE for employee attendance.",
+            "tables_used": ["HRDNEW.CURRENTATTENDANCE"],
+            "relationships_used": [],
+            "confidence": confidence,
+            "source": "nlp_pre_router",
+            "intent": intent,
+            "parameters": {"empcode": empcode},
+            "retrieved_schema": ["HRDNEW.CURRENTATTENDANCE"],
+        }
+
+    return None
+
+
+def _apply_known_sql_corrections(sql: str, sql_result: dict[str, Any] | None = None) -> str:
+    """
+    Final deterministic SQL corrections before execution.
+
+    This is not free-form generation.
+    It only fixes known verified table mapping mistakes.
+    """
+    if not sql:
+        return sql
+
+    sql_result = sql_result or {}
+    intent = str(sql_result.get("intent") or "").strip()
+
+    if intent in {"stock_by_item_name", "stock_availability_by_item_name", "stock_by_item_code"}:
+        sql = sql.replace("FROM INVENTORY.STOCK S", "FROM INVENTORY.ITEMSTOCK S")
+        sql = sql.replace("JOIN INVENTORY.STOCK S", "JOIN INVENTORY.ITEMSTOCK S")
+        sql = sql.replace("INVENTORY.STOCK.ITEMCODE", "INVENTORY.ITEMSTOCK.ITEMCODE")
+
+        tables_used = sql_result.get("tables_used")
+        if isinstance(tables_used, list):
+            sql_result["tables_used"] = [
+                "INVENTORY.ITEMSTOCK" if str(t).upper() == "INVENTORY.STOCK" else t
+                for t in tables_used
+            ]
+
+        relationships_used = sql_result.get("relationships_used")
+        if isinstance(relationships_used, list):
+            sql_result["relationships_used"] = [
+                str(r).replace("INVENTORY.STOCK.ITEMCODE", "INVENTORY.ITEMSTOCK.ITEMCODE")
+                for r in relationships_used
+            ]
+
+        explanation = str(sql_result.get("explanation") or "")
+        if "INVENTORY.STOCK" in explanation:
+            sql_result["explanation"] = explanation.replace("INVENTORY.STOCK", "INVENTORY.ITEMSTOCK")
+
+    return sql
+
 def _known_schema_fallback_sql(question: str) -> dict[str, Any] | None:
     """
     Deterministic fallback hints for common admin/HR questions.
@@ -449,17 +635,32 @@ def _answer_question_core(question: str) -> dict[str, Any]:
                 resolved_values_preview=_safe_preview(resolved_values),
             )
 
-        template_result = planner_match_router(
+        nlp_template_result = _nlp_template_override(sql_question)
 
-            router_question,
+        if nlp_template_result:
+            router_question = sql_question
+            template_result = nlp_template_result
 
-            resolved_values=resolved_values,
-
-            module=planner_module,
-
-            original_question=sql_question,
-
-        )
+            log_event(
+                request_id,
+                "nlp_pre_router_matched",
+                "High-confidence NLP pre-router selected deterministic SQL template",
+                intent=template_result.get("intent"),
+                source=template_result.get("source"),
+                parameters=template_result.get("parameters"),
+            )
+        else:
+            template_result = planner_match_router(
+            
+                router_question,
+            
+                resolved_values=resolved_values,
+            
+                module=planner_module,
+            
+                original_question=sql_question,
+            
+            )
         if template_result:
             sql_result = template_result
             sql = sql_result["sql"]
@@ -561,6 +762,10 @@ def _answer_question_core(question: str) -> dict[str, Any]:
             tables_used=sql_result.get("tables_used"),
         )
         sql_result["sql"] = sql
+
+        sql = _apply_known_sql_corrections(sql, sql_result)
+        if sql_result is not None:
+            sql_result["sql"] = sql
 
         db_result = run_safe_select(sql)
 

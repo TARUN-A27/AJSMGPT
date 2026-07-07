@@ -1,0 +1,27 @@
+version: "3.1"
+
+nlu:
+- intent: purchase_last_supplier_by_material
+  examples: |
+    - last supply of [mouse](item_name)
+    - last supply of [keyboard](item_name)
+    - last supply of [barcode chromo label](item_name)
+    - last supply of [dell system](item_name)
+    - latest supply of [mouse](item_name)
+    - latest supply of [keyboard](item_name)
+    - last supplier for [mouse](item_name)
+    - last supplier for [keyboard](item_name)
+    - [mouse](item_name) last purchased supplier name
+    - [keyboard](item_name) last purchased supplier name
+    - who supplied [mouse](item_name)
+    - who supplied [keyboard](item_name)
+    - supplier for last supply of [mouse](item_name)
+    - supplier for last supply of [keyboard](item_name)
+
+- intent: purchase_last_n_purchases_by_material
+  examples: |
+    - last 3 purchase qty purchase of the item [keyboard](item_name)
+    - last 3 purchase details of [dell system](item_name)
+    - last 5 purchases of [mouse](item_name)
+    - last purchase qty purchase of the item [keyboard](item_name)
+    - last 10 purchase details of [barcode chromo label](item_name)

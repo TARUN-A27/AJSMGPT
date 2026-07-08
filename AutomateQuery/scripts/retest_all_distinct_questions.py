@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Any
 
 
+def norm(q: str) -> str:
+    return " ".join(str(q or "").strip().lower().split())
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows = []
     for line_no, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
@@ -28,11 +32,7 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def normalize_question(q: str) -> str:
-    return " ".join(str(q or "").strip().lower().split())
-
-
-def extract_distinct_questions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def distinct_questions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     latest = {}
     counts = Counter()
 
@@ -40,17 +40,15 @@ def extract_distinct_questions(rows: list[dict[str, Any]]) -> list[dict[str, Any
         q = str(row.get("question") or "").strip()
         if not q:
             continue
-
-        key = normalize_question(q)
+        key = norm(q)
         counts[key] += 1
         latest[key] = row
 
     items = []
     for key, row in latest.items():
-        q = str(row.get("question") or "").strip()
         items.append({
             "question_key": key,
-            "question": q,
+            "question": str(row.get("question") or "").strip(),
             "old_count": counts[key],
             "old_success": row.get("success"),
             "old_source": row.get("source"),
@@ -63,21 +61,19 @@ def extract_distinct_questions(rows: list[dict[str, Any]]) -> list[dict[str, Any
     return items
 
 
-def ask_api(api_url: str, question: str, timeout: int) -> dict[str, Any]:
-    payload = json.dumps({"question": question}).encode("utf-8")
+def ask(api_url: str, question: str, timeout: int) -> dict[str, Any]:
     req = urllib.request.Request(
         api_url.rstrip("/") + "/ask",
-        data=payload,
+        data=json.dumps({"question": question}).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
     )
 
-    started = time.time()
+    start = time.time()
 
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-            body = json.loads(raw)
+            payload = json.loads(resp.read().decode("utf-8", errors="replace"))
     except Exception as exc:
         return {
             "success": False,
@@ -87,33 +83,23 @@ def ask_api(api_url: str, question: str, timeout: int) -> dict[str, Any]:
             "answer": None,
             "sql": None,
             "error": str(exc),
-            "api_elapsed_ms": int((time.time() - started) * 1000),
+            "api_elapsed_ms": int((time.time() - start) * 1000),
         }
 
-    data = body.get("data", body)
+    data = payload.get("data", payload)
     if not isinstance(data, dict):
-        data = {
-            "success": False,
-            "source": None,
-            "intent": None,
-            "row_count": None,
-            "answer": None,
-            "sql": None,
-            "error": "Unexpected API response",
-        }
+        data = {"success": False, "error": "Unexpected API response"}
 
-    data["api_elapsed_ms"] = int((time.time() - started) * 1000)
+    data["api_elapsed_ms"] = int((time.time() - start) * 1000)
     return data
 
 
-def verdict(result: dict[str, Any]) -> str:
-    success = bool(result.get("success"))
-    source = str(result.get("source") or "").lower()
-    error = result.get("error")
-    row_count = result.get("row_count")
-
-    if not success or error:
+def verdict(r: dict[str, Any]) -> str:
+    if not r.get("success") or r.get("error"):
         return "FAIL"
+
+    source = str(r.get("source") or "").lower()
+    row_count = r.get("row_count")
 
     if "fallback" in source or "qwen" in source:
         try:
@@ -137,30 +123,31 @@ def verdict(result: dict[str, Any]) -> str:
     return "ZERO_REVIEW"
 
 
-def load_done(jsonl_path: Path) -> set[str]:
+def load_done(path: Path) -> set[str]:
     done = set()
-    if not jsonl_path.exists():
+    if not path.exists():
         return done
 
-    for line in jsonl_path.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         try:
             obj = json.loads(line)
-            key = obj.get("question_key")
-            if key:
-                done.add(str(key))
+            if obj.get("question_key"):
+                done.add(str(obj["question_key"]))
         except Exception:
             continue
 
     return done
 
 
-def write_reports(results_jsonl: Path, out_dir: Path) -> None:
+def write_reports(results_path: Path, out_dir: Path) -> None:
     rows = []
-    for line in results_jsonl.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in results_path.read_text(encoding="utf-8", errors="replace").splitlines():
         try:
             rows.append(json.loads(line))
         except Exception:
             continue
+
+    counts = Counter(r.get("verdict") for r in rows)
 
     latest_json = out_dir / "latest_all_distinct_retest.json"
     latest_csv = out_dir / "latest_all_distinct_retest.csv"
@@ -168,31 +155,16 @@ def write_reports(results_jsonl: Path, out_dir: Path) -> None:
 
     latest_json.write_text(json.dumps(rows, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
+    fields = [
+        "verdict", "question", "old_count", "old_success", "old_source", "old_intent", "old_row_count",
+        "success", "source", "intent", "row_count", "elapsed_ms", "api_elapsed_ms", "answer", "error", "sql"
+    ]
+
     with latest_csv.open("w", newline="", encoding="utf-8") as f:
-        fields = [
-            "verdict",
-            "question",
-            "old_count",
-            "old_success",
-            "old_source",
-            "old_intent",
-            "old_row_count",
-            "success",
-            "source",
-            "intent",
-            "row_count",
-            "elapsed_ms",
-            "api_elapsed_ms",
-            "answer",
-            "error",
-            "sql",
-        ]
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
-        for r in rows:
-            writer.writerow({k: r.get(k) for k in fields})
-
-    counts = Counter(r.get("verdict") for r in rows)
+        for row in rows:
+            writer.writerow({k: row.get(k) for k in fields})
 
     lines = []
     lines.append("# AJSMGPT All Distinct Question Retest")
@@ -202,6 +174,7 @@ def write_reports(results_jsonl: Path, out_dir: Path) -> None:
     lines.append("")
     lines.append("## Summary")
     lines.append("")
+
     for k, v in sorted(counts.items()):
         lines.append(f"- {k}: `{v}`")
 
@@ -209,47 +182,52 @@ def write_reports(results_jsonl: Path, out_dir: Path) -> None:
     lines.append("## Needs work")
     lines.append("")
 
-    bad_verdicts = {"FAIL", "REVIEW_FALLBACK", "ZERO_REVIEW", "REVIEW_NO_ROWCOUNT", "REVIEW_BAD_ROWCOUNT"}
+    bad = {"FAIL", "REVIEW_FALLBACK", "ZERO_REVIEW", "REVIEW_NO_ROWCOUNT", "REVIEW_BAD_ROWCOUNT"}
 
-    for r in rows:
-        if r.get("verdict") not in bad_verdicts:
+    for row in rows:
+        if row.get("verdict") not in bad:
             continue
 
-        lines.append(f"### {r.get('question')}")
+        lines.append(f"### {row.get('question')}")
         lines.append("")
-        lines.append(f"- Verdict: `{r.get('verdict')}`")
-        lines.append(f"- Old count: `{r.get('old_count')}`")
-        lines.append(f"- Current source: `{r.get('source')}`")
-        lines.append(f"- Current intent: `{r.get('intent')}`")
-        lines.append(f"- Current row_count: `{r.get('row_count')}`")
-        if r.get("error"):
-            lines.append(f"- Error: `{r.get('error')}`")
-        if r.get("answer"):
-            lines.append(f"- Answer: {r.get('answer')}")
-        if r.get("sql"):
+        lines.append(f"- Verdict: `{row.get('verdict')}`")
+        lines.append(f"- Old count: `{row.get('old_count')}`")
+        lines.append(f"- Current source: `{row.get('source')}`")
+        lines.append(f"- Current intent: `{row.get('intent')}`")
+        lines.append(f"- Current row_count: `{row.get('row_count')}`")
+
+        if row.get("error"):
+            lines.append(f"- Error: `{row.get('error')}`")
+        if row.get("answer"):
+            lines.append(f"- Answer: {row.get('answer')}")
+        if row.get("sql"):
             lines.append("")
             lines.append("```sql")
-            lines.append(str(r.get("sql"))[:2500])
+            lines.append(str(row.get("sql"))[:2500])
             lines.append("```")
         lines.append("")
 
     latest_md.write_text("\n".join(lines), encoding="utf-8")
 
     print()
-    print("Reports updated:")
+    print("Reports:")
     print("JSON:", latest_json)
     print("CSV :", latest_csv)
     print("MD  :", latest_md)
+    print()
+    print("Summary:")
+    for k, v in sorted(counts.items()):
+        print(f"{k}: {v}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--log-file", required=True)
-    parser.add_argument("--api-url", default="http://172.16.90.1:8000")
+    parser.add_argument("--api-url", default="http://127.0.0.1:8000")
     parser.add_argument("--timeout", type=int, default=25)
     parser.add_argument("--sleep", type=float, default=0.2)
-    parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--limit", type=int, default=0)
     args = parser.parse_args()
 
     log_file = Path(args.log_file)
@@ -259,37 +237,33 @@ def main() -> int:
     out_dir = Path("AutomateQuery/reports/retest_from_logs")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    results_jsonl = out_dir / "all_distinct_retest_results.jsonl"
+    results_path = out_dir / "all_distinct_retest_results.jsonl"
 
     rows = read_jsonl(log_file)
-    questions = extract_distinct_questions(rows)
+    questions = distinct_questions(rows)
 
-    if args.limit and args.limit > 0:
+    if args.limit > 0:
         questions = questions[: args.limit]
 
-    done = load_done(results_jsonl) if args.resume else set()
+    done = load_done(results_path) if args.resume else set()
 
     print("Total log rows:", len(rows))
     print("Distinct questions:", len(questions))
     print("Already done:", len(done))
     print("API:", args.api_url)
-    print("Timeout per question:", args.timeout)
-    print("Results JSONL:", results_jsonl)
+    print("Timeout:", args.timeout)
+    print("Results:", results_path)
     print()
 
-    total = len(questions)
-
-    with results_jsonl.open("a", encoding="utf-8") as f:
-        for idx, item in enumerate(questions, start=1):
-            key = item["question_key"]
-            q = item["question"]
-
-            if key in done:
+    with results_path.open("a", encoding="utf-8") as f:
+        for i, item in enumerate(questions, start=1):
+            if item["question_key"] in done:
                 continue
 
-            print(f"[{idx}/{total}] {q}")
+            q = item["question"]
+            print(f"[{i}/{len(questions)}] {q}")
 
-            result = ask_api(args.api_url, q, args.timeout)
+            result = ask(args.api_url, q, args.timeout)
             v = verdict(result)
 
             row = {
@@ -318,7 +292,7 @@ def main() -> int:
 
             time.sleep(args.sleep)
 
-    write_reports(results_jsonl, out_dir)
+    write_reports(results_path, out_dir)
     return 0
 
 

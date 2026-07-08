@@ -33,7 +33,7 @@ router = APIRouter()
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_ROOT = Path(os.environ.get("AJSMGPT_RUNTIME_ROOT", "/home/ajsmgpt/AJSMGPT")).resolve()
 
-TEMPLATE_PATH = PROJECT_ROOT / "AutomateQuery/web/templates/learning_cycle.html"
+TEMPLATE_PATH = PROJECT_ROOT / "AutomateQuery/web/templates/learning_cycle/index.html"
 
 SUMMARY_JSON = PROJECT_ROOT / "AutomateQuery/reports/learning_cycle/latest_learning_cycle_summary.json"
 SUMMARY_MD = PROJECT_ROOT / "AutomateQuery/reports/learning_cycle/latest_learning_cycle_summary.md"
@@ -182,7 +182,7 @@ def learning_cycle_page():
 
     return JSONResponse(
         {
-            "error": "learning_cycle.html not found",
+            "error": "learning_cycle index.html not found",
             "expected_path": str(TEMPLATE_PATH),
         },
         status_code=404,

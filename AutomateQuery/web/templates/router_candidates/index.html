@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Router Candidates</title>
+  <style>
+    :root { color-scheme: dark; --bg:#09090b; --panel:#121217; --text:#f5f5f7; --muted:#a1a1aa; --border:#2a2a2f; --accent:#8b5cf6; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { border-bottom:1px solid var(--border); padding:24px; }
+    main { max-width: 1100px; margin:0 auto; padding:24px; }
+    .intro { color: var(--muted); margin-top:7px; }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; margin-top:16px; }
+    .tag { display:inline-block; padding:4px 8px; border-radius:999px; background:#1f2937; color:#cbd5e1; margin-right:8px; font-size:0.85rem; }
+    a { color:#c4b5fd; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Router Candidates</h1>
+    <div class="intro">Inspect suspicious router outcomes, fallback usage, wrong-table reports, and suggested follow-up actions.</div>
+    <div class="intro"><a href="/dashboard">Back to dashboard</a></div>
+  </header>
+  <main>
+    <div class="card">
+      <h2>What you can review</h2>
+      <p><span class="tag">Fallback</span><span class="tag">Wrong table</span><span class="tag">Slow path</span><span class="tag">Zero-row</span></p>
+      <p>Use this page to check router data that needs a human decision before production changes are made.</p>
+    </div>
+    <div class="card">
+      <h2>Next step</h2>
+      <p>Open the router-candidate data source from the review backend and confirm if the issue should be routed to a patch or a new template.</p>
+    </div>
+  </main>
+</body>
+</html>

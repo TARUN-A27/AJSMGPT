@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AutomateQuery Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #09090b;
+      --panel: #111114;
+      --panel-2: #17171b;
+      --text: #f5f5f7;
+      --muted: #a1a1aa;
+      --border: #2a2a2f;
+      --accent: #8b5cf6;
+      --accent-2: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(17, 17, 20, 0.95);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 24px 16px; }
+    h1 { margin: 0 0 6px; font-size: 1.8rem; }
+    .sub { color: var(--muted); }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+    }
+    .card h2 { margin: 0 0 8px; font-size: 1.08rem; }
+    .card p { color: var(--muted); margin: 0 0 12px; }
+    .card a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      text-decoration: none;
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 600;
+    }
+    .pill { display: inline-block; padding: 4px 9px; border-radius: 999px; background: var(--panel-2); color: var(--muted); font-size: 0.84rem; margin-bottom: 10px; }
+    .meta { margin-top: 8px; color: var(--muted); font-size: 0.9rem; }
+    @media (max-width: 640px) { .wrap, main { padding: 18px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="pill">AutomateQuery UI</div>
+      <h1>Dashboard</h1>
+      <div class="sub">Review learning-cycle outputs, NLP candidates, router candidates, eval review items, and question-bank coverage from one place.</div>
+    </div>
+  </header>
+  <main>
+    <div class="grid">
+      <section class="card">
+        <h2>Learning Cycle</h2>
+        <p>Run the learning cycle, inspect summaries, and review generated SQL candidates.</p>
+        <a href="/learning-cycle">Open Learning Cycle</a>
+      </section>
+      <section class="card">
+        <h2>NLP Review</h2>
+        <p>Inspect logged questions and review NLP router candidates before applying them.</p>
+        <a href="/nlp-review">Open NLP Review</a>
+      </section>
+      <section class="card">
+        <h2>Router Candidates</h2>
+        <p>Review router problem candidates and fallback or wrong-table issues.</p>
+        <a href="/router-candidates">Open Router Candidates</a>
+      </section>
+      <section class="card">
+        <h2>Eval Candidates</h2>
+        <p>Review generated evaluation candidates and approve or reject them.</p>
+        <a href="/eval-review">Open Eval Candidates</a>
+      </section>
+      <section class="card">
+        <h2>Question Bank</h2>
+        <p>Browse grouped questions and coverage to guide the next automation pass.</p>
+        <a href="/question-bank">Open Question Bank</a>
+      </section>
+    </div>
+    <div class="meta">Updated <span id="today"></span></div>
+  </main>
+  <script>
+    document.getElementById('today').textContent = new Date().toLocaleString();
+  </script>
+</body>
+</html>

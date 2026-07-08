@@ -11,7 +11,7 @@ from AutomateQuery.scripts.sql_query_generator import generate_sql_for_patch_que
 from urllib.parse import parse_qs, quote
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -38,6 +38,18 @@ app = FastAPI(title="AutomateQuery UI")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def serve_html_template(*relative_parts: str) -> FileResponse | JSONResponse:
+    template_path = TEMPLATES_DIR.joinpath(*relative_parts)
+
+    if not template_path.exists():
+        return JSONResponse(
+            {"error": "template_not_found", "path": str(template_path)},
+            status_code=404,
+        )
+
+    return FileResponse(str(template_path))
 
 
 def to_pretty_json(value: Any) -> str:
@@ -550,85 +562,23 @@ async def health() -> str:
 
 
 @app.get("/")
-async def dashboard(request: Request):
-    question_bank = as_list(read_json(QUESTION_BANK_JSON))
-    router_candidates = as_list(read_json(ROUTER_FIX_JSON))
-    generated_eval = as_list(read_json(GENERATED_EVAL_JSON))
-    reviewed_eval = sync_review_file()
-    approved_eval = as_list(read_json(APPROVED_EVAL_JSON))
-    router_patches = sync_router_patch_review_file()
+async def dashboard():
+    return serve_html_template("dashboard", "index.html")
 
-    approved_count = sum(1 for item in reviewed_eval if item.get("approved") is True)
 
-    return templates.TemplateResponse(
-        request,
-        "dashboard.html",
-        {
-            "title": "AutomateQuery Dashboard",
-            "active": "dashboard",
-            "message": request.query_params.get("message", ""),
-            "unique_questions": len(question_bank),
-            "review_questions": sum(1 for item in question_bank if item.get("needs_review")),
-            "router_problem_count": len(router_candidates),
-            "wrong_table_count": sum(1 for c in router_candidates if c.get("wrong_tables_detected")),
-            "router_patch_count": len(router_patches),
-            "generated_eval_count": len(generated_eval),
-            "approved_count": approved_count,
-            "pending_count": len(reviewed_eval) - approved_count,
-            "approved_eval_count": len(approved_eval),
-        },
-    )
+@app.get("/dashboard")
+async def dashboard_page():
+    return serve_html_template("dashboard", "index.html")
 
 
 @app.get("/question-bank")
-async def question_bank_page(request: Request):
-    bank = as_list(read_json(QUESTION_BANK_JSON))
-
-    category_counts: dict[str, int] = {}
-    for item in bank:
-        category = str(item.get("category") or "unknown")
-        category_counts[category] = category_counts.get(category, 0) + 1
-
-    return templates.TemplateResponse(
-        request,
-        "question_bank.html",
-        {
-            "title": "AutomateQuery Question Bank",
-            "active": "question_bank",
-            "items": bank,
-            "total": len(bank),
-            "review_count": sum(1 for item in bank if item.get("needs_review")),
-            "ok_count": sum(1 for item in bank if not item.get("needs_review")),
-            "category_counts": sorted(category_counts.items()),
-        },
-    )
+async def question_bank_page():
+    return serve_html_template("question_bank", "index.html")
 
 
 @app.get("/router-candidates")
-async def router_candidates_page(request: Request):
-    candidates = as_list(read_json(ROUTER_FIX_JSON))
-
-    return templates.TemplateResponse(
-        request,
-        "router_candidates.html",
-        {
-            "title": "AutomateQuery Router Candidates",
-            "active": "router_candidates",
-            "candidates": candidates,
-            "total": len(candidates),
-            "review_required": sum(
-                1
-                for c in candidates
-                if ((c.get("suggestion") or {}).get("suggested_intent_name") == "REVIEW_REQUIRED")
-            ),
-            "wrong_table_count": sum(1 for c in candidates if c.get("wrong_tables_detected")),
-            "fallback_count": sum(
-                1
-                for c in candidates
-                if "fallback_used" in (c.get("problem_types") or [])
-            ),
-        },
-    )
+async def router_candidates_page():
+    return serve_html_template("router_candidates", "index.html")
 
 
 @app.get("/router-patches")
@@ -653,29 +603,18 @@ async def router_patches_page(request: Request):
 
 
 @app.get("/eval-review")
-async def eval_review_page(request: Request):
-    reviewed = sync_review_file()
+async def eval_review_page():
+    return serve_html_template("eval_candidates", "index.html")
 
-    approved_count = sum(1 for record in reviewed if record.get("approved") is True)
 
-    return templates.TemplateResponse(
-        request,
-        "eval_review.html",
-        {
-            "title": "AutomateQuery Eval Approval",
-            "active": "eval_review",
-            "message": request.query_params.get("message", ""),
-            "records": reviewed,
-            "total_count": len(reviewed),
-            "approved_count": approved_count,
-            "pending_count": len(reviewed) - approved_count,
-        },
-    )
+@app.get("/eval-candidates")
+async def eval_candidates_page():
+    return serve_html_template("eval_candidates", "index.html")
 
 
 @app.get("/approval")
-async def approval_alias(request: Request):
-    return await eval_review_page(request)
+async def approval_alias():
+    return serve_html_template("eval_candidates", "index.html")
 
 
 @app.post("/run-pipeline")
@@ -1124,415 +1063,9 @@ async def api_nlp_review_save_feedback(request: Request):
     }
 
 
-@app.get("/nlp-review", response_class=HTMLResponse)
+@app.get("/nlp-review")
 def nlp_review_page():
-    """
-    Simple review UI for Rasa + Duckling NLP router candidates.
-    """
-    return HTMLResponse("""
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>AJSMGPT NLP Review</title>
-  <style>
-    body {
-      margin: 0;
-      background: #0f0f10;
-      color: #f4f4f5;
-      font-family: Arial, sans-serif;
-    }
-    header {
-      padding: 18px 24px;
-      border-bottom: 1px solid #2a2a2d;
-      background: #151518;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    h1 {
-      margin: 0;
-      font-size: 22px;
-    }
-    .sub {
-      margin-top: 6px;
-      color: #a1a1aa;
-      font-size: 13px;
-    }
-    main {
-      padding: 20px 24px;
-      max-width: 1280px;
-      margin: 0 auto;
-    }
-    .toolbar {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    input, select {
-      background: #18181b;
-      color: #f4f4f5;
-      border: 1px solid #3f3f46;
-      border-radius: 8px;
-      padding: 10px 12px;
-    }
-    input {
-      min-width: 360px;
-      flex: 1;
-    }
-    button {
-      background: #f4f4f5;
-      color: #09090b;
-      border: 0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    button.secondary {
-      background: #27272a;
-      color: #f4f4f5;
-      border: 1px solid #3f3f46;
-    }
-    button:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-    .card {
-      background: #18181b;
-      border: 1px solid #2f2f33;
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 14px;
-    }
-    .question-row {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 12px;
-      align-items: center;
-    }
-    .question {
-      font-size: 15px;
-      line-height: 1.4;
-    }
-    .badge {
-      display: inline-block;
-      border-radius: 999px;
-      padding: 4px 9px;
-      background: #27272a;
-      color: #d4d4d8;
-      font-size: 12px;
-    }
-    .result {
-      margin-top: 14px;
-      border-top: 1px solid #2f2f33;
-      padding-top: 14px;
-      display: none;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .field {
-      background: #0f0f10;
-      border: 1px solid #2f2f33;
-      border-radius: 10px;
-      padding: 10px;
-      overflow-wrap: anywhere;
-    }
-    .label {
-      color: #a1a1aa;
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-    .value {
-      font-size: 14px;
-      white-space: pre-wrap;
-    }
-    .ok {
-      color: #86efac;
-    }
-    .warn {
-      color: #fde68a;
-    }
-    .bad {
-      color: #fca5a5;
-    }
-    pre {
-      background: #0f0f10;
-      border: 1px solid #2f2f33;
-      border-radius: 10px;
-      padding: 12px;
-      overflow-x: auto;
-      color: #e4e4e7;
-    }
-    .empty {
-      color: #a1a1aa;
-      padding: 30px;
-      text-align: center;
-    }
-    @media (max-width: 900px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-      .question-row {
-        grid-template-columns: 1fr;
-      }
-      input {
-        min-width: 0;
-      }
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>AJSMGPT NLP Review</h1>
-    <div class="sub">
-      Review Rasa + Duckling intent, entities, module, confidence and safe_to_apply for real logged questions.
-    </div>
-  </header>
-
-  <main>
-    <div class="toolbar">
-      <input id="searchBox" placeholder="Filter questions..." oninput="render()" />
-      <select id="limitSelect" onchange="loadQuestions()">
-        <option value="100">100 questions</option>
-        <option value="200" selected>200 questions</option>
-        <option value="500">500 questions</option>
-        <option value="1000">1000 questions</option>
-      </select>
-      <button onclick="loadQuestions()">Reload</button>
-      <button class="secondary" onclick="checkVisible()">Check visible</button>
-    </div>
-
-    <div id="status" class="sub">Loading...</div>
-    <div id="list"></div>
-  </main>
-
-<script>
-let QUESTIONS = [];
-
-function escapeHtml(text) {
-  return String(text ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function fmtJson(obj) {
-  return escapeHtml(JSON.stringify(obj ?? {}, null, 2));
-}
-
-function shortNum(value) {
-  const n = Number(value || 0);
-  return Number.isFinite(n) ? n.toFixed(4) : "0.0000";
-}
-
-async function loadQuestions() {
-  const limit = document.getElementById("limitSelect").value;
-  const status = document.getElementById("status");
-  const list = document.getElementById("list");
-
-  status.textContent = "Loading questions...";
-  list.innerHTML = "";
-
-  try {
-    const res = await fetch(`/api/nlp-review/questions?limit=${limit}`);
-    const data = await res.json();
-
-    if (!data.success) {
-      status.textContent = "Failed to load questions.";
-      return;
-    }
-
-    QUESTIONS = data.questions || [];
-    status.textContent = `Loaded ${QUESTIONS.length} unique questions from ${data.log_path}`;
-    render();
-
-  } catch (err) {
-    status.textContent = "Error loading questions: " + err;
-  }
-}
-
-function render() {
-  const list = document.getElementById("list");
-  const search = document.getElementById("searchBox").value.toLowerCase().trim();
-
-  const filtered = QUESTIONS.filter(q => {
-    return !search || q.question.toLowerCase().includes(search);
-  });
-
-  if (!filtered.length) {
-    list.innerHTML = `<div class="empty">No questions found.</div>`;
-    return;
-  }
-
-  list.innerHTML = filtered.map((row, idx) => {
-    const id = "q_" + idx + "_" + Math.random().toString(36).slice(2);
-    row._domId = id;
-
-    return `
-      <div class="card" data-question="${escapeHtml(row.question)}">
-        <div class="question-row">
-          <div class="question">${escapeHtml(row.question)}</div>
-          <div class="badge">count: ${row.count}</div>
-          <button onclick="checkOne(this)">Check NLP</button>
-        </div>
-        <div class="result"></div>
-      </div>
-    `;
-  }).join("");
-}
-
-async function checkOne(button) {
-  const card = button.closest(".card");
-  const question = card.getAttribute("data-question");
-  const resultDiv = card.querySelector(".result");
-
-  button.disabled = true;
-  button.textContent = "Checking...";
-  resultDiv.style.display = "block";
-  resultDiv.innerHTML = `<div class="sub">Running Rasa + Duckling...</div>`;
-
-  try {
-    const res = await fetch("/api/nlp-review/candidate", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({question})
-    });
-
-    const d = await res.json();
-
-    const okClass = d.success ? "ok" : "bad";
-    const safeClass = d.safe_to_apply ? "warn" : "ok";
-
-    resultDiv.innerHTML = `
-      <div class="grid">
-        <div class="field">
-          <div class="label">Success</div>
-          <div class="value ${okClass}">${escapeHtml(d.success)}</div>
-        </div>
-        <div class="field">
-          <div class="label">Intent</div>
-          <div class="value">${escapeHtml(d.intent)}</div>
-        </div>
-        <div class="field">
-          <div class="label">Confidence</div>
-          <div class="value">${shortNum(d.confidence)}</div>
-        </div>
-        <div class="field">
-          <div class="label">Module</div>
-          <div class="value">${escapeHtml(d.module)}</div>
-        </div>
-        <div class="field">
-          <div class="label">Required entities OK</div>
-          <div class="value ${d.required_entities_ok ? "ok" : "bad"}">${escapeHtml(d.required_entities_ok)}</div>
-        </div>
-        <div class="field">
-          <div class="label">safe_to_apply</div>
-          <div class="value ${safeClass}">${escapeHtml(d.safe_to_apply)}</div>
-        </div>
-        <div class="field">
-          <div class="label">Reason</div>
-          <div class="value">${escapeHtml(d.reason)}</div>
-        </div>
-        <div class="field">
-          <div class="label">Missing entities</div>
-          <div class="value">${escapeHtml((d.missing_entities || []).join(", ") || "-")}</div>
-        </div>
-        <div class="field">
-          <div class="label">Required entities</div>
-          <div class="value">${escapeHtml((d.required_entities || []).join(", ") || "-")}</div>
-        </div>
-      </div>
-
-      <div style="margin-top:12px">
-        <div class="label">Entities</div>
-        <pre>${fmtJson(d.entities)}</pre>
-      </div>
-
-      <details style="margin-top:12px">
-        <summary class="sub">Full JSON</summary>
-        <pre>${fmtJson(d)}</pre>
-      </details>
-
-      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
-        <button class="secondary" onclick='saveNlpFeedback(this, true, ${JSON.stringify(question)}, ${JSON.stringify(d)})'>
-          Save Correct
-        </button>
-        <button class="secondary" onclick='saveNlpFeedback(this, false, ${JSON.stringify(question)}, ${JSON.stringify(d)})'>
-          Save Wrong
-        </button>
-        <input style="min-width:260px" placeholder="Optional note..." class="feedback-note" />
-      </div>
-    `;
-
-  } catch (err) {
-    resultDiv.innerHTML = `<div class="bad">Error: ${escapeHtml(err)}</div>`;
-  } finally {
-    button.disabled = false;
-    button.textContent = "Check NLP";
-  }
-}
-
-async function checkVisible() {
-  const buttons = Array.from(document.querySelectorAll(".card button"));
-  for (const btn of buttons) {
-    await checkOne(btn);
-  }
-}
-
-
-async function saveNlpFeedback(button, isCorrect, question, candidate) {
-  const wrap = button.parentElement;
-  const noteInput = wrap.querySelector(".feedback-note");
-  const note = noteInput ? noteInput.value : "";
-
-  const original = button.textContent;
-  button.disabled = true;
-  button.textContent = "Saving...";
-
-  try {
-    const res = await fetch("/api/nlp-review/save-feedback", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        question,
-        candidate,
-        is_correct: isCorrect,
-        note
-      })
-    });
-
-    const data = await res.json();
-
-    if (!data.success) {
-      button.textContent = "Save failed";
-      return;
-    }
-
-    button.textContent = isCorrect ? "Saved Correct" : "Saved Wrong";
-
-  } catch (err) {
-    button.textContent = "Error";
-  } finally {
-    setTimeout(() => {
-      button.disabled = false;
-      button.textContent = original;
-    }, 1500);
-  }
-}
-
-loadQuestions();
-</script>
-</body>
-</html>
-    """)
+    return serve_html_template("nlp_review", "index.html")
 
 
 # --- AutomateQuery Learning Cycle Dashboard routes ---

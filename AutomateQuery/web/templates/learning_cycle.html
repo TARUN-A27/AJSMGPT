@@ -7,15 +7,17 @@
 
   <style>
     :root {
-      --bg: #ffffff;
-      --fg: #111111;
-      --muted: #666666;
-      --border: #dddddd;
-      --soft: #f7f7f7;
-      --soft2: #eeeeee;
-      --ok: #0f7b0f;
-      --bad: #b00020;
-      --warn: #9a6700;
+      --bg: #0b0b0f;
+      --fg: #f5f5f7;
+      --muted: #a1a1aa;
+      --border: #2d2d35;
+      --soft: #15151b;
+      --soft2: #20202a;
+      --card: #111116;
+      --code: #050507;
+      --ok: #22c55e;
+      --bad: #fb7185;
+      --warn: #fbbf24;
     }
 
     * {
@@ -218,6 +220,108 @@
       color: var(--muted);
     }
 
+    .manual-form {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .manual-input {
+      flex: 1;
+      min-width: 320px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 12px;
+      font-size: 14px;
+    }
+
+
+    /* Dark dashboard overrides */
+    header {
+      background: #0b0b0f;
+    }
+
+    .metric,
+    .card,
+    .row {
+      background: var(--card);
+      border-color: var(--border);
+    }
+
+    .card-head {
+      border-color: var(--border);
+      background: #121218;
+    }
+
+    pre {
+      background: var(--code);
+      border: 1px solid var(--border);
+      color: #f8fafc;
+    }
+
+    button {
+      background: #f5f5f7;
+      color: #050507;
+      border-color: #f5f5f7;
+    }
+
+    button.secondary,
+    .tab {
+      background: #17171f;
+      color: #f5f5f7;
+      border-color: var(--border);
+    }
+
+    .tab.active {
+      background: #f5f5f7;
+      color: #050507;
+      border-color: #f5f5f7;
+    }
+
+    .badge {
+      background: #17171f;
+      color: #e5e7eb;
+      border-color: var(--border);
+    }
+
+    .manual-input {
+      background: #0f0f15;
+      color: #f5f5f7;
+      border-color: var(--border);
+    }
+
+    .manual-input::placeholder {
+      color: #71717a;
+    }
+
+    a {
+      color: #c4b5fd;
+    }
+
+    .query-slide {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #0f0f15;
+      overflow: hidden;
+    }
+
+    .query-slide-title {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .query-slide pre {
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      max-height: 420px;
+    }
+
     @media (max-width: 900px) {
       .grid {
         grid-template-columns: repeat(2, minmax(120px, 1fr));
@@ -275,6 +379,29 @@
       </div>
     </div>
 
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Manual Get Query / Test Query</h2>
+        <span class="small">Calls main /ask API and shows SQL/result</span>
+      </div>
+      <div class="card-body">
+        <div class="manual-form">
+          <input
+            id="manualQuestion"
+            class="manual-input"
+            placeholder="Type a question, example: stock for keyboard"
+            onkeydown="if(event.key === 'Enter') manualGetQuery();"
+          />
+          <button onclick="manualGetQuery()">Get Query</button>
+          <button class="secondary" onclick="clearManualQuery()">Clear</button>
+        </div>
+
+        <pre id="manualQueryOutput">Type a question and click Get Query.</pre>
+      </div>
+    </div>
+
+
     <div class="tabs">
       <button class="tab active" onclick="showTab('summary')">Summary</button>
       <button class="tab" onclick="showTab('expectedZero')">Expected Zero</button>
@@ -330,10 +457,25 @@
 
     async function fetchJson(url, options = {}) {
       const res = await fetch(url, options);
-      if (!res.ok) {
-        throw new Error(`${url} failed: ${res.status}`);
+      const text = await res.text();
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {raw_text: text};
       }
-      return await res.json();
+
+      if (!res.ok) {
+        return {
+          ok: false,
+          http_status: res.status,
+          error: data?.error || data?.detail || `${url} failed: ${res.status}`,
+          raw: data,
+        };
+      }
+
+      return data;
     }
 
     function showTab(name) {
@@ -345,17 +487,77 @@
         btn.classList.remove("active");
       }
 
-      event.target.classList.add("active");
+      if (event && event.target) {
+        event.target.classList.add("active");
+      }
     }
 
     function renderMetrics(summary) {
       const finalStatus = summary?.final_status || {};
-
       document.getElementById("passCount").textContent = finalStatus.pass ?? "-";
       document.getElementById("expectedZeroCount").textContent = finalStatus.expected_zero ?? "-";
       document.getElementById("failCount").textContent = finalStatus.fail ?? "-";
       document.getElementById("verifiedCandidatesCount").textContent = finalStatus.verified_candidates ?? "-";
       document.getElementById("needsWorkCount").textContent = finalStatus.needs_work ?? "-";
+    }
+
+    function buildQueryOnlyText(data) {
+      const extracted = data?.extracted || {};
+
+      let resultText = "";
+      resultText += "QUESTION: " + (data?.question || "-") + "\n";
+      resultText += "SUCCESS: " + (extracted.success ?? "-") + "\n";
+      resultText += "SOURCE: " + (extracted.source ?? "-") + "\n";
+      resultText += "INTENT: " + (extracted.intent ?? "-") + "\n";
+      resultText += "ROW COUNT: " + (extracted.row_count ?? "-") + "\n\n";
+
+      if (data?.ok === false) {
+        resultText += "ERROR:\n";
+        resultText += (data.error || "Unknown error") + "\n";
+        return resultText;
+      }
+
+      if (extracted.sql) {
+        resultText += "GENERATED SQL:\n";
+        resultText += extracted.sql + "\n";
+      } else {
+        resultText += "GENERATED SQL: not found in response\n";
+      }
+
+      return resultText;
+    }
+
+    async function getQuery(question) {
+      const url = "/api/learning-cycle/get-query?question=" + encodeURIComponent(question);
+      return await fetchJson(url);
+    }
+
+    async function getQueryForCard(encodedQuestion, outputId) {
+      const question = decodeURIComponent(encodedQuestion);
+      const output = document.getElementById(outputId);
+
+      output.textContent = "Getting SQL query...";
+      const data = await getQuery(question);
+      output.textContent = buildQueryOnlyText(data);
+    }
+
+    async function manualGetQuery() {
+      const question = document.getElementById("manualQuestion").value.trim();
+      const output = document.getElementById("manualQueryOutput");
+
+      if (!question) {
+        output.textContent = "Please type a question first.";
+        return;
+      }
+
+      output.textContent = "Getting SQL query...";
+      const data = await getQuery(question);
+      output.textContent = buildQueryOnlyText(data);
+    }
+
+    function clearManualQuery() {
+      document.getElementById("manualQuestion").value = "";
+      document.getElementById("manualQueryOutput").textContent = "Type a question and click Get Query.";
     }
 
     function renderRows(containerId, rows, type) {
@@ -366,8 +568,12 @@
         return;
       }
 
-      container.innerHTML = rows.map(row => {
+      container.innerHTML = rows.map((row, idx) => {
         const question = htmlEscape(row.question || row.title || "Untitled");
+        const rawQuestion = row.question || row.title || "";
+        const encodedQuestion = encodeURIComponent(rawQuestion);
+        const outputId = `${containerId}_query_output_${idx}`;
+
         const classification = htmlEscape(row.classification || "UNKNOWN");
         const module = htmlEscape(row.module || "-");
         const intent = htmlEscape(row.old_intent || row.intent || row.suggested_intent || "-");
@@ -379,14 +585,43 @@
           sqlBlock = `<pre>${htmlEscape(row.candidate_sql)}</pre>`;
         }
 
+        let verificationBlock = "";
+        if (row.verification) {
+          verificationBlock = `<pre>${htmlEscape(JSON.stringify(row.verification, null, 2))}</pre>`;
+        }
+
         let probeBlock = "";
         if (row.probes) {
           probeBlock = `<pre>${htmlEscape(JSON.stringify(row.probes, null, 2))}</pre>`;
         }
 
-        let verificationBlock = "";
-        if (row.verification) {
-          verificationBlock = `<pre>${htmlEscape(JSON.stringify(row.verification, null, 2))}</pre>`;
+        let actionBlock = "";
+        if (type === "expected-zero") {
+          actionBlock = `
+            <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="secondary" onclick="getQueryForCard('${encodedQuestion}', '${outputId}')">
+                Get Query
+              </button>
+              <button class="secondary" onclick="approveExpectedZero('${encodedQuestion}')">
+                Mark Expected Zero
+              </button>
+            </div>
+            <div class="query-slide">
+              <div class="query-slide-title">Generated SQL</div>
+              <pre id="${outputId}">Click Get Query to view only SQL for this question.</pre>
+            </div>
+          `;
+        }
+
+        if (type === "candidate" && row.candidate_id) {
+          const encodedCandidateId = encodeURIComponent(row.candidate_id || "");
+          actionBlock = `
+            <div style="margin-top:12px;">
+              <button class="secondary" onclick="approveCandidate('${encodedCandidateId}')">
+                Approve Candidate SQL
+              </button>
+            </div>
+          `;
         }
 
         return `
@@ -402,9 +637,40 @@
             ${sqlBlock}
             ${verificationBlock}
             ${probeBlock}
+            ${actionBlock}
           </div>
         `;
       }).join("");
+    }
+
+    async function approveExpectedZero(encodedQuestion) {
+      const question = decodeURIComponent(encodedQuestion);
+      const note = prompt("Business note for expected-zero approval:", "Oracle probes verified this is a no-data case.");
+      if (note === null) return;
+
+      await fetchJson("/api/learning-cycle/expected-zero/approve", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({question, note}),
+      });
+
+      alert("Expected-zero case approved.");
+      await loadExpectedZero();
+    }
+
+    async function approveCandidate(encodedCandidateId) {
+      const candidate_id = decodeURIComponent(encodedCandidateId);
+      const note = prompt("Approval note for candidate SQL:", "Verified candidate SQL approved for review.");
+      if (note === null) return;
+
+      await fetchJson("/api/learning-cycle/candidates/approve", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({candidate_id, note}),
+      });
+
+      alert("Candidate SQL approved.");
+      await loadCandidates();
     }
 
     async function loadSummary() {

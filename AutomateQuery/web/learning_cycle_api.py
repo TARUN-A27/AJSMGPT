@@ -18,6 +18,8 @@ import json
 import os
 import subprocess
 import threading
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -43,6 +45,8 @@ CANDIDATES_JSON = PROJECT_ROOT / "AutomateQuery/reports/candidate_queries/latest
 CANDIDATES_MD = PROJECT_ROOT / "AutomateQuery/reports/candidate_queries/latest_candidate_queries.md"
 
 EXPECTED_ZERO_JSON = PROJECT_ROOT / "AutomateQuery/reports/question_diagnosis/expected_zero_candidates.json"
+APPROVED_EXPECTED_ZERO_JSON = PROJECT_ROOT / "AutomateQuery/reports/approvals/approved_expected_zero_cases.json"
+APPROVED_CANDIDATES_JSON = PROJECT_ROOT / "AutomateQuery/reports/approvals/approved_candidate_queries.json"
 
 RUN_LOCK = threading.Lock()
 RUN_STATUS: dict[str, Any] = {
@@ -267,3 +271,294 @@ def learning_cycle_expected_zero():
         "rows": rows,
         "file": file_info(EXPECTED_ZERO_JSON),
     }
+
+
+# --- Approval memory endpoints ---
+
+def _norm_key(value: Any) -> str:
+    return " ".join(str(value or "").strip().upper().split())
+
+
+def _load_list(path: Path) -> list[dict[str, Any]]:
+    data = read_json(path, [])
+    return data if isinstance(data, list) else []
+
+
+def _write_list(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(rows, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+
+
+def _upsert_by_key(path: Path, key_name: str, key_value: str, record: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = _load_list(path)
+    wanted = _norm_key(key_value)
+    updated = False
+
+    for idx, row in enumerate(rows):
+        if _norm_key(row.get(key_name)) == wanted:
+            rows[idx] = {**row, **record, "updated_at": now_iso()}
+            updated = True
+            break
+
+    if not updated:
+        rows.append({**record, "created_at": now_iso(), "updated_at": now_iso()})
+
+    _write_list(path, rows)
+    return rows
+
+
+@router.get("/api/learning-cycle/approved-expected-zero")
+def approved_expected_zero_cases():
+    rows = _load_list(APPROVED_EXPECTED_ZERO_JSON)
+    return {
+        "count": len(rows),
+        "rows": rows,
+        "file": file_info(APPROVED_EXPECTED_ZERO_JSON),
+    }
+
+
+@router.post("/api/learning-cycle/expected-zero/approve")
+def approve_expected_zero_case(payload: dict[str, Any] = Body(default={})):
+    question = str(payload.get("question") or "").strip()
+    note = str(payload.get("note") or "").strip()
+
+    if not question:
+        return JSONResponse({"approved": False, "error": "question is required"}, status_code=400)
+
+    source_rows = _load_list(EXPECTED_ZERO_JSON)
+    source = None
+    wanted = _norm_key(question)
+
+    for row in source_rows:
+        if _norm_key(row.get("question")) == wanted:
+            source = row
+            break
+
+    record = {
+        "question": question,
+        "approved": True,
+        "approval_type": "expected_zero",
+        "note": note,
+        "source": source,
+    }
+
+    rows = _upsert_by_key(APPROVED_EXPECTED_ZERO_JSON, "question", question, record)
+
+    return {
+        "approved": True,
+        "question": question,
+        "count": len(rows),
+        "file": str(APPROVED_EXPECTED_ZERO_JSON),
+    }
+
+
+@router.get("/api/learning-cycle/approved-candidates")
+def approved_candidate_queries():
+    rows = _load_list(APPROVED_CANDIDATES_JSON)
+    return {
+        "count": len(rows),
+        "rows": rows,
+        "file": file_info(APPROVED_CANDIDATES_JSON),
+    }
+
+
+@router.post("/api/learning-cycle/candidates/approve")
+def approve_candidate_query(payload: dict[str, Any] = Body(default={})):
+    candidate_id = str(payload.get("candidate_id") or "").strip()
+    note = str(payload.get("note") or "").strip()
+
+    if not candidate_id:
+        return JSONResponse({"approved": False, "error": "candidate_id is required"}, status_code=400)
+
+    source_rows = _load_list(CANDIDATES_JSON)
+    source = None
+    wanted = _norm_key(candidate_id)
+
+    for row in source_rows:
+        if _norm_key(row.get("candidate_id")) == wanted:
+            source = row
+            break
+
+    if source is None:
+        return JSONResponse(
+            {
+                "approved": False,
+                "error": f"Candidate not found: {candidate_id}",
+            },
+            status_code=404,
+        )
+
+    record = {
+        "candidate_id": candidate_id,
+        "question": source.get("question"),
+        "approved": True,
+        "approval_type": "candidate_sql",
+        "note": note,
+        "source": source,
+    }
+
+    rows = _upsert_by_key(APPROVED_CANDIDATES_JSON, "candidate_id", candidate_id, record)
+
+    return {
+        "approved": True,
+        "candidate_id": candidate_id,
+        "count": len(rows),
+        "file": str(APPROVED_CANDIDATES_JSON),
+    }
+
+# --- End approval memory endpoints ---
+
+
+# --- Manual Get Query / Test Query endpoint ---
+
+def _find_first_value(obj: Any, keys: list[str]) -> Any:
+    if isinstance(obj, dict):
+        for key in keys:
+            if key in obj and obj[key] not in (None, ""):
+                return obj[key]
+
+        for value in obj.values():
+            found = _find_first_value(value, keys)
+            if found not in (None, ""):
+                return found
+
+    if isinstance(obj, list):
+        for item in obj:
+            found = _find_first_value(item, keys)
+            if found not in (None, ""):
+                return found
+
+    return None
+
+
+def _find_sql(obj: Any) -> str | None:
+    found = _find_first_value(
+        obj,
+        ["sql", "generated_sql", "final_sql", "query", "executed_sql"],
+    )
+
+    if isinstance(found, str) and "select" in found.lower():
+        return found
+
+    return None
+
+
+def _find_rows_preview(obj: Any) -> list[Any]:
+    rows = _find_first_value(obj, ["rows", "data", "results"])
+
+    if isinstance(rows, list):
+        return rows[:10]
+
+    return []
+
+
+def _post_json(url: str, payload: dict[str, Any], timeout: int) -> dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8")
+
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        body = response.read().decode("utf-8", errors="replace")
+        status = response.getcode()
+
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        parsed = {"raw_text": body}
+
+    return {
+        "http_status": status,
+        "body": parsed,
+    }
+
+
+@router.get("/api/learning-cycle/get-query")
+@router.get("/api/learning-cycle/test-query")
+def manual_get_query(question: str, api_url: str = "http://127.0.0.1:8000", timeout: int = 25):
+    question = str(question or "").strip()
+
+    if not question:
+        return JSONResponse(
+            {"ok": False, "error": "question query parameter is required"},
+            status_code=400,
+        )
+
+    ask_url = api_url.rstrip("/") + "/ask"
+
+    try:
+        response = _post_json(
+            ask_url,
+            {"question": question},
+            timeout=int(timeout),
+        )
+    except urllib.error.HTTPError as exc:
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            body_text = ""
+
+        try:
+            body_json = json.loads(body_text) if body_text else None
+        except json.JSONDecodeError:
+            body_json = None
+
+        return {
+            "ok": False,
+            "question": question,
+            "api_url": api_url,
+            "ask_url": ask_url,
+            "http_status": exc.code,
+            "error": f"/ask API returned HTTP {exc.code}",
+            "raw": body_json if body_json is not None else body_text,
+        }
+
+    except urllib.error.URLError as exc:
+        return {
+            "ok": False,
+            "question": question,
+            "api_url": api_url,
+            "ask_url": ask_url,
+            "http_status": None,
+            "error": f"Could not call /ask API: {exc}",
+            "raw": None,
+        }
+
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "question": question,
+            "api_url": api_url,
+            "ask_url": ask_url,
+            "http_status": None,
+            "error": f"{type(exc).__name__}: {exc}",
+            "raw": None,
+        }
+
+    body = response.get("body", {})
+
+    extracted = {
+        "success": _find_first_value(body, ["success"]),
+        "source": _find_first_value(body, ["source"]),
+        "intent": _find_first_value(body, ["intent", "matched_intent"]),
+        "row_count": _find_first_value(body, ["row_count", "rows_count", "count"]),
+        "sql": _find_sql(body),
+        "rows_preview": _find_rows_preview(body),
+    }
+
+    return {
+        "ok": True,
+        "question": question,
+        "api_url": api_url,
+        "ask_url": ask_url,
+        "http_status": response.get("http_status"),
+        "extracted": extracted,
+        "raw": body,
+    }
+
+# --- End Manual Get Query / Test Query endpoint ---

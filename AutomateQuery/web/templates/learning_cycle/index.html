@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutomateQuery Learning Cycle</title>
+  <style>
+    :root { color-scheme: dark; --bg:#07111f; --panel:#101a2a; --panel-2:#15233a; --text:#f4f7fb; --muted:#8ca1b9; --accent:#5eead4; --border:#25364d; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); }
+    a { color:var(--accent); text-decoration:none; }
+    header { padding:24px 28px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:16px; align-items:center; flex-wrap:wrap; }
+    main { max-width:1280px; margin:0 auto; padding:24px 28px 60px; }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+    .toolbar button, .toolbar a { border:1px solid var(--border); background:var(--panel-2); color:var(--text); padding:10px 12px; border-radius:999px; cursor:pointer; }
+    .toolbar button.active { background:var(--accent); color:#051018; border-color:var(--accent); }
+    .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:16px; }
+    .card h2 { margin-top:0; font-size:18px; }
+    .muted { color:var(--muted); font-size:13px; }
+    pre { white-space:pre-wrap; word-break:break-word; background:#050b12; border:1px solid var(--border); border-radius:12px; padding:14px; overflow:auto; font-size:12px; color:#dce8f7; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:16px; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:var(--panel-2); color:var(--muted); margin:0 6px 6px 0; font-size:12px; }
+    .hidden { display:none; }
+    .row { border:1px solid var(--border); border-radius:12px; padding:12px; margin:10px 0; background:#0f1b2d; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Learning Cycle</h1>
+      <div class="muted">Retest → diagnosis → expected zero → candidate SQL → eval review.</div>
+    </div>
+    <div class="toolbar">
+      <button id="runButton">Run learning cycle</button>
+      <button onclick="loadAll()">Refresh</button>
+      <a href="/dashboard">Back to Dashboard</a>
+    </div>
+  </header>
+  <main>
+    <div class="toolbar" id="tabs"></div>
+    <div id="tabContent"></div>
+  </main>
+  <script>
+    const tabs = [
+      {id:'summary', label:'Summary'},
+      {id:'retest', label:'Retest'},
+      {id:'diagnosis', label:'Diagnosis'},
+      {id:'expected-zero', label:'Expected Zero'},
+      {id:'candidates', label:'Candidates'},
+      {id:'approvals', label:'Approvals'},
+      {id:'eval', label:'Eval'}
+    ];
+    let currentTab = 'summary';
+
+    function renderTabs() {
+      const container = document.getElementById('tabs');
+      container.innerHTML = tabs.map(tab => `<button class="${tab.id === currentTab ? 'active' : ''}" onclick="selectTab('${tab.id}')">${tab.label}</button>`).join('');
+    }
+
+    async function selectTab(tabId) {
+      currentTab = tabId;
+      renderTabs();
+      const content = document.getElementById('tabContent');
+      content.innerHTML = '<div class="card"><h2>Loading…</h2><p class="muted">Fetching the latest data from the reports.</p></div>';
+      if (tabId === 'summary') {
+        const res = await fetch('/api/learning-cycle/summary');
+        const data = await res.json();
+        content.innerHTML = `
+          <div class="card">
+            <h2>Summary</h2>
+            <pre>${escapeHtml(JSON.stringify(data.summary || {}, null, 2))}</pre>
+          </div>
+          <div class="card">
+            <h2>Markdown</h2>
+            <pre>${escapeHtml(data.summary_md || 'No markdown yet.')}</pre>
+          </div>
+        `;
+      } else if (tabId === 'retest') {
+        const res = await fetch('/api/learning-cycle/retest');
+        const data = await res.json();
+        content.innerHTML = `<div class="card"><h2>Retest rows (${data.count})</h2>${renderRows(data.rows)}</div>`;
+      } else if (tabId === 'diagnosis') {
+        const res = await fetch('/api/learning-cycle/diagnosis');
+        const data = await res.json();
+        content.innerHTML = `<div class="card"><h2>Diagnosis (${data.count})</h2>${renderRows(data.rows)}<pre>${escapeHtml(data.markdown || 'No markdown yet.')}</pre></div>`;
+      } else if (tabId === 'expected-zero') {
+        const res = await fetch('/api/learning-cycle/expected-zero');
+        const data = await res.json();
+        content.innerHTML = `<div class="card"><h2>Expected zero (${data.count})</h2>${renderRows(data.rows)}</div>`;
+      } else if (tabId === 'candidates') {
+        const res = await fetch('/api/learning-cycle/candidates');
+        const data = await res.json();
+        content.innerHTML = `
+          <div class="card">
+            <h2>Candidate queries (${data.counts?.candidate_queries ?? 0})</h2>
+            ${renderRows(data.candidate_queries)}
+          </div>
+          <div class="card">
+            <h2>Latest candidates (${data.counts?.latest_candidates ?? 0})</h2>
+            ${renderRows(data.latest_candidates)}
+          </div>
+        `;
+      } else if (tabId === 'approvals') {
+        const res = await fetch('/api/learning-cycle/approvals');
+        const data = await res.json();
+        content.innerHTML = `
+          <div class="card"><h2>Expected zero approvals (${data.counts?.expected_zero ?? 0})</h2>${renderRows(data.expected_zero)}</div>
+          <div class="card"><h2>Candidate approvals (${data.counts?.candidate_queries ?? 0})</h2>${renderRows(data.candidate_queries)}</div>
+        `;
+      } else if (tabId === 'eval') {
+        const res = await fetch('/api/learning-cycle/eval');
+        const data = await res.json();
+        content.innerHTML = `
+          <div class="card"><h2>Generated eval (${data.counts?.generated ?? 0})</h2>${renderRows(data.generated)}</div>
+          <div class="card"><h2>Reviewed eval (${data.counts?.reviewed ?? 0})</h2>${renderRows(data.reviewed)}</div>
+          <div class="card"><h2>Approved eval (${data.counts?.approved ?? 0})</h2>${renderRows(data.approved)}</div>
+          <div class="card"><h2>Approved run log</h2><pre>${escapeHtml(data.approved_run || 'No run log yet.')}</pre></div>
+        `;
+      }
+    }
+
+    function renderRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) return '<p class="muted">No rows available yet.</p>';
+      return rows.slice(0, 15).map(item => `<div class="row">${escapeHtml(JSON.stringify(item, null, 2))}</div>`).join('');
+    }
+
+    async function runCycle() {
+      document.getElementById('runButton').disabled = true;
+      const res = await fetch('/api/learning-cycle/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({})});
+      const data = await res.json();
+      document.getElementById('runButton').disabled = false;
+      alert(data.message || 'Run requested');
+      await selectTab(currentTab);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');
+    }
+
+    document.getElementById('runButton').addEventListener('click', runCycle);
+    renderTabs();
+    selectTab('summary');
+  </script>
+</body>
+</html>

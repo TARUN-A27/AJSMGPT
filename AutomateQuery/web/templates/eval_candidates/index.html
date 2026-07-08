@@ -3,33 +3,119 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Eval Candidates</title>
+  <title>AutomateQuery Eval Candidates</title>
   <style>
-    :root { color-scheme: dark; --bg:#09090b; --panel:#121217; --text:#f5f5f7; --muted:#a1a1aa; --border:#2a2a2f; }
+    :root { color-scheme: dark; --bg:#09090b; --panel:#121217; --panel-2:#181821; --text:#f5f5f7; --muted:#a1a1aa; --border:#2a2a2f; --ok:#86efac; --warn:#fde68a; --danger:#fca5a5; }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: Arial, sans-serif; background:var(--bg); color:var(--text); }
-    header { border-bottom:1px solid var(--border); padding:24px; }
-    main { max-width: 1100px; margin:0 auto; padding:24px; }
-    .intro { color: var(--muted); margin-top:7px; }
+    body { margin:0; font-family: Inter, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { border-bottom:1px solid var(--border); padding:24px; position:sticky; top:0; background:rgba(9,9,11,0.95); backdrop-filter:blur(8px); z-index:10; }
+    main { max-width: 1320px; margin:0 auto; padding:24px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+    .intro { color:var(--muted); margin-top:8px; }
+    .back { color:#c4b5fd; text-decoration:none; font-weight:600; }
+    .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:18px 0; }
+    .summary-box { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px; }
+    .summary-box strong { display:block; font-size:1.25rem; margin-bottom:4px; }
+    .toolbar { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; }
+    button, .btn { background:#f4f4f5; color:#09090b; border:0; border-radius:8px; padding:10px 14px; font-weight:600; cursor:pointer; text-decoration:none; display:inline-block; }
+    button.secondary, .btn.secondary { background:#27272a; color:#f4f4f5; border:1px solid #3f3f46; }
     .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; margin-top:16px; }
+    .card-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+    .badge { display:inline-block; padding:4px 9px; border-radius:999px; font-size:0.8rem; font-weight:700; }
+    .badge.approved { background:var(--ok); color:#052e16; }
+    .badge.pending { background:var(--warn); color:#422006; }
+    .badge.rejected { background:var(--danger); color:#450a0a; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin:10px 0; }
+    .grid > div { background:var(--panel-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
+    label { display:block; color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:4px; }
+    textarea { width:100%; border:1px solid var(--border); border-radius:10px; padding:10px; background:#17171c; color:var(--text); }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    form { display:inline-block; }
+    .empty { padding:24px; text-align:center; color:var(--muted); }
     a { color:#c4b5fd; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Eval Candidates</h1>
-    <div class="intro">Review generated evaluation candidates, approve good regressions, and keep the review queue organized.</div>
-    <div class="intro"><a href="/dashboard">Back to dashboard</a></div>
+    <div class="topbar">
+      <div>
+        <h1>Eval Candidates</h1>
+        <div class="intro">Review generated evaluation candidates, approve strong regressions, and export the approved set.</div>
+      </div>
+      <a class="back" href="/dashboard">Back to Dashboard</a>
+    </div>
   </header>
   <main>
-    <div class="card">
-      <h2>Review workflow</h2>
-      <p>Approve or reject each candidate based on whether it reflects a useful regression test and is safe to export.</p>
+    <div class="summary" id="summary"></div>
+    <div class="toolbar">
+      <form method="post" action="/sync"><button type="submit">Sync Review File</button></form>
+      <form method="post" action="/export-approved"><button class="secondary" type="submit">Export Approved Tests</button></form>
+      <form method="post" action="/run-approved-tests"><button type="submit">Run Approved Tests</button></form>
+      <a class="btn secondary" href="/approved-test-log">View Approved Test Log</a>
     </div>
-    <div class="card">
-      <h2>Status</h2>
-      <p>This page is now served from a dedicated template file and is ready to be extended with live review data.</p>
-    </div>
+    <div id="list"></div>
   </main>
+  <script>
+    let RECORDS = [];
+    const summaryEl = document.getElementById('summary');
+    const listEl = document.getElementById('list');
+
+    async function loadData() {
+      const res = await fetch('/api/eval-review');
+      const data = await res.json();
+      RECORDS = data.records || [];
+      renderSummary(data);
+      renderList();
+    }
+
+    function renderSummary(data) {
+      summaryEl.innerHTML = [
+        ['Total Candidates', data.total_count || 0],
+        ['Approved', data.approved_count || 0],
+        ['Pending / Rejected', data.pending_count || 0],
+      ].map(([label, value]) => `<div class="summary-box"><strong>${value}</strong>${label}</div>`).join('');
+    }
+
+    function renderList() {
+      if (!RECORDS.length) {
+        listEl.innerHTML = '<div class="empty">No review candidates found.</div>';
+        return;
+      }
+      listEl.innerHTML = RECORDS.map(record => {
+        const status = record.approved ? 'approved' : 'pending';
+        const label = record.approved ? 'APPROVED' : String(record.status || 'PENDING').toUpperCase();
+        const candidateId = record.candidate_id || '';
+        return `
+          <div class="card">
+            <div class="card-head">
+              <span class="badge ${status}">${label}</span>
+              <span>${escapeHtml(candidateId)}</span>
+            </div>
+            <h2>${escapeHtml(record.question || '')}</h2>
+            <div class="grid">
+              <div><label>Expected Source</label><div>${escapeHtml(record.expected_source || '')}</div></div>
+              <div><label>Expected Intent</label><div>${escapeHtml(record.expected_intent || '')}</div></div>
+            </div>
+            <h3>Expected SQL Contains</h3>
+            <ul>${(record.expected_sql_contains || []).map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+            <form method="post" action="/note/${encodeURIComponent(candidateId)}">
+              <label>Review Note</label>
+              <textarea name="review_note" rows="3">${escapeHtml(record.review_note || '')}</textarea>
+              <div class="actions"><button class="secondary" type="submit">Save Note</button></div>
+            </form>
+            <div class="actions">
+              <form method="post" action="/approve/${encodeURIComponent(candidateId)}"><button type="submit">Approve</button></form>
+              <form method="post" action="/reject/${encodeURIComponent(candidateId)}"><button class="secondary" type="submit">Reject</button></form>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+    }
+
+    loadData();
+  </script>
 </body>
 </html>

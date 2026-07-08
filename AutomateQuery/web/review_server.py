@@ -576,9 +576,46 @@ async def question_bank_page():
     return serve_html_template("question_bank", "index.html")
 
 
+@app.get("/api/question-bank")
+def api_question_bank():
+    bank = as_list(read_json(QUESTION_BANK_JSON))
+    category_counts: dict[str, int] = {}
+    for item in bank:
+        category = str(item.get("category") or "unknown")
+        category_counts[category] = category_counts.get(category, 0) + 1
+
+    return {
+        "items": bank,
+        "total": len(bank),
+        "review_count": sum(1 for item in bank if item.get("needs_review")),
+        "ok_count": sum(1 for item in bank if not item.get("needs_review")),
+        "category_counts": sorted(category_counts.items()),
+    }
+
+
 @app.get("/router-candidates")
 async def router_candidates_page():
     return serve_html_template("router_candidates", "index.html")
+
+
+@app.get("/api/router-candidates")
+def api_router_candidates():
+    candidates = as_list(read_json(ROUTER_FIX_JSON))
+    return {
+        "candidates": candidates,
+        "total": len(candidates),
+        "review_required": sum(
+            1
+            for c in candidates
+            if ((c.get("suggestion") or {}).get("suggested_intent_name") == "REVIEW_REQUIRED")
+        ),
+        "wrong_table_count": sum(1 for c in candidates if c.get("wrong_tables_detected")),
+        "fallback_count": sum(
+            1
+            for c in candidates
+            if "fallback_used" in (c.get("problem_types") or [])
+        ),
+    }
 
 
 @app.get("/router-patches")
@@ -605,6 +642,18 @@ async def router_patches_page(request: Request):
 @app.get("/eval-review")
 async def eval_review_page():
     return serve_html_template("eval_candidates", "index.html")
+
+
+@app.get("/api/eval-review")
+def api_eval_review():
+    reviewed = sync_review_file()
+    approved_count = sum(1 for record in reviewed if record.get("approved") is True)
+    return {
+        "records": reviewed,
+        "total_count": len(reviewed),
+        "approved_count": approved_count,
+        "pending_count": len(reviewed) - approved_count,
+    }
 
 
 @app.get("/eval-candidates")

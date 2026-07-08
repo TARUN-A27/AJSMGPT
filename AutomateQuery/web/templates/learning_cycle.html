@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AutomateQuery Learning Cycle</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #666666;
+      --border: #dddddd;
+      --soft: #f7f7f7;
+      --soft2: #eeeeee;
+      --ok: #0f7b0f;
+      --bad: #b00020;
+      --warn: #9a6700;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    header {
+      padding: 22px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 14px;
+    }
+
+    main {
+      padding: 24px 28px 60px;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      border: 1px solid #111;
+      background: #111;
+      color: #fff;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: #111;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .metric {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      background: var(--soft);
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .metric .value {
+      font-size: 30px;
+      font-weight: 800;
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .bad {
+      color: var(--bad);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      margin: 18px 0;
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .card-head h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .card-body {
+      padding: 18px;
+    }
+
+    pre {
+      background: #0f0f0f;
+      color: #f5f5f5;
+      padding: 14px;
+      border-radius: 12px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .row {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin: 12px 0;
+      background: var(--soft);
+    }
+
+    .row-title {
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .row-meta {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      margin: 2px 4px 2px 0;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 16px 0;
+    }
+
+    .tab {
+      background: #fff;
+      color: #111;
+      border: 1px solid var(--border);
+    }
+
+    .tab.active {
+      background: #111;
+      color: #fff;
+      border-color: #111;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>AutomateQuery Learning Cycle</h1>
+      <div class="sub">Retest logs → diagnose → prove expected-zero OR generate candidate SQL → summary</div>
+    </div>
+
+    <div class="top-actions">
+      <button onclick="runCycle()" id="runBtn">Run Learning Cycle</button>
+      <button class="secondary" onclick="loadAll()">Refresh</button>
+      <a href="/" class="small">Back to Review UI</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="grid">
+      <div class="metric">
+        <div class="label">PASS</div>
+        <div class="value ok" id="passCount">-</div>
+      </div>
+      <div class="metric">
+        <div class="label">EXPECTED ZERO</div>
+        <div class="value warn" id="expectedZeroCount">-</div>
+      </div>
+      <div class="metric">
+        <div class="label">FAIL</div>
+        <div class="value bad" id="failCount">-</div>
+      </div>
+      <div class="metric">
+        <div class="label">VERIFIED CANDIDATES</div>
+        <div class="value" id="verifiedCandidatesCount">-</div>
+      </div>
+      <div class="metric">
+        <div class="label">NEEDS WORK</div>
+        <div class="value bad" id="needsWorkCount">-</div>
+      </div>
+    </section>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Run Status</h2>
+        <span class="small" id="lastUpdated">Not loaded</span>
+      </div>
+      <div class="card-body">
+        <div id="statusLine" class="small">Idle</div>
+        <pre id="runOutput">No run output yet.</pre>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('summary')">Summary</button>
+      <button class="tab" onclick="showTab('expectedZero')">Expected Zero</button>
+      <button class="tab" onclick="showTab('candidates')">Candidates</button>
+      <button class="tab" onclick="showTab('diagnosis')">Diagnosis</button>
+    </div>
+
+    <section id="tab-summary" class="card">
+      <div class="card-head">
+        <h2>Learning Cycle Summary</h2>
+      </div>
+      <div class="card-body">
+        <pre id="summaryMd">Loading...</pre>
+      </div>
+    </section>
+
+    <section id="tab-expectedZero" class="card hidden">
+      <div class="card-head">
+        <h2>Expected Zero Cases</h2>
+        <span class="small" id="expectedZeroMeta"></span>
+      </div>
+      <div class="card-body" id="expectedZeroRows"></div>
+    </section>
+
+    <section id="tab-candidates" class="card hidden">
+      <div class="card-head">
+        <h2>Candidate Queries</h2>
+        <span class="small" id="candidateMeta"></span>
+      </div>
+      <div class="card-body" id="candidateRows"></div>
+    </section>
+
+    <section id="tab-diagnosis" class="card hidden">
+      <div class="card-head">
+        <h2>Diagnosis Report</h2>
+        <span class="small" id="diagnosisMeta"></span>
+      </div>
+      <div class="card-body" id="diagnosisRows"></div>
+    </section>
+  </main>
+
+  <script>
+    let pollTimer = null;
+
+    function htmlEscape(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        throw new Error(`${url} failed: ${res.status}`);
+      }
+      return await res.json();
+    }
+
+    function showTab(name) {
+      for (const id of ["summary", "expectedZero", "candidates", "diagnosis"]) {
+        document.getElementById(`tab-${id}`).classList.toggle("hidden", id !== name);
+      }
+
+      for (const btn of document.querySelectorAll(".tab")) {
+        btn.classList.remove("active");
+      }
+
+      event.target.classList.add("active");
+    }
+
+    function renderMetrics(summary) {
+      const finalStatus = summary?.final_status || {};
+
+      document.getElementById("passCount").textContent = finalStatus.pass ?? "-";
+      document.getElementById("expectedZeroCount").textContent = finalStatus.expected_zero ?? "-";
+      document.getElementById("failCount").textContent = finalStatus.fail ?? "-";
+      document.getElementById("verifiedCandidatesCount").textContent = finalStatus.verified_candidates ?? "-";
+      document.getElementById("needsWorkCount").textContent = finalStatus.needs_work ?? "-";
+    }
+
+    function renderRows(containerId, rows, type) {
+      const container = document.getElementById(containerId);
+
+      if (!rows || !rows.length) {
+        container.innerHTML = `<div class="small">No rows found.</div>`;
+        return;
+      }
+
+      container.innerHTML = rows.map(row => {
+        const question = htmlEscape(row.question || row.title || "Untitled");
+        const classification = htmlEscape(row.classification || "UNKNOWN");
+        const module = htmlEscape(row.module || "-");
+        const intent = htmlEscape(row.old_intent || row.intent || row.suggested_intent || "-");
+        const reason = htmlEscape(row.reason || "");
+        const confidence = htmlEscape(row.confidence ?? "-");
+
+        let sqlBlock = "";
+        if (row.candidate_sql) {
+          sqlBlock = `<pre>${htmlEscape(row.candidate_sql)}</pre>`;
+        }
+
+        let probeBlock = "";
+        if (row.probes) {
+          probeBlock = `<pre>${htmlEscape(JSON.stringify(row.probes, null, 2))}</pre>`;
+        }
+
+        let verificationBlock = "";
+        if (row.verification) {
+          verificationBlock = `<pre>${htmlEscape(JSON.stringify(row.verification, null, 2))}</pre>`;
+        }
+
+        return `
+          <div class="row">
+            <div class="row-title">${question}</div>
+            <div class="row-meta">
+              <span class="badge">${classification}</span>
+              <span class="badge">module: ${module}</span>
+              <span class="badge">intent: ${intent}</span>
+              <span class="badge">confidence: ${confidence}</span>
+            </div>
+            ${reason ? `<p>${reason}</p>` : ""}
+            ${sqlBlock}
+            ${verificationBlock}
+            ${probeBlock}
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function loadSummary() {
+      const data = await fetchJson("/api/learning-cycle/summary");
+      renderMetrics(data.summary || {});
+      document.getElementById("summaryMd").textContent = data.summary_md || "No summary file found yet.";
+    }
+
+    async function loadExpectedZero() {
+      const data = await fetchJson("/api/learning-cycle/expected-zero");
+      document.getElementById("expectedZeroMeta").textContent = `${data.count || 0} rows`;
+      renderRows("expectedZeroRows", data.rows || [], "expected-zero");
+    }
+
+    async function loadCandidates() {
+      const data = await fetchJson("/api/learning-cycle/candidates");
+      document.getElementById("candidateMeta").textContent = `${data.count || 0} rows`;
+      renderRows("candidateRows", data.rows || [], "candidate");
+    }
+
+    async function loadDiagnosis() {
+      const data = await fetchJson("/api/learning-cycle/diagnosis");
+      document.getElementById("diagnosisMeta").textContent = `${data.count || 0} rows`;
+      renderRows("diagnosisRows", data.rows || [], "diagnosis");
+    }
+
+    async function loadStatus() {
+      const status = await fetchJson("/api/learning-cycle/run-status");
+
+      document.getElementById("statusLine").textContent =
+        status.running
+          ? `Running since ${status.started_at || "-"}`
+          : `Idle. Last finished: ${status.finished_at || "-"}. Return code: ${status.returncode ?? "-"}`;
+
+      document.getElementById("runOutput").textContent = status.output || "No run output yet.";
+      document.getElementById("runBtn").disabled = !!status.running;
+      document.getElementById("lastUpdated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+      if (!status.running && pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        await loadAll(false);
+      }
+    }
+
+    async function loadAll(includeStatus = true) {
+      await Promise.all([
+        loadSummary(),
+        loadExpectedZero(),
+        loadCandidates(),
+        loadDiagnosis(),
+      ]);
+
+      if (includeStatus) {
+        await loadStatus();
+      }
+    }
+
+    async function runCycle() {
+      document.getElementById("runBtn").disabled = true;
+      document.getElementById("runOutput").textContent = "Starting learning cycle...";
+
+      await fetchJson("/api/learning-cycle/run", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          api_url: "http://127.0.0.1:8000",
+          timeout: 25
+        }),
+      });
+
+      if (pollTimer) {
+        clearInterval(pollTimer);
+      }
+
+      pollTimer = setInterval(loadStatus, 1500);
+      await loadStatus();
+    }
+
+    loadAll().catch(err => {
+      document.getElementById("runOutput").textContent = err.stack || String(err);
+    });
+  </script>
+</body>
+</html>

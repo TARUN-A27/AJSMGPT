@@ -1533,3 +1533,14 @@ loadQuestions();
 </body>
 </html>
     """)
+
+
+# --- AutomateQuery Learning Cycle Dashboard routes ---
+try:
+    from AutomateQuery.web.learning_cycle_api import router as learning_cycle_router
+except Exception:
+    from learning_cycle_api import router as learning_cycle_router
+
+app.include_router(learning_cycle_router)
+# --- End AutomateQuery Learning Cycle Dashboard routes ---
+

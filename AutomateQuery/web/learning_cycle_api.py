@@ -246,6 +246,227 @@ def _fallback_from_question_logs(question: str) -> dict[str, Any] | None:
     }
 
 
+REPORT_SQL_FALLBACK_PATHS = (
+    RETEST_JSON,
+    REPORTS_DIR / "learning_queue" / "latest_learning_queue.json",
+    REPORTS_DIR / "learning_queue" / "regression_candidates.json",
+    DIAGNOSIS_JSON,
+    LATEST_CANDIDATES_JSON,
+    CANDIDATE_QUERIES_JSON,
+    VERIFIED_CANDIDATES_JSON,
+    PENDING_CANDIDATES_JSON,
+    APPROVED_CANDIDATES_JSON,
+)
+
+REPORT_SQL_KEYS = (
+    "sql",
+    "candidate_sql",
+    "generated_sql",
+    "latest_sql",
+    "verified_sql",
+    "final_sql",
+    "executable_sql",
+    "query",
+)
+
+REPORT_QUESTION_KEYS = (
+    "question",
+    "normalized_question",
+    "user_question",
+    "original_question",
+    "text",
+    "prompt",
+)
+
+
+def _normalize_match_text(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _walk_dicts(payload: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            rows.append(value)
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    walk(child)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, (dict, list)):
+                    walk(item)
+
+    walk(payload)
+    return rows
+
+
+def _extract_report_sql(record: dict[str, Any]) -> str | None:
+    for key in REPORT_SQL_KEYS:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            sql = value.strip()
+            if "select" in sql.lower():
+                return sql
+
+    for container_key in ("data", "result", "response", "answer", "payload", "verification", "raw_candidate"):
+        container = record.get(container_key)
+        if isinstance(container, dict):
+            sql = _extract_report_sql(container)
+            if sql:
+                return sql
+
+    return None
+
+
+def _extract_report_question(record: dict[str, Any]) -> str | None:
+    for key in REPORT_QUESTION_KEYS:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    for container_key in ("data", "result", "response", "answer", "payload", "verification", "raw_candidate"):
+        container = record.get(container_key)
+        if isinstance(container, dict):
+            value = _extract_report_question(container)
+            if value:
+                return value
+
+    return None
+
+
+def _extract_report_intent(record: dict[str, Any]) -> str | None:
+    for key in ("intent", "old_intent", "suggested_intent", "matched_intent"):
+        value = _coerce_text(record.get(key))
+        if value:
+            return value
+    return None
+
+
+def _extract_report_row_count(record: dict[str, Any]) -> Any:
+    for key in ("row_count", "latest_row_count", "verified_row_count"):
+        if key in record:
+            return record.get(key)
+    verification = record.get("verification")
+    if isinstance(verification, dict):
+        for key in ("row_count", "latest_row_count", "verified_row_count"):
+            if key in verification:
+                return verification.get(key)
+    return None
+
+
+def _score_report_match(question: str, candidate_question: str, record: dict[str, Any]) -> int:
+    wanted = _normalize_match_text(question)
+    candidate = _normalize_match_text(candidate_question)
+
+    if not wanted or not candidate:
+        return 0
+
+    if wanted == candidate:
+        return 1000
+
+    wanted_tokens = set(wanted.split())
+    candidate_tokens = set(candidate.split())
+    overlap = len(wanted_tokens & candidate_tokens)
+
+    score = overlap * 10
+
+    if wanted in candidate or candidate in wanted:
+        score += 100
+
+    record_text = _normalize_match_text(json.dumps(record, ensure_ascii=False, default=str))
+    if wanted and wanted in record_text:
+        score += 250
+
+    return score
+
+
+def _fallback_from_report_files(question: str) -> dict[str, Any] | None:
+    best: tuple[int, Path, dict[str, Any], str, str] | None = None
+
+    for report_path in REPORT_SQL_FALLBACK_PATHS:
+        payload = read_json(report_path, None)
+        if payload is None:
+            continue
+
+        for record in _walk_dicts(payload):
+            sql = _extract_report_sql(record)
+            if not sql:
+                continue
+
+            candidate_question = _extract_report_question(record) or question
+            score = _score_report_match(question, candidate_question, record)
+
+            if score < 30:
+                continue
+
+            if best is None or score > best[0]:
+                best = (score, report_path, record, candidate_question, sql)
+
+    if best is None:
+        return None
+
+    score, report_path, record, candidate_question, sql = best
+
+    return {
+        "matched_score": score,
+        "matched_file": str(report_path),
+        "matched_question": candidate_question,
+        "record": record,
+        "sql": sql,
+        "source": _stringify_source(record.get("source") or record.get("latest_source") or record.get("old_source"))
+            or "saved_candidate_fallback",
+        "intent": _extract_report_intent(record),
+        "row_count": _extract_report_row_count(record),
+    }
+
+
+def _normalized_report_fallback_response(
+    question: str,
+    fallback: dict[str, Any],
+    live_normalized: dict[str, Any],
+    raw_response: dict[str, Any],
+) -> dict[str, Any]:
+    live_extracted = live_normalized.get("extracted") if isinstance(live_normalized.get("extracted"), dict) else {}
+    live_error = (
+        live_extracted.get("error")
+        or raw_response.get("error")
+        or raw_response.get("message")
+        or raw_response.get("detail")
+        or "Live /ask did not return usable SQL."
+    )
+
+    return {
+        "ok": True,
+        "question": question,
+        "http_status": live_normalized.get("http_status") or 200,
+        "extracted": {
+            "success": True,
+            "source": "saved_candidate_fallback",
+            "intent": fallback.get("intent") or live_extracted.get("intent"),
+            "row_count": fallback.get("row_count"),
+            "sql": fallback.get("sql"),
+            "error": None,
+        },
+        "fallback_used": True,
+        "fallback_reason": "Live /ask failed or returned no SQL, but saved AutomateQuery report SQL exists.",
+        "live_error": live_error,
+        "live_error_type": raw_response.get("error_type"),
+        "raw_response": raw_response,
+        "fallback_record": {
+            "matched_score": fallback.get("matched_score"),
+            "matched_file": fallback.get("matched_file"),
+            "matched_question": fallback.get("matched_question"),
+            "source": fallback.get("source"),
+            "intent": fallback.get("intent"),
+            "row_count": fallback.get("row_count"),
+            "record": fallback.get("record"),
+        },
+    }
+
+
 def _call_ask(question: str) -> dict[str, Any]:
     try:
         from app.api import AskRequest, ask as ask_endpoint
@@ -421,6 +642,20 @@ def learning_cycle_get_query(request: Request) -> dict[str, Any]:
     raw_response = ask_result.get("body") if isinstance(ask_result.get("body"), dict) else {}
     normalized = _normalize_ask_response(question, raw_response)
     normalized["http_status"] = ask_result.get("status_code") or normalized.get("http_status") or 200
+
+    extracted = normalized.get("extracted") if isinstance(normalized.get("extracted"), dict) else {}
+    live_sql = extracted.get("sql")
+
+    if not isinstance(live_sql, str) or not live_sql.strip():
+        fallback = _fallback_from_report_files(question)
+        if fallback and fallback.get("sql"):
+            return _normalized_report_fallback_response(
+                question=question,
+                fallback=fallback,
+                live_normalized=normalized,
+                raw_response=raw_response,
+            )
+
     return normalized
 
 

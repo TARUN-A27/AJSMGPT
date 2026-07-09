@@ -4,74 +4,644 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AutomateQuery Dashboard</title>
+
   <style>
-    :root { color-scheme: dark; --bg:#07111f; --panel:#101a2a; --panel-2:#15233a; --text:#f4f7fb; --muted:#8ca1b9; --accent:#5eead4; --border:#25364d; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); }
-    a { color:var(--accent); text-decoration:none; }
-    header { padding:24px 28px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:16px; align-items:center; }
-    main { max-width:1200px; margin:0 auto; padding:24px 28px 60px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px; }
-    .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:18px; box-shadow:0 14px 34px rgba(0,0,0,.18); }
-    .card h2 { margin:0 0 10px; font-size:18px; }
-    .card p { margin:0; color:var(--muted); line-height:1.5; }
-    .stat { font-size:32px; font-weight:700; margin-top:10px; }
-    .muted { color:var(--muted); font-size:13px; }
-    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
-    .actions a, .actions button { border:1px solid var(--border); background:var(--panel-2); color:var(--text); padding:10px 12px; border-radius:999px; cursor:pointer; }
-    pre { white-space:pre-wrap; word-break:break-word; background:#050b12; border:1px solid var(--border); border-radius:12px; padding:14px; overflow:auto; font-size:12px; color:#dce8f7; }
-    .list { margin:0; padding-left:18px; color:var(--muted); }
+    :root {
+      color-scheme: dark;
+
+      --bg: #000000;
+      --panel: #0f0f0f;
+      --panel-soft: #171717;
+      --panel-hover: #1f1f1f;
+
+      --text: #f5f5f5;
+      --muted: #a3a3a3;
+      --faint: #737373;
+
+      --border: #2a2a2a;
+      --border-soft: #1f1f1f;
+
+      --white: #ffffff;
+      --black: #000000;
+
+      --radius-lg: 22px;
+      --radius-md: 16px;
+
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(255,255,255,0.05), transparent 30%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(18px);
+      background: rgba(0, 0, 0, 0.78);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .topbar-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(145deg, #ffffff, #9ca3af);
+      color: #000000;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .nav a,
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 9px 13px;
+      border-radius: 999px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .nav a:hover,
+    .btn:hover {
+      background: var(--white);
+      color: var(--black);
+      border-color: var(--white);
+      transform: translateY(-1px);
+    }
+
+    .shell {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.9fr);
+      gap: 18px;
+      margin: 24px 0;
+    }
+
+    .hero-card,
+    .panel {
+      background: rgba(15, 15, 15, 0.88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 28px;
+      min-height: 230px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      margin-bottom: 16px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
+    }
+
+    .hero h2 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 56px);
+      line-height: 0.95;
+      letter-spacing: -0.065em;
+    }
+
+    .hero p {
+      margin: 16px 0 0;
+      max-width: 700px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .status-title {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 11px 12px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-row strong {
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(145px, 1fr));
+      gap: 12px;
+      margin: 18px 0;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      min-height: 132px;
+      transition: 160ms ease;
+    }
+
+    .metric:hover {
+      background: var(--panel-hover);
+      transform: translateY(-2px);
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+      min-height: 32px;
+    }
+
+    .metric-value {
+      font-size: 34px;
+      line-height: 1;
+      font-weight: 850;
+      letter-spacing: -0.05em;
+      margin-top: 14px;
+    }
+
+    .metric-foot {
+      color: var(--faint);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .panel {
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #050505;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      overflow: auto;
+      max-height: 440px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #e5e5e5;
+    }
+
+    .quick-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .quick-link {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel-soft);
+      transition: 160ms ease;
+    }
+
+    .quick-link:hover {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .quick-link span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .quick-link:hover span {
+      color: #404040;
+    }
+
+    .arrow {
+      font-size: 18px;
+      opacity: 0.8;
+    }
+
+    .queue {
+      display: grid;
+      gap: 10px;
+    }
+
+    .queue-item {
+      border: 1px solid var(--border-soft);
+      background: var(--panel-soft);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .queue-title {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.45;
+      margin-bottom: 8px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 7px;
+      font-size: 11px;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 18px;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .skeleton {
+      animation: pulse 1.3s ease-in-out infinite;
+      color: var(--faint);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
+    }
+
+    @media (max-width: 1080px) {
+      .hero,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .cards {
+        grid-template-columns: repeat(3, minmax(145px, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar-inner,
+      .shell {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .topbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, minmax(130px, 1fr));
+      }
+
+      .hero-card {
+        padding: 22px;
+      }
+    }
   </style>
 </head>
+
 <body>
-  <header>
-    <div>
-      <h1>AutomateQuery Dashboard</h1>
-      <div class="muted">Live summaries from reports and NLP review data.</div>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo">AQ</div>
+        <div>
+          <h1>AutomateQuery</h1>
+          <div class="subtitle">Safe learning dashboard for AJSMGPT</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="/learning-cycle">Learning Cycle</a>
+        <a href="/question-bank">Question Bank</a>
+        <a href="/nlp-review">NLP Review</a>
+      </nav>
     </div>
-    <div class="actions">
-      <a href="/learning-cycle">Learning Cycle</a>
-      <a href="/question-bank">Question Bank</a>
-      <a href="/nlp-review">NLP Review</a>
-    </div>
-  </header>
-  <main>
-    <section class="grid" id="summaryCards"></section>
-    <section class="card">
-      <h2>Learning cycle summary</h2>
-      <pre id="summaryText">Loading…</pre>
+  </div>
+
+  <main class="shell">
+    <section class="hero">
+      <article class="hero-card">
+        <div>
+          <div class="eyebrow"><span class="dot"></span> Live from AutomateQuery reports</div>
+          <h2>Control center for query improvement.</h2>
+          <p>
+            Monitor real user questions, diagnose failures, review expected-zero cases,
+            inspect candidate SQL, and guide NLP feedback without touching production routers automatically.
+          </p>
+        </div>
+
+        <div class="actions">
+          <a class="btn" href="/learning-cycle">Open Learning Cycle</a>
+          <a class="btn" href="/question-bank">Review Questions</a>
+          <button class="btn" onclick="loadDashboard()">Refresh</button>
+        </div>
+      </article>
+
+      <aside class="hero-card">
+        <div>
+          <div class="status-title">System snapshot</div>
+          <div class="status-grid">
+            <div class="status-row"><span>Learning cycle</span><strong id="cycleState">Loading</strong></div>
+            <div class="status-row"><span>Needs work</span><strong id="needsWorkState">-</strong></div>
+            <div class="status-row"><span>Approved zero</span><strong id="approvedZeroState">-</strong></div>
+            <div class="status-row"><span>Updated</span><strong id="updatedAt">-</strong></div>
+          </div>
+        </div>
+      </aside>
     </section>
-    <section class="card">
-      <h2>Latest queue snapshot</h2>
-      <div id="queueList"></div>
+
+    <section class="cards" id="summaryCards">
+      <article class="metric"><div class="metric-label skeleton">Loading</div><div class="metric-value">-</div></article>
+      <article class="metric"><div class="metric-label skeleton">Loading</div><div class="metric-value">-</div></article>
+      <article class="metric"><div class="metric-label skeleton">Loading</div><div class="metric-value">-</div></article>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <div class="panel-head">
+          <h3>Learning cycle summary</h3>
+          <a class="btn" href="/learning-cycle">View details</a>
+        </div>
+        <div class="panel-body">
+          <pre id="summaryText">Loading…</pre>
+        </div>
+      </article>
+
+      <aside class="panel">
+        <div class="panel-head">
+          <h3>Quick actions</h3>
+        </div>
+        <div class="panel-body">
+          <div class="quick-grid">
+            <a class="quick-link" href="/learning-cycle">
+              <div><strong>Learning Cycle</strong><span>Retest, diagnosis, expected-zero, candidates</span></div>
+              <div class="arrow">→</div>
+            </a>
+            <a class="quick-link" href="/question-bank">
+              <div><strong>Question Bank</strong><span>Live question queue and review status</span></div>
+              <div class="arrow">→</div>
+            </a>
+            <a class="quick-link" href="/nlp-review">
+              <div><strong>NLP Review</strong><span>Intent, entity, module and feedback checks</span></div>
+              <div class="arrow">→</div>
+            </a>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel" style="margin-top:18px;">
+      <div class="panel-head">
+        <h3>Latest queue snapshot</h3>
+        <a class="btn" href="/question-bank">Open queue</a>
+      </div>
+      <div class="panel-body">
+        <div id="queueList" class="queue"></div>
+      </div>
     </section>
   </main>
+
   <script>
-    async function loadDashboard() {
-      const res = await fetch('/api/dashboard/summary');
-      const data = await res.json();
-      const cards = document.getElementById('summaryCards');
-      cards.innerHTML = '';
-      const stats = [
-        ['Diagnosis', data.counts?.diagnosis ?? 0],
-        ['Candidate queries', data.counts?.candidate_queries ?? 0],
-        ['Expected zero', data.counts?.expected_zero ?? 0],
-        ['Approved expected zero', data.counts?.approved_expected_zero ?? 0],
-        ['Approved candidate queries', data.counts?.approved_candidate_queries ?? 0],
-        ['Learning queue', data.counts?.learning_queue ?? 0],
-      ];
-      stats.forEach(([label, value]) => {
-        const card = document.createElement('article');
-        card.className = 'card';
-        card.innerHTML = `<h2>${label}</h2><div class="stat">${value}</div><div class="muted">Live from reports.</div>`;
-        cards.appendChild(card);
-      });
-      const summaryText = document.getElementById('summaryText');
-      summaryText.textContent = JSON.stringify(data.summary || {}, null, 2);
-      const queueList = document.getElementById('queueList');
-      const queue = Array.isArray(data.learning_queue) ? data.learning_queue : [];
-      queueList.innerHTML = queue.length ? `<ul class="list">${queue.slice(0, 10).map(item => `<li>${JSON.stringify(item)}</li>`).join('')}</ul>` : '<p class="muted">No learning queue data yet.</p>';
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
+
+    function pickQuestion(item) {
+      return item.question || item.normalized_question || item.text || item.user_question || JSON.stringify(item).slice(0, 120);
+    }
+
+    function renderMetric(label, value, foot) {
+      const card = document.createElement("article");
+      card.className = "metric";
+      card.innerHTML = `
+        <div class="metric-label">${escapeHtml(label)}</div>
+        <div class="metric-value">${escapeHtml(value ?? 0)}</div>
+        <div class="metric-foot">${escapeHtml(foot || "Live from reports")}</div>
+      `;
+      return card;
+    }
+
+    function renderQueue(queue) {
+      const target = document.getElementById("queueList");
+
+      if (!Array.isArray(queue) || queue.length === 0) {
+        target.innerHTML = '<div class="empty">No learning queue data yet.</div>';
+        return;
+      }
+
+      target.innerHTML = queue.slice(0, 8).map((item) => {
+        const question = pickQuestion(item);
+        const verdict = item.verdict || item.status || item.classification || item.latest_verdict || "review";
+        const source = item.source || item.latest_source || item.module || "-";
+        const count = item.count || item.occurrences || item.times_seen || "";
+
+        return `
+          <div class="queue-item">
+            <div class="queue-title">${escapeHtml(question)}</div>
+            <div class="chips">
+              <span class="chip">${escapeHtml(verdict)}</span>
+              <span class="chip">source: ${escapeHtml(source)}</span>
+              ${count ? `<span class="chip">count: ${escapeHtml(count)}</span>` : ""}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function loadDashboard() {
+      const cards = document.getElementById("summaryCards");
+      cards.innerHTML = `
+        <article class="metric"><div class="metric-label skeleton">Loading</div><div class="metric-value">-</div></article>
+        <article class="metric"><div class="metric-label skeleton">Loading</div><div class="metric-value">-</div></article>
+        <article class="metric"><div class="metric-label skeleton">Loading</div><div class="metric-value">-</div></article>
+      `;
+
+      try {
+        const res = await fetch("/api/dashboard/summary");
+        const data = await res.json();
+        const counts = data.counts || {};
+        const summary = data.summary || {};
+        const finalStatus = summary.final_status || {};
+
+        const stats = [
+          ["Pass", finalStatus.pass ?? counts.pass ?? 0, "Questions passing retest"],
+          ["Expected zero", finalStatus.expected_zero ?? counts.expected_zero ?? 0, "Approved no-data candidates"],
+          ["Needs work", finalStatus.needs_work ?? counts.needs_work ?? 0, "Open improvement work"],
+          ["Diagnosis", counts.diagnosis ?? 0, "Diagnosed questions"],
+          ["Candidate SQL", counts.candidate_queries ?? 0, "Generated candidate queries"],
+          ["Question bank", counts.learning_queue ?? counts.question_bank ?? 0, "Tracked real questions"],
+        ];
+
+        cards.innerHTML = "";
+        stats.forEach(([label, value, foot]) => cards.appendChild(renderMetric(label, value, foot)));
+
+        document.getElementById("cycleState").textContent =
+          (finalStatus.fail ?? 0) === 0 ? "Healthy" : "Review";
+        document.getElementById("needsWorkState").textContent = finalStatus.needs_work ?? counts.needs_work ?? 0;
+        document.getElementById("approvedZeroState").textContent = counts.approved_expected_zero ?? 0;
+        document.getElementById("updatedAt").textContent = new Date().toLocaleTimeString();
+
+        document.getElementById("summaryText").textContent = JSON.stringify(summary, null, 2);
+        renderQueue(data.learning_queue || []);
+      } catch (error) {
+        cards.innerHTML = "";
+        cards.appendChild(renderMetric("Error", "!", "Could not load dashboard data"));
+        document.getElementById("summaryText").textContent = error.stack || String(error);
+        document.getElementById("queueList").innerHTML = '<div class="empty">Dashboard API failed.</div>';
+      }
+    }
+
     loadDashboard();
   </script>
 </body>

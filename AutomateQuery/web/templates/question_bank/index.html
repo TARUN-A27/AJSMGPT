@@ -4,65 +4,960 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AutomateQuery Question Bank</title>
+
   <style>
-    :root { color-scheme: dark; --bg:#07111f; --panel:#101a2a; --panel-2:#15233a; --text:#f4f7fb; --muted:#8ca1b9; --accent:#5eead4; --border:#25364d; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); }
-    a { color:var(--accent); text-decoration:none; }
-    header { padding:24px 28px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:16px; align-items:center; flex-wrap:wrap; }
-    main { max-width:1280px; margin:0 auto; padding:24px 28px 60px; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:16px; }
-    .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:16px; }
-    .card h2 { margin-top:0; font-size:18px; }
-    .muted { color:var(--muted); font-size:13px; }
-    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:var(--panel-2); color:var(--muted); margin:0 6px 6px 0; font-size:12px; }
-    pre { white-space:pre-wrap; word-break:break-word; background:#050b12; border:1px solid var(--border); border-radius:12px; padding:14px; overflow:auto; font-size:12px; color:#dce8f7; }
-    .row { border:1px solid var(--border); border-radius:12px; padding:12px; margin:10px 0; background:#0f1b2d; }
+    :root {
+      color-scheme: dark;
+
+      --bg: #000000;
+      --panel: #0f0f0f;
+      --panel-soft: #171717;
+      --panel-hover: #1f1f1f;
+
+      --text: #f5f5f5;
+      --muted: #a3a3a3;
+      --faint: #737373;
+
+      --border: #2a2a2a;
+      --border-soft: #1f1f1f;
+
+      --white: #ffffff;
+      --black: #000000;
+
+      --radius-lg: 22px;
+      --radius-md: 16px;
+
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(255,255,255,0.05), transparent 30%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(18px);
+      background: rgba(0, 0, 0, 0.78);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .topbar-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(145deg, #ffffff, #9ca3af);
+      color: #000000;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .nav,
+    .actions,
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .nav {
+      justify-content: flex-end;
+    }
+
+    .nav a,
+    .btn,
+    .tab {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 9px 13px;
+      border-radius: 999px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .nav a:hover,
+    .btn:hover,
+    .tab:hover {
+      background: var(--white);
+      color: var(--black);
+      border-color: var(--white);
+      transform: translateY(-1px);
+    }
+
+    .tab.active {
+      background: var(--white);
+      color: var(--black);
+      border-color: var(--white);
+    }
+
+    .shell {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
+      gap: 18px;
+      margin: 24px 0;
+    }
+
+    .hero-card,
+    .panel,
+    .question-card {
+      background: rgba(15, 15, 15, 0.88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      margin-bottom: 16px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
+    }
+
+    .hero h2 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 50px);
+      line-height: 0.98;
+      letter-spacing: -0.06em;
+    }
+
+    .hero p {
+      margin: 16px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 11px 12px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-row strong {
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      min-height: 120px;
+      transition: 160ms ease;
+    }
+
+    .metric:hover {
+      background: var(--panel-hover);
+      transform: translateY(-2px);
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      min-height: 30px;
+    }
+
+    .metric-value {
+      font-size: 34px;
+      line-height: 1;
+      font-weight: 850;
+      letter-spacing: -0.05em;
+      margin-top: 14px;
+    }
+
+    .metric-foot {
+      color: var(--faint);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .filters {
+      background: rgba(15, 15, 15, 0.88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      margin: 18px 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 190px 190px auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #050505;
+      color: var(--text);
+      border-radius: 14px;
+      padding: 11px 13px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: #ffffff;
+    }
+
+    .tabs-wrap {
+      margin: 18px 0;
+      background: rgba(15, 15, 15, 0.65);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px;
+    }
+
+    .panel {
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+
+    .panel-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .question-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .question-card {
+      box-shadow: none;
+      border-radius: 18px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .question-title {
+      font-weight: 800;
+      font-size: 14px;
+      line-height: 1.45;
+      margin-bottom: 10px;
+    }
+
+    .question-meta {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 8px 0;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      background: var(--panel-soft);
+    }
+
+    .chip.strong {
+      color: var(--text);
+      border-color: #3a3a3a;
+    }
+
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .query-box {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #050505;
+    }
+
+    .query-box-title {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #050505;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      overflow: auto;
+      max-height: 430px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #e5e5e5;
+    }
+
+    .query-box pre {
+      border: none;
+      border-radius: 0;
+      max-height: 360px;
+    }
+
+    details {
+      margin-top: 12px;
+    }
+
+    summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 18px;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    @media (max-width: 1080px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .cards {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+      }
+
+      .filters {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar-inner,
+      .shell {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .topbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, minmax(130px, 1fr));
+      }
+
+      .filters {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-card {
+        padding: 22px;
+      }
+    }
   </style>
 </head>
+
 <body>
-  <header>
-    <div>
-      <h1>Question Bank</h1>
-      <div class="muted">Live learning queue, regression candidates, retest, diagnosis, and expected-zero cases.</div>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo">AQ</div>
+        <div>
+          <h1>Question Bank</h1>
+          <div class="subtitle">Live queue, retest status, diagnosis and expected-zero review</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/learning-cycle">Learning Cycle</a>
+        <a href="/nlp-review">NLP Review</a>
+      </nav>
     </div>
-    <a href="/dashboard">Back to Dashboard</a>
-  </header>
-  <main>
-    <section class="grid" id="stats"></section>
-    <section class="card">
-      <h2>Queue</h2>
-      <div id="queue"></div>
+  </div>
+
+  <main class="shell">
+    <section class="hero">
+      <article class="hero-card">
+        <div>
+          <div class="eyebrow"><span class="dot"></span> Real user question memory</div>
+          <h2>Review questions before they become router work.</h2>
+          <p>
+            Inspect the live learning queue, retest result, diagnosis classification,
+            regression candidates, and expected-zero questions from one focused UI.
+          </p>
+        </div>
+
+        <div class="actions">
+          <button class="btn" onclick="loadBank()">Refresh Bank</button>
+          <a class="btn" href="/learning-cycle">Open Learning Cycle</a>
+          <a class="btn" href="/dashboard">Back to Dashboard</a>
+        </div>
+      </article>
+
+      <aside class="hero-card">
+        <div class="status-grid">
+          <div class="status-row"><span>Queue</span><strong id="queueState">-</strong></div>
+          <div class="status-row"><span>Regression</span><strong id="regressionState">-</strong></div>
+          <div class="status-row"><span>Expected zero</span><strong id="expectedZeroState">-</strong></div>
+          <div class="status-row"><span>Updated</span><strong id="updatedAt">-</strong></div>
+        </div>
+      </aside>
     </section>
-    <section class="card">
-      <h2>Regression candidates</h2>
-      <div id="regression"></div>
+
+    <section class="cards" id="stats">
+      <article class="metric"><div class="metric-label">Loading</div><div class="metric-value">-</div></article>
     </section>
-    <section class="card">
-      <h2>Expected zero</h2>
-      <div id="expectedZero"></div>
+
+    <section class="filters">
+      <input id="searchInput" placeholder="Search question, source, intent, classification..." />
+      <select id="verdictFilter">
+        <option value="">All verdicts</option>
+        <option value="PASS">PASS</option>
+        <option value="EXPECTED_ZERO">EXPECTED_ZERO</option>
+        <option value="ZERO_REVIEW">ZERO_REVIEW</option>
+        <option value="FAIL">FAIL</option>
+        <option value="review">review</option>
+      </select>
+      <select id="sourceFilter">
+        <option value="">All sources</option>
+      </select>
+      <button class="btn" onclick="resetFilters()">Reset</button>
+    </section>
+
+    <section class="tabs-wrap">
+      <div class="tabs" id="tabs"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3 id="panelTitle">Queue</h3>
+        <span class="subtitle" id="panelSubtitle">Live rows from question bank reports</span>
+      </div>
+
+      <div class="panel-body">
+        <div id="questionList" class="question-list">
+          <div class="empty">Loading question bank...</div>
+        </div>
+      </div>
     </section>
   </main>
+
   <script>
+    const tabs = [
+      { id: "queue", label: "Queue" },
+      { id: "open", label: "Open Questions" },
+      { id: "regression", label: "Regression" },
+      { id: "expected-zero", label: "Expected Zero" },
+      { id: "diagnosis", label: "Diagnosis" },
+      { id: "retest", label: "Retest" },
+    ];
+
+    let bankData = {};
+    let currentTab = "queue";
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function normalizeSourceValue(value) {
+      if (value === null || value === undefined) return "-";
+      if (typeof value === "string") {
+        const text = value.trim();
+        return text || "-";
+      }
+      if (typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+      }
+      if (typeof value === "object") {
+        const preferred = value.name || value.route || value.router || value.source;
+        if (preferred !== undefined && preferred !== null && preferred !== "") {
+          return normalizeSourceValue(preferred);
+        }
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      }
+      return String(value);
+    }
+
+    function normalizeText(value) {
+      return String(value ?? "").toLowerCase();
+    }
+
+    function questionOf(item) {
+      return item?.question || item?.normalized_question || item?.text || item?.user_question || item?.title || "Untitled question";
+    }
+
+    function sourceOf(item) {
+      const value = item?.source || item?.latest_source || item?.old_source || item?.module || item?.planner_module || "-";
+      return normalizeSourceValue(value);
+    }
+
+    function intentOf(item) {
+      return item?.intent || item?.old_intent || item?.suggested_intent || item?.matched_intent || "-";
+    }
+
+    function verdictOf(item) {
+      return item?.verdict || item?.latest_verdict || item?.classification || item?.review_status || item?.status || "review";
+    }
+
+    function rowCountOf(item) {
+      return item?.row_count ?? item?.latest_row_count ?? item?.verification?.row_count ?? "-";
+    }
+
+    function countOf(item) {
+      return item?.count || item?.occurrences || item?.times_seen || item?.frequency || "-";
+    }
+
+    function reasonOf(item) {
+      return item?.reason || item?.explanation || item?.diagnosis || item?.review_note || item?.note || "";
+    }
+
+    function getRowsForTab(tabId) {
+      if (tabId === "queue") {
+        return bankData.queue || bankData.learning_queue || [];
+      }
+
+      if (tabId === "open") {
+        return bankData.open_questions || bankData.open || [];
+      }
+
+      if (tabId === "regression") {
+        return bankData.regression_candidates || bankData.regression || [];
+      }
+
+      if (tabId === "expected-zero") {
+        return bankData.expected_zero || bankData.expected_zero_candidates || [];
+      }
+
+      if (tabId === "diagnosis") {
+        return bankData.diagnosis || bankData.diagnosis_rows || [];
+      }
+
+      if (tabId === "retest") {
+        return bankData.retest || bankData.retest_rows || [];
+      }
+
+      return [];
+    }
+
+    function renderMetric(label, value, foot) {
+      return `
+        <article class="metric">
+          <div class="metric-label">${escapeHtml(label)}</div>
+          <div class="metric-value">${escapeHtml(value ?? 0)}</div>
+          <div class="metric-foot">${escapeHtml(foot || "Live from reports")}</div>
+        </article>
+      `;
+    }
+
+    function renderStats(data) {
+      const counts = data.counts || {};
+      const queue = data.queue || data.learning_queue || [];
+      const open = data.open_questions || data.open || [];
+      const regression = data.regression_candidates || data.regression || [];
+      const expectedZero = data.expected_zero || data.expected_zero_candidates || [];
+      const diagnosis = data.diagnosis || data.diagnosis_rows || [];
+      const retest = data.retest || data.retest_rows || [];
+
+      document.getElementById("stats").innerHTML = [
+        renderMetric("Queue", counts.queue ?? counts.learning_queue ?? queue.length, "Tracked user questions"),
+        renderMetric("Open", counts.open_questions ?? open.length, "Needs review queue"),
+        renderMetric("Regression", counts.regression_candidates ?? regression.length, "Possible eval tests"),
+        renderMetric("Expected zero", counts.expected_zero ?? expectedZero.length, "No-data cases"),
+        renderMetric("Diagnosis", counts.diagnosis ?? diagnosis.length, "Diagnosed rows"),
+      ].join("");
+
+      document.getElementById("queueState").textContent = counts.queue ?? counts.learning_queue ?? queue.length;
+      document.getElementById("regressionState").textContent = counts.regression_candidates ?? regression.length;
+      document.getElementById("expectedZeroState").textContent = counts.expected_zero ?? expectedZero.length;
+      document.getElementById("updatedAt").textContent = new Date().toLocaleTimeString();
+    }
+
+    function renderTabs() {
+      const target = document.getElementById("tabs");
+
+      target.innerHTML = tabs.map((tab) => {
+        const rows = getRowsForTab(tab.id);
+        const count = Array.isArray(rows) ? rows.length : 0;
+        return `<button class="tab ${tab.id === currentTab ? "active" : ""}" onclick="selectTab('${tab.id}')">${tab.label} (${count})</button>`;
+      }).join("");
+    }
+
+    function updateSourceFilter() {
+      const sourceFilter = document.getElementById("sourceFilter");
+      const current = sourceFilter.value;
+
+      const rows = tabs.flatMap((tab) => getRowsForTab(tab.id));
+      const sources = [...new Set(rows.map(sourceOf).filter((value) => value && value !== "-"))].sort();
+
+      sourceFilter.innerHTML = '<option value="">All sources</option>' +
+        sources.map((source) => `<option value="${escapeHtml(source)}">${escapeHtml(source)}</option>`).join("");
+
+      sourceFilter.value = current;
+    }
+
+    function filteredRows(rows) {
+      const search = normalizeText(document.getElementById("searchInput").value);
+      const verdict = normalizeText(document.getElementById("verdictFilter").value);
+      const source = normalizeText(document.getElementById("sourceFilter").value);
+
+      return rows.filter((item) => {
+        const haystack = normalizeText(JSON.stringify(item));
+        const itemVerdict = normalizeText(verdictOf(item));
+        const itemSource = normalizeText(sourceOf(item));
+
+        const matchesSearch = !search || haystack.includes(search);
+        const matchesVerdict = !verdict || itemVerdict.includes(verdict);
+        const matchesSource = !source || itemSource.includes(source);
+
+        return matchesSearch && matchesVerdict && matchesSource;
+      });
+    }
+
+    function buildQueryOnlyText(data) {
+      const extracted = data?.extracted || {};
+
+      let resultText = "";
+      resultText += "QUESTION: " + (data?.question || "-") + "\n";
+      resultText += "OK: " + (data?.ok ?? "-") + "\n";
+      resultText += "HTTP STATUS: " + (data?.http_status ?? "-") + "\n";
+      resultText += "SUCCESS: " + (extracted.success ?? "-") + "\n";
+      resultText += "SOURCE: " + normalizeSourceValue(extracted.source) + "\n";
+      resultText += "INTENT: " + (extracted.intent ?? "-") + "\n";
+      resultText += "ROW COUNT: " + (extracted.row_count ?? "-") + "\n\n";
+
+      if (data?.ok === false) {
+        resultText += "ERROR:\n";
+        resultText += (data.error || "Unknown error") + "\n";
+        return resultText;
+      }
+
+      if (extracted.sql) {
+        resultText += "GENERATED SQL:\n";
+        resultText += extracted.sql + "\n";
+      } else {
+        resultText += "GENERATED SQL: not found in response\n";
+      }
+
+      return resultText;
+    }
+
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { raw_text: text };
+      }
+
+      if (!res.ok) {
+        return {
+          ok: false,
+          http_status: res.status,
+          error: data?.error || data?.detail || `${url} failed: ${res.status}`,
+          raw: data,
+        };
+      }
+
+      return data;
+    }
+
+    async function getQueryForCard(encodedQuestion, outputId) {
+      const question = decodeURIComponent(encodedQuestion);
+      const output = document.getElementById(outputId);
+
+      output.textContent = "Getting SQL query...";
+
+      const data = await fetchJson("/api/learning-cycle/get-query?question=" + encodeURIComponent(question));
+      output.textContent = buildQueryOnlyText(data);
+    }
+
+    async function markExpectedZero(encodedQuestion) {
+      const question = decodeURIComponent(encodedQuestion);
+      const note = prompt("Business note for expected-zero approval:", "Verified as no-data / expected-zero from question bank review.");
+      if (note === null) return;
+
+      const data = await fetchJson("/api/learning-cycle/expected-zero/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, note }),
+      });
+
+      if (data.ok === false) {
+        alert(data.error || "Could not approve expected-zero case.");
+        return;
+      }
+
+      alert("Expected-zero case approved.");
+      await loadBank();
+    }
+
+    function renderQuestionCard(item, idx, mode) {
+      const question = questionOf(item);
+      const encodedQuestion = encodeURIComponent(question);
+      const outputId = `${mode}_query_output_${idx}`;
+      const verdict = verdictOf(item);
+      const source = sourceOf(item);
+      const intent = intentOf(item);
+      const rows = rowCountOf(item);
+      const count = countOf(item);
+      const reason = reasonOf(item);
+      const sql = item?.sql || item?.candidate_sql || item?.generated_sql || item?.latest_sql || "";
+
+      const canMarkExpectedZero =
+        mode === "expected-zero" ||
+        normalizeText(verdict).includes("expected_zero") ||
+        normalizeText(verdict).includes("zero");
+
+      return `
+        <article class="question-card">
+          <div class="question-title">${escapeHtml(question)}</div>
+
+          <div class="chips">
+            <span class="chip strong">${escapeHtml(verdict)}</span>
+            <span class="chip">source: ${escapeHtml(source)}</span>
+            <span class="chip">intent: ${escapeHtml(intent)}</span>
+            <span class="chip">rows: ${escapeHtml(rows)}</span>
+            <span class="chip">count: ${escapeHtml(count)}</span>
+          </div>
+
+          ${reason ? `<div class="question-meta">${escapeHtml(reason)}</div>` : ""}
+
+          ${sql ? `
+            <div class="query-box">
+              <div class="query-box-title">Saved SQL</div>
+              <pre>${escapeHtml(sql)}</pre>
+            </div>
+          ` : ""}
+
+          <div class="row-actions">
+            <button class="btn" onclick="getQueryForCard('${encodedQuestion}', '${outputId}')">Get Query</button>
+            ${canMarkExpectedZero ? `<button class="btn" onclick="markExpectedZero('${encodedQuestion}')">Mark Expected Zero</button>` : ""}
+            <a class="btn" href="/learning-cycle">Open Learning Cycle</a>
+          </div>
+
+          <div class="query-box">
+            <div class="query-box-title">Live generated SQL</div>
+            <pre id="${outputId}">Click Get Query to fetch SQL from /ask.</pre>
+          </div>
+
+          <details>
+            <summary>View raw JSON</summary>
+            <pre>${escapeHtml(JSON.stringify(item, null, 2))}</pre>
+          </details>
+        </article>
+      `;
+    }
+
+    function renderCurrentTab() {
+      const rows = getRowsForTab(currentTab);
+      const filtered = filteredRows(Array.isArray(rows) ? rows : []);
+
+      const titleMap = {
+        "queue": "Learning queue",
+        "open": "Open questions",
+        "regression": "Regression candidates",
+        "expected-zero": "Expected-zero cases",
+        "diagnosis": "Diagnosis rows",
+        "retest": "Retest rows",
+      };
+
+      document.getElementById("panelTitle").textContent = `${titleMap[currentTab] || "Questions"} (${filtered.length})`;
+      document.getElementById("panelSubtitle").textContent = "Search and filter are applied to this tab.";
+
+      const target = document.getElementById("questionList");
+
+      if (!filtered.length) {
+        target.innerHTML = '<div class="empty">No matching rows available.</div>';
+        return;
+      }
+
+      target.innerHTML = filtered
+        .slice(0, 100)
+        .map((item, idx) => renderQuestionCard(item, idx, currentTab))
+        .join("");
+    }
+
+    function selectTab(tabId) {
+      currentTab = tabId;
+      renderTabs();
+      renderCurrentTab();
+    }
+
+    function resetFilters() {
+      document.getElementById("searchInput").value = "";
+      document.getElementById("verdictFilter").value = "";
+      document.getElementById("sourceFilter").value = "";
+      renderCurrentTab();
+    }
+
     async function loadBank() {
-      const res = await fetch('/api/question-bank');
-      const data = await res.json();
-      document.getElementById('stats').innerHTML = Object.entries(data.counts || {}).map(([label, value]) => `
-        <div class="card">
-          <h2>${label}</h2>
-          <div style="font-size:32px;font-weight:700;">${value}</div>
-          <div class="muted">From the contract-backed reports.</div>
-        </div>
-      `).join('');
-      document.getElementById('queue').innerHTML = renderRows(data.queue);
-      document.getElementById('regression').innerHTML = renderRows(data.regression_candidates);
-      document.getElementById('expectedZero').innerHTML = renderRows(data.expected_zero);
+      const target = document.getElementById("questionList");
+      target.innerHTML = '<div class="empty">Loading question bank...</div>';
+
+      try {
+        const res = await fetch("/api/question-bank");
+        bankData = await res.json();
+
+        renderStats(bankData);
+        updateSourceFilter();
+        renderTabs();
+        renderCurrentTab();
+      } catch (error) {
+        target.innerHTML = `<pre>${escapeHtml(error.stack || String(error))}</pre>`;
+      }
     }
-    function renderRows(rows) {
-      if (!Array.isArray(rows) || !rows.length) return '<p class="muted">No rows available yet.</p>';
-      return rows.slice(0, 15).map(item => `<div class="row">${escapeHtml(JSON.stringify(item, null, 2))}</div>`).join('');
-    }
-    function escapeHtml(value) { return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;'); }
+
+    document.getElementById("searchInput").addEventListener("input", renderCurrentTab);
+    document.getElementById("verdictFilter").addEventListener("change", renderCurrentTab);
+    document.getElementById("sourceFilter").addEventListener("change", renderCurrentTab);
+
     loadBank();
   </script>
 </body>

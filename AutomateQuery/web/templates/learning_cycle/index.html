@@ -4,142 +4,1048 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AutomateQuery Learning Cycle</title>
+
   <style>
-    :root { color-scheme: dark; --bg:#07111f; --panel:#101a2a; --panel-2:#15233a; --text:#f4f7fb; --muted:#8ca1b9; --accent:#5eead4; --border:#25364d; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); }
-    a { color:var(--accent); text-decoration:none; }
-    header { padding:24px 28px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:16px; align-items:center; flex-wrap:wrap; }
-    main { max-width:1280px; margin:0 auto; padding:24px 28px 60px; }
-    .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
-    .toolbar button, .toolbar a { border:1px solid var(--border); background:var(--panel-2); color:var(--text); padding:10px 12px; border-radius:999px; cursor:pointer; }
-    .toolbar button.active { background:var(--accent); color:#051018; border-color:var(--accent); }
-    .card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:18px; margin-bottom:16px; }
-    .card h2 { margin-top:0; font-size:18px; }
-    .muted { color:var(--muted); font-size:13px; }
-    pre { white-space:pre-wrap; word-break:break-word; background:#050b12; border:1px solid var(--border); border-radius:12px; padding:14px; overflow:auto; font-size:12px; color:#dce8f7; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:16px; }
-    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:var(--panel-2); color:var(--muted); margin:0 6px 6px 0; font-size:12px; }
-    .hidden { display:none; }
-    .row { border:1px solid var(--border); border-radius:12px; padding:12px; margin:10px 0; background:#0f1b2d; }
+    :root {
+      color-scheme: dark;
+
+      --bg: #000000;
+      --panel: #0f0f0f;
+      --panel-soft: #171717;
+      --panel-hover: #1f1f1f;
+
+      --text: #f5f5f5;
+      --muted: #a3a3a3;
+      --faint: #737373;
+
+      --border: #2a2a2a;
+      --border-soft: #1f1f1f;
+
+      --white: #ffffff;
+      --black: #000000;
+
+      --radius-lg: 22px;
+      --radius-md: 16px;
+
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(255,255,255,0.05), transparent 30%),
+        var(--bg);
+      color: var(--text);
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(18px);
+      background: rgba(0, 0, 0, 0.78);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .topbar-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: linear-gradient(145deg, #ffffff, #9ca3af);
+      color: #000000;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      letter-spacing: -0.06em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .nav,
+    .actions,
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .nav {
+      justify-content: flex-end;
+    }
+
+    .nav a,
+    .btn,
+    .tab {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 9px 13px;
+      border-radius: 999px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: 160ms ease;
+    }
+
+    .nav a:hover,
+    .btn:hover,
+    .tab:hover {
+      background: var(--white);
+      color: var(--black);
+      border-color: var(--white);
+      transform: translateY(-1px);
+    }
+
+    .tab.active {
+      background: var(--white);
+      color: var(--black);
+      border-color: var(--white);
+    }
+
+    .shell {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
+      gap: 18px;
+      margin: 24px 0;
+    }
+
+    .hero-card,
+    .panel,
+    .row {
+      background: rgba(15, 15, 15, 0.88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      margin-bottom: 16px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
+    }
+
+    .hero h2 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 50px);
+      line-height: 0.98;
+      letter-spacing: -0.06em;
+    }
+
+    .hero p {
+      margin: 16px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 11px 12px;
+      background: var(--panel-soft);
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-row strong {
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .manual-box {
+      margin: 18px 0;
+      background: rgba(15, 15, 15, 0.88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+    }
+
+    .manual-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #050505;
+      color: var(--text);
+      border-radius: 14px;
+      padding: 11px 13px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: #ffffff;
+    }
+
+    .tabs-wrap {
+      margin: 18px 0;
+      background: rgba(15, 15, 15, 0.65);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px;
+    }
+
+    .panel {
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+
+    .panel-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border-soft);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .panel-head h3 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      min-height: 120px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      min-height: 30px;
+    }
+
+    .metric-value {
+      font-size: 34px;
+      line-height: 1;
+      font-weight: 850;
+      letter-spacing: -0.05em;
+      margin-top: 14px;
+    }
+
+    .metric-foot {
+      color: var(--faint);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .row {
+      box-shadow: none;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: var(--panel);
+    }
+
+    .row-title {
+      font-weight: 750;
+      font-size: 14px;
+      line-height: 1.45;
+      margin-bottom: 10px;
+    }
+
+    .row-text {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 8px 0;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 11px;
+      background: var(--panel-soft);
+    }
+
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #050505;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      overflow: auto;
+      max-height: 460px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #e5e5e5;
+    }
+
+    .query-slide {
+      margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #050505;
+    }
+
+    .query-slide-title {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .query-slide pre {
+      border: none;
+      border-radius: 0;
+      max-height: 380px;
+    }
+
+    details {
+      margin-top: 12px;
+    }
+
+    summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+      user-select: none;
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 18px;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .error {
+      color: #ffffff;
+      border-color: #525252;
+    }
+
+    @media (max-width: 1080px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .cards {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar-inner,
+      .shell {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .topbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      .manual-form {
+        grid-template-columns: 1fr;
+      }
+
+      .cards {
+        grid-template-columns: repeat(2, minmax(130px, 1fr));
+      }
+    }
   </style>
 </head>
+
 <body>
-  <header>
-    <div>
-      <h1>Learning Cycle</h1>
-      <div class="muted">Retest → diagnosis → expected zero → candidate SQL → eval review.</div>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo">AQ</div>
+        <div>
+          <h1>Learning Cycle</h1>
+          <div class="subtitle">Retest → diagnosis → expected zero → candidate SQL → regression</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/question-bank">Question Bank</a>
+        <a href="/nlp-review">NLP Review</a>
+      </nav>
     </div>
-    <div class="toolbar">
-      <button id="runButton">Run learning cycle</button>
-      <button onclick="loadAll()">Refresh</button>
-      <a href="/dashboard">Back to Dashboard</a>
-    </div>
-  </header>
-  <main>
-    <div class="toolbar" id="tabs"></div>
-    <div id="tabContent"></div>
+  </div>
+
+  <main class="shell">
+    <section class="hero">
+      <article class="hero-card">
+        <div>
+          <div class="eyebrow"><span class="dot"></span> Safe automation loop</div>
+          <h2>Review what AutomateQuery learned.</h2>
+          <p>
+            Run the full learning cycle, inspect failed and zero-row questions, approve expected-zero cases,
+            review candidate SQL, and generate evaluation/regression evidence without auto-editing production routers.
+          </p>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="runButton">Run Learning Cycle</button>
+          <button class="btn" onclick="loadAll()">Refresh</button>
+          <a class="btn" href="/dashboard">Back to Dashboard</a>
+        </div>
+      </article>
+
+      <aside class="hero-card">
+        <div class="status-grid">
+          <div class="status-row"><span>Run state</span><strong id="runState">Idle</strong></div>
+          <div class="status-row"><span>Last finished</span><strong id="lastFinished">-</strong></div>
+          <div class="status-row"><span>Return code</span><strong id="returnCode">-</strong></div>
+          <div class="status-row"><span>Updated</span><strong id="updatedAt">-</strong></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="manual-box">
+      <div class="manual-form">
+        <input id="manualQuestion" placeholder="Type a question, example: latest GRN for supplier 800967 in 2025" />
+        <button class="btn" onclick="manualGetQuery()">Get Query</button>
+        <button class="btn" onclick="clearManualQuery()">Clear</button>
+      </div>
+      <div class="query-slide" style="margin-top:14px;">
+        <div class="query-slide-title">Manual query output</div>
+        <pre id="manualQueryOutput">Type a question and click Get Query.</pre>
+      </div>
+    </section>
+
+    <section class="tabs-wrap">
+      <div class="tabs" id="tabs"></div>
+    </section>
+
+    <section id="tabContent"></section>
   </main>
+
   <script>
     const tabs = [
-      {id:'summary', label:'Summary'},
-      {id:'retest', label:'Retest'},
-      {id:'diagnosis', label:'Diagnosis'},
-      {id:'expected-zero', label:'Expected Zero'},
-      {id:'candidates', label:'Candidates'},
-      {id:'approvals', label:'Approvals'},
-      {id:'eval', label:'Eval'}
+      { id: "summary", label: "Summary" },
+      { id: "retest", label: "Retest" },
+      { id: "diagnosis", label: "Diagnosis" },
+      { id: "expected-zero", label: "Expected Zero" },
+      { id: "candidates", label: "Candidate SQL" },
+      { id: "approvals", label: "Approvals" },
+      { id: "eval", label: "Eval / Regression" },
+      { id: "logs", label: "Run Logs" },
     ];
-    let currentTab = 'summary';
+
+    let currentTab = "summary";
+    let runPoller = null;
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function normalizeSourceValue(value) {
+      if (value === null || value === undefined) return "-";
+      if (typeof value === "string") {
+        const text = value.trim();
+        return text || "-";
+      }
+      if (typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+      }
+      if (typeof value === "object") {
+        const preferred = value.name || value.route || value.router || value.source;
+        if (preferred !== undefined && preferred !== null && preferred !== "") {
+          return normalizeSourceValue(preferred);
+        }
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      }
+      return String(value);
+    }
+
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { raw_text: text };
+      }
+
+      if (!res.ok) {
+        return {
+          ok: false,
+          http_status: res.status,
+          error: data?.error || data?.detail || `${url} failed: ${res.status}`,
+          raw: data,
+        };
+      }
+
+      return data;
+    }
+
+    function questionOf(item) {
+      return item?.question || item?.normalized_question || item?.text || item?.user_question || item?.title || "Untitled question";
+    }
+
+    function sourceOf(item) {
+      const value = item?.source || item?.latest_source || item?.old_source || item?.module || item?.planner_module || "-";
+      return normalizeSourceValue(value);
+    }
+
+    function intentOf(item) {
+      return item?.intent || item?.old_intent || item?.suggested_intent || item?.matched_intent || "-";
+    }
+
+    function verdictOf(item) {
+      return item?.verdict || item?.latest_verdict || item?.classification || item?.review_status || item?.status || "review";
+    }
+
+    function rowCountOf(item) {
+      return item?.row_count ?? item?.latest_row_count ?? item?.verification?.row_count ?? "-";
+    }
+
+    function confidenceOf(item) {
+      return item?.confidence ?? item?.nlp_confidence ?? "-";
+    }
 
     function renderTabs() {
-      const container = document.getElementById('tabs');
-      container.innerHTML = tabs.map(tab => `<button class="${tab.id === currentTab ? 'active' : ''}" onclick="selectTab('${tab.id}')">${tab.label}</button>`).join('');
+      const container = document.getElementById("tabs");
+      container.innerHTML = tabs
+        .map((tab) => `<button class="tab ${tab.id === currentTab ? "active" : ""}" onclick="selectTab('${tab.id}')">${tab.label}</button>`)
+        .join("");
+    }
+
+    function renderMetric(label, value, foot) {
+      return `
+        <article class="metric">
+          <div class="metric-label">${escapeHtml(label)}</div>
+          <div class="metric-value">${escapeHtml(value ?? 0)}</div>
+          <div class="metric-foot">${escapeHtml(foot || "")}</div>
+        </article>
+      `;
+    }
+
+    function buildQueryOnlyText(data) {
+      const extracted = data?.extracted || {};
+
+      let resultText = "";
+      resultText += "QUESTION: " + (data?.question || "-") + "\n";
+      resultText += "OK: " + (data?.ok ?? "-") + "\n";
+      resultText += "HTTP STATUS: " + (data?.http_status ?? "-") + "\n";
+      resultText += "SUCCESS: " + (extracted.success ?? "-") + "\n";
+      resultText += "SOURCE: " + normalizeSourceValue(extracted.source) + "\n";
+      resultText += "INTENT: " + (extracted.intent ?? "-") + "\n";
+      resultText += "ROW COUNT: " + (extracted.row_count ?? "-") + "\n\n";
+
+      if (data?.ok === false) {
+        resultText += "ERROR:\n";
+        resultText += (data.error || "Unknown error") + "\n";
+        return resultText;
+      }
+
+      if (extracted.sql) {
+        resultText += "GENERATED SQL:\n";
+        resultText += extracted.sql + "\n";
+      } else {
+        resultText += "GENERATED SQL: not found in response\n";
+      }
+
+      return resultText;
+    }
+
+    async function getQuery(question) {
+      return await fetchJson("/api/learning-cycle/get-query?question=" + encodeURIComponent(question));
+    }
+
+    async function getQueryForCard(encodedQuestion, outputId) {
+      const question = decodeURIComponent(encodedQuestion);
+      const output = document.getElementById(outputId);
+      output.textContent = "Getting SQL query...";
+      const data = await getQuery(question);
+      output.textContent = buildQueryOnlyText(data);
+    }
+
+    async function manualGetQuery() {
+      const question = document.getElementById("manualQuestion").value.trim();
+      const output = document.getElementById("manualQueryOutput");
+
+      if (!question) {
+        output.textContent = "Please type a question first.";
+        return;
+      }
+
+      output.textContent = "Getting SQL query...";
+      const data = await getQuery(question);
+      output.textContent = buildQueryOnlyText(data);
+    }
+
+    function clearManualQuery() {
+      document.getElementById("manualQuestion").value = "";
+      document.getElementById("manualQueryOutput").textContent = "Type a question and click Get Query.";
+    }
+
+    async function approveExpectedZero(encodedQuestion) {
+      const question = decodeURIComponent(encodedQuestion);
+      const note = prompt("Business note for expected-zero approval:", "Oracle probes verified this is a no-data case.");
+      if (note === null) return;
+
+      const res = await fetchJson("/api/learning-cycle/expected-zero/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, note }),
+      });
+
+      if (res.ok === false) {
+        alert(res.error || "Could not approve expected-zero case.");
+        return;
+      }
+
+      alert("Expected-zero case approved.");
+      await selectTab(currentTab);
+    }
+
+    async function approveCandidate(encodedCandidateId) {
+      const candidate_id = decodeURIComponent(encodedCandidateId);
+      const note = prompt("Approval note for candidate SQL:", "Verified candidate SQL approved for review.");
+      if (note === null) return;
+
+      const res = await fetchJson("/api/learning-cycle/candidates/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidate_id, note }),
+      });
+
+      if (res.ok === false) {
+        alert(res.error || "Could not approve candidate.");
+        return;
+      }
+
+      alert("Candidate SQL approved.");
+      await selectTab(currentTab);
+    }
+
+    function renderRow(item, idx, mode) {
+      const question = questionOf(item);
+      const encodedQuestion = encodeURIComponent(question);
+      const outputId = `${mode}_query_output_${idx}`;
+      const candidateId = item?.candidate_id || item?.id || "";
+      const encodedCandidateId = encodeURIComponent(candidateId);
+
+      const reason = item?.reason || item?.explanation || item?.review_note || "";
+      const candidateSql = item?.candidate_sql || item?.sql || item?.raw_candidate?.sql || "";
+      const expectedZero = item?.expected_zero === true || mode === "expected-zero";
+
+      let actions = `
+        <button class="btn" onclick="getQueryForCard('${encodedQuestion}', '${outputId}')">Get Query</button>
+      `;
+
+      if (expectedZero) {
+        actions += `
+          <button class="btn" onclick="approveExpectedZero('${encodedQuestion}')">Mark Expected Zero</button>
+        `;
+      }
+
+      if (candidateId && mode === "candidates") {
+        actions += `
+          <button class="btn" onclick="approveCandidate('${encodedCandidateId}')">Approve Candidate SQL</button>
+        `;
+      }
+
+      return `
+        <article class="row">
+          <div class="row-title">${escapeHtml(question)}</div>
+
+          <div class="chips">
+            <span class="chip">${escapeHtml(verdictOf(item))}</span>
+            <span class="chip">source: ${escapeHtml(sourceOf(item))}</span>
+            <span class="chip">intent: ${escapeHtml(intentOf(item))}</span>
+            <span class="chip">rows: ${escapeHtml(rowCountOf(item))}</span>
+            <span class="chip">confidence: ${escapeHtml(confidenceOf(item))}</span>
+          </div>
+
+          ${reason ? `<div class="row-text">${escapeHtml(reason)}</div>` : ""}
+
+          ${candidateSql ? `
+            <div class="query-slide">
+              <div class="query-slide-title">Saved / candidate SQL</div>
+              <pre>${escapeHtml(candidateSql)}</pre>
+            </div>
+          ` : ""}
+
+          <div class="row-actions">${actions}</div>
+
+          <div class="query-slide">
+            <div class="query-slide-title">Live generated SQL</div>
+            <pre id="${outputId}">Click Get Query to fetch SQL from /ask.</pre>
+          </div>
+
+          <details>
+            <summary>View raw JSON</summary>
+            <pre>${escapeHtml(JSON.stringify(item, null, 2))}</pre>
+          </details>
+        </article>
+      `;
+    }
+
+    function renderRows(rows, mode) {
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return '<div class="empty">No rows available yet.</div>';
+      }
+
+      return rows.slice(0, 50).map((item, idx) => renderRow(item, idx, mode)).join("");
     }
 
     async function selectTab(tabId) {
       currentTab = tabId;
       renderTabs();
-      const content = document.getElementById('tabContent');
-      content.innerHTML = '<div class="card"><h2>Loading…</h2><p class="muted">Fetching the latest data from the reports.</p></div>';
-      if (tabId === 'summary') {
-        const res = await fetch('/api/learning-cycle/summary');
-        const data = await res.json();
-        content.innerHTML = `
-          <div class="card">
-            <h2>Summary</h2>
-            <pre>${escapeHtml(JSON.stringify(data.summary || {}, null, 2))}</pre>
+
+      const content = document.getElementById("tabContent");
+      content.innerHTML = `
+        <section class="panel">
+          <div class="panel-body">
+            <div class="empty">Loading latest ${escapeHtml(tabId)} data...</div>
           </div>
-          <div class="card">
-            <h2>Markdown</h2>
-            <pre>${escapeHtml(data.summary_md || 'No markdown yet.')}</pre>
-          </div>
-        `;
-      } else if (tabId === 'retest') {
-        const res = await fetch('/api/learning-cycle/retest');
-        const data = await res.json();
-        content.innerHTML = `<div class="card"><h2>Retest rows (${data.count})</h2>${renderRows(data.rows)}</div>`;
-      } else if (tabId === 'diagnosis') {
-        const res = await fetch('/api/learning-cycle/diagnosis');
-        const data = await res.json();
-        content.innerHTML = `<div class="card"><h2>Diagnosis (${data.count})</h2>${renderRows(data.rows)}<pre>${escapeHtml(data.markdown || 'No markdown yet.')}</pre></div>`;
-      } else if (tabId === 'expected-zero') {
-        const res = await fetch('/api/learning-cycle/expected-zero');
-        const data = await res.json();
-        content.innerHTML = `<div class="card"><h2>Expected zero (${data.count})</h2>${renderRows(data.rows)}</div>`;
-      } else if (tabId === 'candidates') {
-        const res = await fetch('/api/learning-cycle/candidates');
-        const data = await res.json();
+        </section>
+      `;
+
+      try {
+        if (tabId === "summary") {
+          const data = await fetchJson("/api/learning-cycle/summary");
+          const summary = data.summary || {};
+          const finalStatus = summary.final_status || {};
+
+          content.innerHTML = `
+            <section class="cards">
+              ${renderMetric("Pass", finalStatus.pass ?? 0, "Questions passing retest")}
+              ${renderMetric("Expected zero", finalStatus.expected_zero ?? 0, "No-data cases proven")}
+              ${renderMetric("Needs work", finalStatus.needs_work ?? 0, "Open improvement work")}
+              ${renderMetric("Verified candidates", finalStatus.verified_candidates ?? 0, "Candidate fixes with rows")}
+              ${renderMetric("Safe handled", finalStatus.safe_handled_questions ?? 0, "Pass + expected zero")}
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Learning cycle summary</h3>
+                <button class="btn" onclick="loadAll()">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <pre>${escapeHtml(JSON.stringify(summary, null, 2))}</pre>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head"><h3>Summary markdown</h3></div>
+              <div class="panel-body">
+                <pre>${escapeHtml(data.summary_md || "No markdown yet.")}</pre>
+              </div>
+            </section>
+          `;
+        }
+
+        if (tabId === "retest") {
+          const data = await fetchJson("/api/learning-cycle/retest");
+          content.innerHTML = `
+            <section class="panel">
+              <div class="panel-head"><h3>Retest results (${data.count ?? 0})</h3></div>
+              <div class="panel-body">${renderRows(data.rows || [], "retest")}</div>
+            </section>
+          `;
+        }
+
+        if (tabId === "diagnosis") {
+          const data = await fetchJson("/api/learning-cycle/diagnosis");
+          content.innerHTML = `
+            <section class="panel">
+              <div class="panel-head"><h3>Diagnosis (${data.count ?? 0})</h3></div>
+              <div class="panel-body">${renderRows(data.rows || [], "diagnosis")}</div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Diagnosis markdown</h3></div>
+              <div class="panel-body"><pre>${escapeHtml(data.markdown || "No markdown yet.")}</pre></div>
+            </section>
+          `;
+        }
+
+        if (tabId === "expected-zero") {
+          const data = await fetchJson("/api/learning-cycle/expected-zero");
+          content.innerHTML = `
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Expected-zero cases (${data.count ?? 0})</h3>
+                <span class="subtitle">Use Get Query for live SQL and Mark Expected Zero to approve no-data cases.</span>
+              </div>
+              <div class="panel-body">${renderRows(data.rows || [], "expected-zero")}</div>
+            </section>
+          `;
+        }
+
+        if (tabId === "candidates") {
+          const data = await fetchJson("/api/learning-cycle/candidates");
+          const candidateRows = data.candidate_queries || data.rows || [];
+          const latestRows = data.latest_candidates || [];
+
+          content.innerHTML = `
+            <section class="panel">
+              <div class="panel-head"><h3>Candidate SQL (${candidateRows.length})</h3></div>
+              <div class="panel-body">${renderRows(candidateRows, "candidates")}</div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Latest diagnosis candidates (${latestRows.length})</h3></div>
+              <div class="panel-body">${renderRows(latestRows, "candidates")}</div>
+            </section>
+          `;
+        }
+
+        if (tabId === "approvals") {
+          const data = await fetchJson("/api/learning-cycle/approvals");
+          content.innerHTML = `
+            <section class="panel">
+              <div class="panel-head"><h3>Approved expected-zero (${data.counts?.expected_zero ?? 0})</h3></div>
+              <div class="panel-body">${renderRows(data.expected_zero || [], "approvals")}</div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Approved candidate SQL (${data.counts?.candidate_queries ?? 0})</h3></div>
+              <div class="panel-body">${renderRows(data.candidate_queries || [], "approvals")}</div>
+            </section>
+          `;
+        }
+
+        if (tabId === "eval") {
+          const data = await fetchJson("/api/learning-cycle/eval");
+          content.innerHTML = `
+            <section class="panel">
+              <div class="panel-head"><h3>Generated eval candidates (${data.counts?.generated ?? 0})</h3></div>
+              <div class="panel-body">${renderRows(data.generated || [], "eval")}</div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Reviewed eval candidates (${data.counts?.reviewed ?? 0})</h3></div>
+              <div class="panel-body">${renderRows(data.reviewed || [], "eval")}</div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Approved eval tests (${data.counts?.approved ?? 0})</h3></div>
+              <div class="panel-body">${renderRows(data.approved || [], "eval")}</div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Approved eval run log</h3></div>
+              <div class="panel-body"><pre>${escapeHtml(data.approved_run || "No run log yet.")}</pre></div>
+            </section>
+          `;
+        }
+
+        if (tabId === "logs") {
+          const status = await fetchJson("/api/learning-cycle/run-status");
+          content.innerHTML = `
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Learning cycle run status</h3>
+                <button class="btn" onclick="loadRunStatus()">Refresh status</button>
+              </div>
+              <div class="panel-body">
+                <pre id="runStatusOutput">${escapeHtml(JSON.stringify(status, null, 2))}</pre>
+              </div>
+            </section>
+          `;
+        }
+      } catch (error) {
         content.innerHTML = `
-          <div class="card">
-            <h2>Candidate queries (${data.counts?.candidate_queries ?? 0})</h2>
-            ${renderRows(data.candidate_queries)}
-          </div>
-          <div class="card">
-            <h2>Latest candidates (${data.counts?.latest_candidates ?? 0})</h2>
-            ${renderRows(data.latest_candidates)}
-          </div>
-        `;
-      } else if (tabId === 'approvals') {
-        const res = await fetch('/api/learning-cycle/approvals');
-        const data = await res.json();
-        content.innerHTML = `
-          <div class="card"><h2>Expected zero approvals (${data.counts?.expected_zero ?? 0})</h2>${renderRows(data.expected_zero)}</div>
-          <div class="card"><h2>Candidate approvals (${data.counts?.candidate_queries ?? 0})</h2>${renderRows(data.candidate_queries)}</div>
-        `;
-      } else if (tabId === 'eval') {
-        const res = await fetch('/api/learning-cycle/eval');
-        const data = await res.json();
-        content.innerHTML = `
-          <div class="card"><h2>Generated eval (${data.counts?.generated ?? 0})</h2>${renderRows(data.generated)}</div>
-          <div class="card"><h2>Reviewed eval (${data.counts?.reviewed ?? 0})</h2>${renderRows(data.reviewed)}</div>
-          <div class="card"><h2>Approved eval (${data.counts?.approved ?? 0})</h2>${renderRows(data.approved)}</div>
-          <div class="card"><h2>Approved run log</h2><pre>${escapeHtml(data.approved_run || 'No run log yet.')}</pre></div>
+          <section class="panel error">
+            <div class="panel-head"><h3>Error loading tab</h3></div>
+            <div class="panel-body"><pre>${escapeHtml(error.stack || String(error))}</pre></div>
+          </section>
         `;
       }
     }
 
-    function renderRows(rows) {
-      if (!Array.isArray(rows) || !rows.length) return '<p class="muted">No rows available yet.</p>';
-      return rows.slice(0, 15).map(item => `<div class="row">${escapeHtml(JSON.stringify(item, null, 2))}</div>`).join('');
+    async function loadRunStatus() {
+      const status = await fetchJson("/api/learning-cycle/run-status");
+      const output = document.getElementById("runStatusOutput");
+      if (output) {
+        output.textContent = JSON.stringify(status, null, 2);
+      }
+
+      document.getElementById("runState").textContent = status.running ? "Running" : "Idle";
+      document.getElementById("lastFinished").textContent = status.finished_at || "-";
+      document.getElementById("returnCode").textContent = status.returncode ?? "-";
+      document.getElementById("updatedAt").textContent = new Date().toLocaleTimeString();
+
+      if (!status.running && runPoller) {
+        clearInterval(runPoller);
+        runPoller = null;
+        await selectTab(currentTab);
+      }
     }
 
     async function runCycle() {
-      document.getElementById('runButton').disabled = true;
-      const res = await fetch('/api/learning-cycle/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({})});
-      const data = await res.json();
-      document.getElementById('runButton').disabled = false;
-      alert(data.message || 'Run requested');
+      const button = document.getElementById("runButton");
+      button.disabled = true;
+      button.textContent = "Starting...";
+
+      const res = await fetchJson("/api/learning-cycle/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      button.disabled = false;
+      button.textContent = "Run Learning Cycle";
+
+      if (res.ok === false) {
+        alert(res.error || "Could not start learning cycle.");
+        return;
+      }
+
+      alert(res.message || "Learning cycle started.");
+      currentTab = "logs";
+      renderTabs();
+      await selectTab("logs");
+
+      if (runPoller) clearInterval(runPoller);
+      runPoller = setInterval(loadRunStatus, 1500);
+      await loadRunStatus();
+    }
+
+    async function loadAll() {
+      await loadRunStatus();
       await selectTab(currentTab);
     }
 
-    function escapeHtml(value) {
-      return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');
-    }
+    document.getElementById("runButton").addEventListener("click", runCycle);
+    document.getElementById("manualQuestion").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") manualGetQuery();
+    });
 
-    document.getElementById('runButton').addEventListener('click', runCycle);
     renderTabs();
-    selectTab('summary');
+    loadAll();
   </script>
 </body>
 </html>

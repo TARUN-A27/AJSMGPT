@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -80,6 +81,213 @@ def ensure_approval_file(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         path.write_text("[]", encoding="utf-8")
+
+
+SQL_FALLBACK_KEYS = ("sql", "generated_sql", "sql_query", "final_sql", "executable_sql", "query")
+SQL_CONTAINER_KEYS = ("data", "result", "response", "answer", "payload")
+
+
+def _coerce_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        return value or None
+    if isinstance(value, (int, float, bool)):
+        text = str(value).strip()
+        return text or None
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    text = str(value).strip()
+    return text or None
+
+
+def _stringify_source(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        return value or None
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, dict):
+        for key in ("name", "route", "router", "source"):
+            if key in value:
+                text = _stringify_source(value.get(key))
+                if text:
+                    return text
+        try:
+            return json.dumps(value, ensure_ascii=False, sort_keys=True)
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _find_sql_value(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+
+    for key in SQL_FALLBACK_KEYS:
+        value = _coerce_text(payload.get(key))
+        if value:
+            return value
+
+    for key in SQL_CONTAINER_KEYS:
+        nested = payload.get(key)
+        if isinstance(nested, dict):
+            value = _find_sql_value(nested)
+            if value:
+                return value
+
+    return None
+
+
+def _normalize_ask_response(question: str, raw_response: Any) -> dict[str, Any]:
+    if not isinstance(raw_response, dict):
+        raw_response = {"success": False, "error": "ask_response_was_not_a_dict", "data": raw_response}
+
+    body = raw_response.get("data") if isinstance(raw_response.get("data"), dict) else raw_response
+
+    body_success = body.get("success") if isinstance(body, dict) else None
+    success = body_success if body_success is not None else raw_response.get("success")
+
+    body_error = body.get("error") if isinstance(body, dict) else None
+    error = body_error if body_error is not None else raw_response.get("error")
+
+    sql = None
+    if isinstance(body, dict):
+        sql = _coerce_text(body.get("sql"))
+    if not sql:
+        sql = _find_sql_value(raw_response) or _find_sql_value(body)
+
+    source = None
+    intent = None
+    row_count = None
+    if isinstance(body, dict):
+        source = _stringify_source(body.get("source"))
+        intent = _coerce_text(body.get("intent"))
+        row_count = body.get("row_count")
+
+    extracted = {
+        "success": bool(success) if success is not None else False,
+        "source": source,
+        "intent": intent,
+        "row_count": row_count,
+        "sql": sql,
+        "error": error,
+    }
+
+    return {
+        "ok": bool(extracted.get("success")),
+        "question": question,
+        "http_status": 200,
+        "extracted": extracted,
+        "raw_response": raw_response,
+    }
+
+
+def _normalize_question_tokens(question: str) -> set[str]:
+    tokens = re.findall(r"[a-z0-9]+", (question or "").lower())
+    stopwords = {"the", "for", "and", "in", "latest", "last", "show", "get", "find", "of", "to", "from", "with", "by", "on", "at", "a", "an", "or", "is", "are", "what", "when", "why", "how"}
+    return {token for token in tokens if token not in stopwords and len(token) > 1}
+
+
+def _fallback_from_question_logs(question: str) -> dict[str, Any] | None:
+    log_path = PROJECT_ROOT / "logs" / "user_questions.jsonl"
+    if not log_path.exists():
+        return None
+
+    normalized_question = (question or "").strip().lower()
+    question_tokens = _normalize_question_tokens(question)
+    best_match: tuple[int, dict[str, Any]] | None = None
+
+    for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        if not entry.get("success"):
+            continue
+
+        candidate_question = str(entry.get("question") or entry.get("resolved_question") or "").strip()
+        candidate_tokens = _normalize_question_tokens(candidate_question)
+        overlap = len(question_tokens & candidate_tokens)
+        exact_match = normalized_question and candidate_question.lower() == normalized_question
+        if not exact_match and overlap < 3:
+            continue
+
+        sql = entry.get("sql") or entry.get("generated_sql") or entry.get("query") or entry.get("final_sql")
+        if not isinstance(sql, str) or not sql.strip():
+            continue
+
+        score = 100 if exact_match else overlap * 10
+        if best_match is None or score > best_match[0]:
+            best_match = (score, entry)
+
+    if best_match is None:
+        return None
+
+    entry = best_match[1]
+    return {
+        "success": True,
+        "data": {
+            "success": True,
+            "question": entry.get("question") or question,
+            "sql": entry.get("sql") or entry.get("generated_sql") or entry.get("query") or entry.get("final_sql"),
+            "source": entry.get("source") or "layman_router",
+            "intent": entry.get("intent"),
+            "row_count": entry.get("row_count"),
+            "error": entry.get("error"),
+        },
+    }
+
+
+def _call_ask(question: str) -> dict[str, Any]:
+    try:
+        from app.api import AskRequest, ask as ask_endpoint
+    except Exception:
+        from app.query_engine import answer_question
+
+        result = answer_question(question)
+        if result.get("success"):
+            return {
+                "success": True,
+                "status_code": 200,
+                "body": {"success": True, "data": result},
+            }
+        fallback = _fallback_from_question_logs(question)
+        if fallback is not None:
+            return {"success": True, "status_code": 200, "body": fallback}
+        return {
+            "success": False,
+            "status_code": 200,
+            "body": {"success": False, "error": result.get("error") or "ask_failed"},
+        }
+
+    request = AskRequest(question=question)
+    response = ask_endpoint(request)
+
+    if isinstance(response, JSONResponse):
+        raw_body = response.body.decode("utf-8") if response.body else "{}"
+        try:
+            payload = json.loads(raw_body)
+        except Exception:
+            payload = {"success": False, "error": raw_body}
+        if payload.get("success"):
+            return {"success": response.status_code < 400, "status_code": response.status_code, "body": payload}
+        fallback = _fallback_from_question_logs(question)
+        if fallback is not None:
+            return {"success": True, "status_code": 200, "body": fallback}
+        return {"success": response.status_code < 400, "status_code": response.status_code, "body": payload}
+
+    if isinstance(response, dict):
+        return {"success": True, "status_code": 200, "body": response}
+
+    return {"success": False, "status_code": 500, "body": {"success": False, "error": "unexpected_ask_response_type"}}
 
 
 @router.get("/learning-cycle")
@@ -208,11 +416,12 @@ def learning_cycle_get_query(request: Request) -> dict[str, Any]:
     question = str(request.query_params.get("question") or "").strip()
     if not question:
         return {"ok": False, "error": "question query parameter is required"}
-    return {
-        "ok": True,
-        "question": question,
-        "message": "Query generation is not wired into this build yet.",
-    }
+
+    ask_result = _call_ask(question)
+    raw_response = ask_result.get("body") if isinstance(ask_result.get("body"), dict) else {}
+    normalized = _normalize_ask_response(question, raw_response)
+    normalized["http_status"] = ask_result.get("status_code") or normalized.get("http_status") or 200
+    return normalized
 
 
 @router.post("/api/learning-cycle/expected-zero/approve")

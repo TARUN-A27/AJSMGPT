@@ -931,22 +931,45 @@
         }
 
         if (tabId === "candidates") {
-          const data = await fetchJson("/api/learning-cycle/candidates");
-          const candidateRows = data.candidate_queries || data.rows || [];
-          const latestRows = data.latest_candidates || [];
+  const data = await fetchJson("/api/learning-cycle/candidates");
+  const candidateRows = data.candidate_queries || data.rows || [];
+  const latestRows = data.latest_candidates || [];
+  const savedFallbackRows = data.saved_sql_fallbacks || [];
 
-          content.innerHTML = `
-            <section class="panel">
-              <div class="panel-head"><h3>Candidate SQL (${candidateRows.length})</h3></div>
-              <div class="panel-body">${renderRows(candidateRows, "candidates")}</div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h3>Latest diagnosis candidates (${latestRows.length})</h3></div>
-              <div class="panel-body">${renderRows(latestRows, "candidates")}</div>
-            </section>
-          `;
-        }
+  content.innerHTML = `
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Candidate SQL (${candidateRows.length})</h3>
+        <span class="subtitle">New generated candidate SQL waiting for review.</span>
+      </div>
+      <div class="panel-body">
+        ${renderRows(candidateRows, "candidates")}
+      </div>
+    </section>
 
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Latest diagnosis candidates (${latestRows.length})</h3>
+        <span class="subtitle">Candidates from diagnosis reports.</span>
+      </div>
+      <div class="panel-body">
+        ${renderRows(latestRows, "candidates")}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Saved SQL fallbacks (${savedFallbackRows.length})</h3>
+        <span class="subtitle">
+          Verified PASS SQL from retest history. Useful when live /ask fails but AutomateQuery already has working SQL.
+        </span>
+      </div>
+      <div class="panel-body">
+        ${renderRows(savedFallbackRows, "candidates")}
+      </div>
+    </section>
+  `;
+}
         if (tabId === "approvals") {
           const data = await fetchJson("/api/learning-cycle/approvals");
           content.innerHTML = `

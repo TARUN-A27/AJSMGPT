@@ -579,22 +579,68 @@ def learning_cycle_expected_zero() -> dict[str, Any]:
     return {"count": len(rows), "rows": rows, "file": file_info(EXPECTED_ZERO_JSON)}
 
 
+def _saved_sql_fallback_rows(limit: int = 200) -> list[dict[str, Any]]:
+    """Return verified SQL rows from retest history for UI fallback review."""
+    payload = read_json(RETEST_JSON, []) or []
+    rows = as_list(payload)
+
+    fallback_rows: list[dict[str, Any]] = []
+
+    for row in rows:
+        sql = row.get("sql") or row.get("candidate_sql") or row.get("generated_sql") or row.get("latest_sql")
+        verdict = str(row.get("verdict") or "").upper()
+        success = row.get("success") is True
+
+        if not isinstance(sql, str) or not sql.strip():
+            continue
+
+        if verdict != "PASS" and not success:
+            continue
+
+        fallback_rows.append({
+            "question": row.get("question") or row.get("question_key") or row.get("normalized_question"),
+            "verdict": row.get("verdict") or "PASS",
+            "source": row.get("source") or row.get("old_source") or "retest_sql_fallback",
+            "intent": row.get("intent") or row.get("old_intent"),
+            "row_count": row.get("row_count") if row.get("row_count") is not None else row.get("old_row_count"),
+            "elapsed_ms": row.get("elapsed_ms") or row.get("api_elapsed_ms"),
+            "sql": sql,
+            "fallback_type": "saved_retest_sql",
+            "matched_file": str(RETEST_JSON),
+            "note": "Verified SQL from latest distinct retest report. Useful when live /ask fails but AutomateQuery already has a working SQL.",
+            "raw": row,
+        })
+
+    fallback_rows.sort(
+        key=lambda item: (
+            str(item.get("verdict") or ""),
+            str(item.get("question") or ""),
+        )
+    )
+
+    return fallback_rows[:limit]
+
+
 @router.get("/api/learning-cycle/candidates")
 def learning_cycle_candidates() -> dict[str, Any]:
     candidate_queries = as_list(read_json(CANDIDATE_QUERIES_JSON, []))
     latest_candidates = as_list(read_json(LATEST_CANDIDATES_JSON, []))
     verified_candidates = as_list(read_json(VERIFIED_CANDIDATES_JSON, []))
     pending_candidates = as_list(read_json(PENDING_CANDIDATES_JSON, []))
+    saved_sql_fallbacks = _saved_sql_fallback_rows()
+
     return {
         "candidate_queries": candidate_queries,
         "latest_candidates": latest_candidates,
         "verified_candidates": verified_candidates,
         "pending_candidates": pending_candidates,
+        "saved_sql_fallbacks": saved_sql_fallbacks,
         "counts": {
             "candidate_queries": len(candidate_queries),
             "latest_candidates": len(latest_candidates),
             "verified_candidates": len(verified_candidates),
             "pending_candidates": len(pending_candidates),
+            "saved_sql_fallbacks": len(saved_sql_fallbacks),
         },
     }
 

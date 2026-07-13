@@ -23,9 +23,6 @@ except Exception as exc:
     NLP_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
 
-# Use the active runtime log first.
-# Current API process runs from /home/ajsmgpt/AJSMGPT.
-# The local project log is only a fallback for laptop testing.
 LOG_CANDIDATES = [
     Path("/home/ajsmgpt/AJSMGPT/logs/user_questions.jsonl"),
     PROJECT_ROOT / "logs" / "user_questions.jsonl",
@@ -52,15 +49,13 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
                 obj["_line_no"] = line_no
                 rows.append(obj)
         except Exception:
-            rows.append(
-                {
-                    "_log_file": str(path),
-                    "_line_no": line_no,
-                    "success": False,
-                    "error": "Invalid JSON log line",
-                    "raw": line[:1000],
-                }
-            )
+            rows.append({
+                "_log_file": str(path),
+                "_line_no": line_no,
+                "success": False,
+                "error": "Invalid JSON log line",
+                "raw": line[:1000],
+            })
 
     return rows
 
@@ -400,7 +395,7 @@ def build_queue(raw_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         g.update(decide_automation(g))
 
-    queue = sorted(
+    return sorted(
         grouped.values(),
         key=lambda x: (
             {"OPEN": 0, "ZERO_REVIEW": 1, "FIXED_NEEDS_REGRESSION": 2, "OK": 3}.get(str(x.get("status")), 9),
@@ -409,8 +404,6 @@ def build_queue(raw_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             str(x["question"] or ""),
         ),
     )
-
-    return queue
 
 
 def write_outputs(queue: list[dict[str, Any]], raw_rows: list[dict[str, Any]], used_logs: list[str]) -> None:
@@ -450,80 +443,83 @@ def write_outputs(queue: list[dict[str, Any]], raw_rows: list[dict[str, Any]], u
         encoding="utf-8",
     )
 
-    lines: list[str] = []
-    lines.append("# AJSMGPT Learning Queue")
-    lines.append("")
-    lines.append(f"- Generated at: `{payload['generated_at']}`")
-    lines.append(f"- Total log rows: `{payload['total_log_rows']}`")
-    lines.append(f"- Unique questions: `{payload['unique_questions']}`")
-    lines.append(f"- Needs review: `{payload['needs_review_count']}`")
-    lines.append(f"- Open problems: `{payload['open_count']}`")
-    lines.append(f"- Zero-row review: `{payload['zero_review_count']}`")
-    lines.append(f"- Fixed, needs regression test: `{payload['fixed_needs_regression_count']}`")
-    lines.append(f"- OK: `{payload['ok_count']}`")
-    lines.append("")
-    lines.append("## Top open / zero-row review candidates")
-    lines.append("")
+    lines: list[str] = [
+        "# AJSMGPT Learning Queue",
+        "",
+        f"- Generated at: `{payload['generated_at']}`",
+        f"- Total log rows: `{payload['total_log_rows']}`",
+        f"- Unique questions: `{payload['unique_questions']}`",
+        f"- Needs review: `{payload['needs_review_count']}`",
+        f"- Open problems: `{payload['open_count']}`",
+        f"- Zero-row review: `{payload['zero_review_count']}`",
+        f"- Fixed, needs regression test: `{payload['fixed_needs_regression_count']}`",
+        f"- OK: `{payload['ok_count']}`",
+        "",
+        "## Top open / zero-row review candidates",
+        "",
+    ]
 
     for idx, item in enumerate((open_questions + zero_review)[:50], start=1):
         latest = item["latest"]
         nlp = item.get("nlp") or {}
 
-        lines.append(f"### {idx}. {item['question']}")
-        lines.append("")
-        lines.append(f"- Status: `{item.get('status')}`")
-        lines.append(f"- Count: `{item['count']}`")
-        lines.append(f"- Priority score: `{item['max_priority_score']}`")
-        lines.append(f"- Reasons: `{', '.join(item['reasons'])}`")
-        lines.append(f"- Latest source: `{latest.get('source')}`")
-        lines.append(f"- Latest intent: `{latest.get('intent')}`")
-        lines.append(f"- Latest row_count: `{latest.get('row_count')}`")
-        lines.append(f"- Latest elapsed_ms: `{latest.get('elapsed_ms')}`")
-        lines.append(f"- Automation decision: `{item.get('automation_decision')}`")
-        lines.append(f"- NLP understood: `{item.get('nlp_understood')}`")
-        lines.append(f"- Create router candidate: `{item.get('should_create_router_candidate')}`")
-        lines.append(f"- Create regression candidate: `{item.get('should_create_regression_candidate')}`")
-        lines.append(f"- Manual review required: `{item.get('requires_manual_approval')}`")
-        lines.append(f"- Manual review reason: {item.get('manual_review_reason')}")
-        lines.append(f"- NLP status: `{nlp.get('status')}`")
+        lines.extend([
+            f"### {idx}. {item['question']}",
+            "",
+            f"- Status: `{item.get('status')}`",
+            f"- Count: `{item['count']}`",
+            f"- Priority score: `{item['max_priority_score']}`",
+            f"- Reasons: `{', '.join(item['reasons'])}`",
+            f"- Latest source: `{latest.get('source')}`",
+            f"- Latest intent: `{latest.get('intent')}`",
+            f"- Latest row_count: `{latest.get('row_count')}`",
+            f"- Latest elapsed_ms: `{latest.get('elapsed_ms')}`",
+            f"- Automation decision: `{item.get('automation_decision')}`",
+            f"- NLP understood: `{item.get('nlp_understood')}`",
+            f"- Create router candidate: `{item.get('should_create_router_candidate')}`",
+            f"- Create regression candidate: `{item.get('should_create_regression_candidate')}`",
+            f"- Manual review required: `{item.get('requires_manual_approval')}`",
+            f"- Manual review reason: {item.get('manual_review_reason')}",
+            f"- NLP status: `{nlp.get('status')}`",
+        ])
 
         if nlp.get("available"):
-            lines.append(f"- NLP intent: `{nlp.get('intent')}`")
-            lines.append(f"- NLP confidence: `{nlp.get('confidence')}`")
-            lines.append(f"- NLP module: `{nlp.get('module')}`")
-            lines.append(f"- NLP missing entities: `{', '.join(nlp.get('missing_entities') or [])}`")
-            lines.append(f"- NLP reason: `{nlp.get('reason')}`")
-            lines.append(f"- NLP entities: `{compact_json_value(nlp.get('entities'), 700)}`")
+            lines.extend([
+                f"- NLP intent: `{nlp.get('intent')}`",
+                f"- NLP confidence: `{nlp.get('confidence')}`",
+                f"- NLP module: `{nlp.get('module')}`",
+                f"- NLP missing entities: `{', '.join(nlp.get('missing_entities') or [])}`",
+                f"- NLP reason: `{nlp.get('reason')}`",
+                f"- NLP entities: `{compact_json_value(nlp.get('entities'), 700)}`",
+            ])
         else:
             lines.append(f"- NLP error: `{nlp.get('error')}`")
 
         lines.append("")
-        if latest.get("sql"):
-            lines.append("```sql")
-            lines.append(str(latest["sql"])[:3000])
-            lines.append("```")
-            lines.append("")
-        if latest.get("answer"):
-            lines.append(f"Answer: {latest.get('answer')}")
-            lines.append("")
 
-    lines.append("")
-    lines.append("## Top fixed questions needing regression tests")
-    lines.append("")
+        if latest.get("sql"):
+            lines.extend(["```sql", str(latest["sql"])[:3000], "```", ""])
+
+        if latest.get("answer"):
+            lines.extend([f"Answer: {latest.get('answer')}", ""])
+
+    lines.extend(["", "## Top fixed questions needing regression tests", ""])
 
     for idx, item in enumerate(regression_candidates[:50], start=1):
         latest = item["latest"]
-        lines.append(f"### {idx}. {item['question']}")
-        lines.append("")
-        lines.append(f"- Status: `{item.get('status')}`")
-        lines.append(f"- Count: `{item['count']}`")
-        lines.append(f"- Previous reasons: `{', '.join(item['reasons'])}`")
-        lines.append(f"- Latest source: `{latest.get('source')}`")
-        lines.append(f"- Latest intent: `{latest.get('intent')}`")
-        lines.append(f"- Latest row_count: `{latest.get('row_count')}`")
-        lines.append(f"- Automation decision: `{item.get('automation_decision')}`")
-        lines.append(f"- Create regression candidate: `{item.get('should_create_regression_candidate')}`")
-        lines.append("")
+        lines.extend([
+            f"### {idx}. {item['question']}",
+            "",
+            f"- Status: `{item.get('status')}`",
+            f"- Count: `{item['count']}`",
+            f"- Previous reasons: `{', '.join(item['reasons'])}`",
+            f"- Latest source: `{latest.get('source')}`",
+            f"- Latest intent: `{latest.get('intent')}`",
+            f"- Latest row_count: `{latest.get('row_count')}`",
+            f"- Automation decision: `{item.get('automation_decision')}`",
+            f"- Create regression candidate: `{item.get('should_create_regression_candidate')}`",
+            "",
+        ])
 
     md_text = "\n".join(lines)
 
@@ -583,18 +579,13 @@ def write_outputs(queue: list[dict[str, Any]], raw_rows: list[dict[str, Any]], u
 def main() -> int:
     raw_rows: list[dict[str, Any]] = []
     used_logs: list[str] = []
-    seen_files: set[str] = set()
 
     for path in LOG_CANDIDATES:
-        real = str(path)
-        if real in seen_files:
-            continue
-        seen_files.add(real)
-
         rows = read_jsonl(path)
         if rows:
-            raw_rows.extend(rows)
-            used_logs.append(str(path))
+            raw_rows = rows
+            used_logs = [str(path)]
+            break
 
     queue = build_queue(raw_rows)
     write_outputs(queue, raw_rows, used_logs)

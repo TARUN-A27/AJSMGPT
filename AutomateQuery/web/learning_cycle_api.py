@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
+import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +37,17 @@ GENERATED_EVAL_JSON = REPORTS_DIR / "generated_eval_candidates.json"
 REVIEWED_EVAL_JSON = REPORTS_DIR / "reviewed_eval_candidates.json"
 APPROVED_EVAL_JSON = REPORTS_DIR / "approved_eval_tests.json"
 APPROVED_EVAL_RUN_TXT = REPORTS_DIR / "approved_eval_test_run.txt"
+REGRESSION_CASES_JSON = REPORTS_DIR / "eval_candidates" / "regression_cases.json"
+REGRESSION_CASES_MD = REPORTS_DIR / "eval_candidates" / "regression_cases.md"
+APPROVED_REGRESSION_JSONL = AUTOMATE_DIR / "evals" / "approved_regression_cases.jsonl"
+APPROVED_REGRESSION_SEED_MD = REPORTS_DIR / "eval_candidates" / "approved_regression_seed.md"
+LATEST_REGRESSION_RUN_JSON = REPORTS_DIR / "regression_runs" / "latest_approved_regression_run.json"
+LATEST_REGRESSION_RUN_MD = REPORTS_DIR / "regression_runs" / "latest_approved_regression_run.md"
+
+BUILD_REGRESSION_SCRIPT = AUTOMATE_DIR / "scripts" / "build_regression_candidates.py"
+BUILD_APPROVED_REGRESSION_SCRIPT = AUTOMATE_DIR / "scripts" / "build_approved_regression_seed.py"
+RUN_APPROVED_REGRESSION_SCRIPT = AUTOMATE_DIR / "scripts" / "run_approved_regression_cases.py"
+
 
 RUN_LOCK = threading.Lock()
 RUN_STATUS: dict[str, Any] = {
@@ -56,6 +69,25 @@ def read_json(path: Path, default: Any = None) -> Any:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return default
+
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+            if isinstance(payload, dict):
+                rows.append(payload)
+        except Exception:
+            rows.append({"raw": line})
+    return rows
 
 
 def read_text(path: Path) -> str:
@@ -703,6 +735,245 @@ def learning_cycle_get_query(request: Request) -> dict[str, Any]:
             )
 
     return normalized
+
+
+
+def _regression_case_count(payload: Any) -> int:
+    if isinstance(payload, dict):
+        cases = payload.get("cases")
+        if isinstance(cases, list):
+            return len(cases)
+        count = payload.get("count")
+        if isinstance(count, int):
+            return count
+    if isinstance(payload, list):
+        return len(payload)
+    return 0
+
+
+def _run_automate_script(script_path: Path, timeout_seconds: int = 900) -> dict[str, Any]:
+    if not script_path.exists():
+        return {
+            "success": False,
+            "error": "script_not_found",
+            "script": str(script_path),
+        }
+
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(script_path)],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "success": False,
+            "error": "script_timeout",
+            "script": str(script_path),
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "",
+        }
+
+    return {
+        "success": completed.returncode == 0,
+        "returncode": completed.returncode,
+        "script": str(script_path),
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+    }
+
+
+@router.get("/api/learning-cycle/regression-summary")
+def learning_cycle_regression_summary() -> dict[str, Any]:
+    regression_payload = read_json(REGRESSION_CASES_JSON, {}) or {}
+    approved_cases = read_jsonl(APPROVED_REGRESSION_JSONL)
+    latest_run = read_json(LATEST_REGRESSION_RUN_JSON, {}) or {}
+
+    latest_run_results = latest_run.get("results") if isinstance(latest_run.get("results"), list) else []
+    failed_results = [item for item in latest_run_results if not item.get("passed")]
+
+    return {
+        "counts": {
+            "regression_candidates": _regression_case_count(regression_payload),
+            "approved_cases": len(approved_cases),
+            "latest_run_total": latest_run.get("total"),
+            "latest_run_passed": latest_run.get("passed"),
+            "latest_run_failed": latest_run.get("failed"),
+        },
+        "latest_run": {
+            "generated_at": latest_run.get("generated_at"),
+            "api_url": latest_run.get("api_url"),
+            "total": latest_run.get("total"),
+            "passed": latest_run.get("passed"),
+            "failed": latest_run.get("failed"),
+            "failed_preview": failed_results[:20],
+        },
+        "reports": {
+            "approved_seed_md": read_text(APPROVED_REGRESSION_SEED_MD)[:12000],
+            "latest_run_md": read_text(LATEST_REGRESSION_RUN_MD)[:12000],
+        },
+        "files": {
+            "regression_cases_json": file_info(REGRESSION_CASES_JSON),
+            "regression_cases_md": file_info(REGRESSION_CASES_MD),
+            "approved_regression_jsonl": file_info(APPROVED_REGRESSION_JSONL),
+            "approved_seed_md": file_info(APPROVED_REGRESSION_SEED_MD),
+            "latest_run_json": file_info(LATEST_REGRESSION_RUN_JSON),
+            "latest_run_md": file_info(LATEST_REGRESSION_RUN_MD),
+        },
+    }
+
+
+@router.post("/api/learning-cycle/build-regression-candidates")
+def learning_cycle_build_regression_candidates() -> dict[str, Any]:
+    result = _run_automate_script(BUILD_REGRESSION_SCRIPT)
+    summary = learning_cycle_regression_summary()
+    return {"action": "build_regression_candidates", "result": result, "summary": summary}
+
+
+@router.post("/api/learning-cycle/build-approved-regression-seed")
+def learning_cycle_build_approved_regression_seed() -> dict[str, Any]:
+    result = _run_automate_script(BUILD_APPROVED_REGRESSION_SCRIPT)
+    summary = learning_cycle_regression_summary()
+    return {"action": "build_approved_regression_seed", "result": result, "summary": summary}
+
+
+REGRESSION_RUN_LOCK = threading.Lock()
+REGRESSION_RUN_STATUS: dict[str, Any] = {
+    "running": False,
+    "started_at": None,
+    "finished_at": None,
+    "message": "No approved regression run started yet.",
+    "result": None,
+}
+
+
+def _approved_regression_worker() -> None:
+    with REGRESSION_RUN_LOCK:
+        REGRESSION_RUN_STATUS.update({
+            "running": True,
+            "started_at": now_iso(),
+            "finished_at": None,
+            "message": "Approved regression run is running.",
+            "result": None,
+        })
+
+    result = _run_automate_script(RUN_APPROVED_REGRESSION_SCRIPT, timeout_seconds=3600)
+
+    with REGRESSION_RUN_LOCK:
+        REGRESSION_RUN_STATUS.update({
+            "running": False,
+            "finished_at": now_iso(),
+            "message": "Approved regression run finished.",
+            "result": result,
+        })
+
+
+@router.post("/api/learning-cycle/run-approved-regression")
+def learning_cycle_run_approved_regression() -> dict[str, Any]:
+    with REGRESSION_RUN_LOCK:
+        if REGRESSION_RUN_STATUS.get("running"):
+            return {
+                "started": False,
+                "message": "Approved regression run is already running.",
+                "status": dict(REGRESSION_RUN_STATUS),
+                "summary": learning_cycle_regression_summary(),
+            }
+
+    thread = threading.Thread(target=_approved_regression_worker, daemon=True)
+    thread.start()
+
+    with REGRESSION_RUN_LOCK:
+        status = dict(REGRESSION_RUN_STATUS)
+
+    return {
+        "started": True,
+        "message": "Approved regression run started.",
+        "status": status,
+        "summary": learning_cycle_regression_summary(),
+    }
+
+
+@router.get("/api/learning-cycle/regression-run-status")
+def learning_cycle_regression_run_status() -> dict[str, Any]:
+    with REGRESSION_RUN_LOCK:
+        status = dict(REGRESSION_RUN_STATUS)
+
+    return {
+        "status": status,
+        "summary": learning_cycle_regression_summary(),
+    }
+
+
+
+
+REGRESSION_RUN_LOCK = threading.Lock()
+REGRESSION_RUN_STATUS: dict[str, Any] = {
+    "running": False,
+    "started_at": None,
+    "finished_at": None,
+    "message": "No approved regression run started yet.",
+    "result": None,
+}
+
+
+def _approved_regression_worker() -> None:
+    with REGRESSION_RUN_LOCK:
+        REGRESSION_RUN_STATUS.update({
+            "running": True,
+            "started_at": now_iso(),
+            "finished_at": None,
+            "message": "Approved regression run is running.",
+            "result": None,
+        })
+
+    result = _run_automate_script(RUN_APPROVED_REGRESSION_SCRIPT, timeout_seconds=3600)
+
+    with REGRESSION_RUN_LOCK:
+        REGRESSION_RUN_STATUS.update({
+            "running": False,
+            "finished_at": now_iso(),
+            "message": "Approved regression run finished.",
+            "result": result,
+        })
+
+
+@router.post("/api/learning-cycle/start-approved-regression")
+def learning_cycle_start_approved_regression() -> dict[str, Any]:
+    with REGRESSION_RUN_LOCK:
+        if REGRESSION_RUN_STATUS.get("running"):
+            return {
+                "started": False,
+                "message": "Approved regression run is already running.",
+                "status": dict(REGRESSION_RUN_STATUS),
+                "summary": learning_cycle_regression_summary(),
+            }
+
+    thread = threading.Thread(target=_approved_regression_worker, daemon=True)
+    thread.start()
+
+    with REGRESSION_RUN_LOCK:
+        status = dict(REGRESSION_RUN_STATUS)
+
+    return {
+        "started": True,
+        "message": "Approved regression run started.",
+        "status": status,
+        "summary": learning_cycle_regression_summary(),
+    }
+
+
+@router.get("/api/learning-cycle/regression-run-status")
+def learning_cycle_regression_run_status() -> dict[str, Any]:
+    with REGRESSION_RUN_LOCK:
+        status = dict(REGRESSION_RUN_STATUS)
+
+    return {
+        "status": status,
+        "summary": learning_cycle_regression_summary(),
+    }
+
 
 
 @router.post("/api/learning-cycle/expected-zero/approve")

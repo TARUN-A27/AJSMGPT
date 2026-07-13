@@ -557,6 +557,7 @@
 
     let currentTab = "summary";
     let runPoller = null;
+    let regressionLastOutput = "Use the buttons above to build or run approved regressions.";
 
     function escapeHtml(value) {
       return String(value ?? "")
@@ -846,6 +847,120 @@
       return rows.slice(0, 50).map((item, idx) => renderRow(item, idx, mode)).join("");
     }
 
+
+    function renderRegressionSummary(regression, runStatus) {
+      const counts = regression?.counts || {};
+      const latestRun = regression?.latest_run || {};
+      const status = runStatus?.status || {};
+      const running = status.running ? "Running" : "Idle";
+
+      return `
+        <section class="cards">
+          ${renderMetric("Regression candidates", counts.regression_candidates ?? 0, "Generated from fixed questions")}
+          ${renderMetric("Approved cases", counts.approved_cases ?? 0, "Seeded for live regression")}
+          ${renderMetric("Latest passed", counts.latest_run_passed ?? latestRun.passed ?? "-", "Last approved regression run")}
+          ${renderMetric("Latest failed", counts.latest_run_failed ?? latestRun.failed ?? "-", "Must stay zero")}
+          ${renderMetric("Run state", running, status.message || "Approved regression")}
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h3>Approved Regression</h3>
+            <div class="actions">
+              <button class="btn" onclick="buildRegressionCandidates()">Build Candidates</button>
+              <button class="btn" onclick="buildApprovedRegressionSeed()">Build Approved Seed</button>
+              <button class="btn" onclick="startApprovedRegression()">Run Approved Regression</button>
+              <button class="btn" onclick="refreshRegressionPanel()">Refresh</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="status-grid">
+              <div class="status-row"><span>Started</span><strong>${escapeHtml(status.started_at || "-")}</strong></div>
+              <div class="status-row"><span>Finished</span><strong>${escapeHtml(status.finished_at || latestRun.generated_at || "-")}</strong></div>
+              <div class="status-row"><span>Total</span><strong>${escapeHtml(counts.latest_run_total ?? latestRun.total ?? "-")}</strong></div>
+              <div class="status-row"><span>Passed / Failed</span><strong>${escapeHtml(`${counts.latest_run_passed ?? latestRun.passed ?? "-"} / ${counts.latest_run_failed ?? latestRun.failed ?? "-"}`)}</strong></div>
+            </div>
+
+            <div class="query-slide" style="margin-top:14px;">
+              <div class="query-slide-title">Regression action output</div>
+              <pre id="regressionActionOutput">${escapeHtml(regressionLastOutput)}</pre>
+            </div>
+
+            <details>
+              <summary>Latest regression run report</summary>
+              <pre>${escapeHtml(regression?.reports?.latest_run_md || "No regression run report yet.")}</pre>
+            </details>
+          </div>
+        </section>
+      `;
+    }
+
+    async function refreshRegressionPanel() {
+      const [regression, runStatus] = await Promise.all([
+        fetchJson("/api/learning-cycle/regression-summary"),
+        fetchJson("/api/learning-cycle/regression-run-status"),
+      ]);
+
+      const host = document.getElementById("regressionPanelHost");
+      if (host) {
+        host.innerHTML = renderRegressionSummary(regression, runStatus);
+      }
+    }
+
+    async function runRegressionAction(url, label) {
+      regressionLastOutput = `${label}...`;
+      await refreshRegressionPanel();
+
+      const res = await fetchJson(url, { method: "POST" });
+
+      regressionLastOutput = JSON.stringify({
+        label,
+        started: res?.started,
+        success: res?.result?.success,
+        returncode: res?.result?.returncode,
+        counts: res?.summary?.counts,
+        stderr: res?.result?.stderr,
+        message: res?.message,
+        error: res?.error,
+      }, null, 2);
+
+      await refreshRegressionPanel();
+      return res;
+    }
+
+    async function buildRegressionCandidates() {
+      await runRegressionAction("/api/learning-cycle/build-regression-candidates", "Building regression candidates");
+    }
+
+    async function buildApprovedRegressionSeed() {
+      await runRegressionAction("/api/learning-cycle/build-approved-regression-seed", "Building approved regression seed");
+    }
+
+    async function startApprovedRegression() {
+      const res = await runRegressionAction("/api/learning-cycle/start-approved-regression", "Starting approved regression run");
+
+      if (res?.started) {
+        let checks = 0;
+        const timer = setInterval(async () => {
+          checks += 1;
+          await refreshRegressionPanel();
+
+          const status = await fetchJson("/api/learning-cycle/regression-run-status");
+          if (status?.status?.running) {
+            regressionLastOutput = "Approved regression run is still running...\n" + JSON.stringify(status?.status || {}, null, 2);
+          } else {
+            regressionLastOutput = "Approved regression run finished.\n" + JSON.stringify(status?.summary?.counts || {}, null, 2);
+          }
+
+          if (!status?.status?.running || checks >= 240) {
+            clearInterval(timer);
+            await refreshRegressionPanel();
+          }
+        }, 3000);
+      }
+    }
+
+
     async function selectTab(tabId) {
       currentTab = tabId;
       renderTabs();
@@ -985,8 +1100,17 @@
         }
 
         if (tabId === "eval") {
-          const data = await fetchJson("/api/learning-cycle/eval");
+          const [data, regression, regressionStatus] = await Promise.all([
+            fetchJson("/api/learning-cycle/eval"),
+            fetchJson("/api/learning-cycle/regression-summary"),
+            fetchJson("/api/learning-cycle/regression-run-status"),
+          ]);
+
           content.innerHTML = `
+            <div id="regressionPanelHost">
+              ${renderRegressionSummary(regression, regressionStatus)}
+            </div>
+
             <section class="panel">
               <div class="panel-head"><h3>Generated eval candidates (${data.counts?.generated ?? 0})</h3></div>
               <div class="panel-body">${renderRows(data.generated || [], "eval")}</div>

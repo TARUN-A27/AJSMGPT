@@ -47,6 +47,7 @@ LATEST_REGRESSION_RUN_MD = REPORTS_DIR / "regression_runs" / "latest_approved_re
 BUILD_REGRESSION_SCRIPT = AUTOMATE_DIR / "scripts" / "build_regression_candidates.py"
 BUILD_APPROVED_REGRESSION_SCRIPT = AUTOMATE_DIR / "scripts" / "build_approved_regression_seed.py"
 RUN_APPROVED_REGRESSION_SCRIPT = AUTOMATE_DIR / "scripts" / "run_approved_regression_cases.py"
+BUILD_LEARNING_QUEUE_SCRIPT = AUTOMATE_DIR / "scripts" / "build_learning_queue.py"
 
 
 RUN_LOCK = threading.Lock()
@@ -823,6 +824,14 @@ def learning_cycle_regression_summary() -> dict[str, Any]:
             "latest_run_md": file_info(LATEST_REGRESSION_RUN_MD),
         },
     }
+
+
+
+@router.post("/api/learning-cycle/build-learning-queue")
+def learning_cycle_build_learning_queue() -> dict[str, Any]:
+    result = _run_automate_script(BUILD_LEARNING_QUEUE_SCRIPT)
+    summary = learning_cycle_regression_summary()
+    return {"action": "build_learning_queue", "result": result, "summary": summary}
 
 
 @router.post("/api/learning-cycle/build-regression-candidates")

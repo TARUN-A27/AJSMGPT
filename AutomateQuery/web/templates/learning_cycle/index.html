@@ -867,6 +867,7 @@
           <div class="panel-head">
             <h3>Approved Regression</h3>
             <div class="actions">
+              <button class="btn" onclick="buildLearningQueue()">Rebuild Learning Queue</button>
               <button class="btn" onclick="buildRegressionCandidates()">Build Candidates</button>
               <button class="btn" onclick="buildApprovedRegressionSeed()">Build Approved Seed</button>
               <button class="btn" onclick="startApprovedRegression()">Run Approved Regression</button>
@@ -926,6 +927,10 @@
 
       await refreshRegressionPanel();
       return res;
+    }
+
+    async function buildLearningQueue() {
+      await runRegressionAction("/api/learning-cycle/build-learning-queue", "Rebuilding learning queue");
     }
 
     async function buildRegressionCandidates() {

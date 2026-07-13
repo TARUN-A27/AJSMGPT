@@ -1106,27 +1106,49 @@
             fetchJson("/api/learning-cycle/regression-run-status"),
           ]);
 
+          const legacyEvalSections = [];
+
+          if ((data.counts?.generated ?? 0) > 0) {
+            legacyEvalSections.push(`
+              <section class="panel">
+                <div class="panel-head"><h3>Generated eval candidates (${data.counts?.generated ?? 0})</h3></div>
+                <div class="panel-body">${renderRows(data.generated || [], "eval")}</div>
+              </section>
+            `);
+          }
+
+          if ((data.counts?.reviewed ?? 0) > 0) {
+            legacyEvalSections.push(`
+              <section class="panel">
+                <div class="panel-head"><h3>Reviewed eval candidates (${data.counts?.reviewed ?? 0})</h3></div>
+                <div class="panel-body">${renderRows(data.reviewed || [], "eval")}</div>
+              </section>
+            `);
+          }
+
+          if ((data.counts?.approved ?? 0) > 0) {
+            legacyEvalSections.push(`
+              <section class="panel">
+                <div class="panel-head"><h3>Approved eval tests (${data.counts?.approved ?? 0})</h3></div>
+                <div class="panel-body">${renderRows(data.approved || [], "eval")}</div>
+              </section>
+            `);
+          }
+
+          if (data.approved_run && data.approved_run.trim()) {
+            legacyEvalSections.push(`
+              <section class="panel">
+                <div class="panel-head"><h3>Approved eval run log</h3></div>
+                <div class="panel-body"><pre>${escapeHtml(data.approved_run)}</pre></div>
+              </section>
+            `);
+          }
+
           content.innerHTML = `
             <div id="regressionPanelHost">
               ${renderRegressionSummary(regression, regressionStatus)}
             </div>
-
-            <section class="panel">
-              <div class="panel-head"><h3>Generated eval candidates (${data.counts?.generated ?? 0})</h3></div>
-              <div class="panel-body">${renderRows(data.generated || [], "eval")}</div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h3>Reviewed eval candidates (${data.counts?.reviewed ?? 0})</h3></div>
-              <div class="panel-body">${renderRows(data.reviewed || [], "eval")}</div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h3>Approved eval tests (${data.counts?.approved ?? 0})</h3></div>
-              <div class="panel-body">${renderRows(data.approved || [], "eval")}</div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h3>Approved eval run log</h3></div>
-              <div class="panel-body"><pre>${escapeHtml(data.approved_run || "No run log yet.")}</pre></div>
-            </section>
+            ${legacyEvalSections.join("")}
           `;
         }
 

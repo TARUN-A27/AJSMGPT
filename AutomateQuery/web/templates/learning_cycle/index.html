@@ -1260,7 +1260,18 @@
       await loadRunStatus();
     }
 
-    async function loadAll() {
+    async function rebuildLearningQueueForUi() {
+      try {
+        await fetchJson("/api/learning-cycle/build-learning-queue", { method: "POST" });
+      } catch (error) {
+        console.warn("Learning queue rebuild failed", error);
+      }
+    }
+
+    async function loadAll(options = {}) {
+      if (options.rebuild !== false) {
+        await rebuildLearningQueueForUi();
+      }
       await loadRunStatus();
       await selectTab(currentTab);
     }

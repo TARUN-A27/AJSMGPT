@@ -14,6 +14,12 @@ from pydantic import BaseModel, Field
 BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(dotenv_path=BASE_DIR / ".env", override=False)
 
+# When running the git working copy directly, Oracle credentials may still live
+# in the runtime checkout. Load it as a fallback without overriding local env.
+RUNTIME_ENV = Path("/home/ajsmgpt/AJSMGPT/.env")
+if RUNTIME_ENV.exists():
+    load_dotenv(dotenv_path=RUNTIME_ENV, override=False)
+
 from app.backend_logger import log_event, new_request_id, set_request_id
 from app.query_engine import answer_question
 from app.query_planner import plan_query

@@ -23,6 +23,8 @@ TEMPLATE_PATH = AUTOMATE_DIR / "web" / "templates" / "learning_cycle" / "index.h
 
 SUMMARY_JSON = REPORTS_DIR / "learning_cycle" / "latest_learning_cycle_summary.json"
 SUMMARY_MD = REPORTS_DIR / "learning_cycle" / "latest_learning_cycle_summary.md"
+LEARNING_QUEUE_JSON = REPORTS_DIR / "learning_queue" / "latest_learning_queue.json"
+LEARNING_QUEUE_MD = REPORTS_DIR / "learning_queue" / "latest_learning_queue.md"
 RETEST_JSON = REPORTS_DIR / "retest_from_logs" / "latest_all_distinct_retest.json"
 DIAGNOSIS_JSON = REPORTS_DIR / "question_diagnosis" / "latest_diagnosis.json"
 DIAGNOSIS_MD = REPORTS_DIR / "question_diagnosis" / "latest_diagnosis.md"
@@ -432,10 +434,20 @@ def _fallback_from_report_files(question: str) -> dict[str, Any] | None:
             if not sql:
                 continue
 
+            # Skip diagnostic probe SQL. These are table checks, not answer SQL.
+            if record.get("name") and not record.get("question"):
+                continue
+
             candidate_question = _extract_report_question(record) or question
             score = _score_report_match(question, candidate_question, record)
 
-            if score < 30:
+            # Never use fuzzy fallback for Get Query.
+            # It can show unrelated SQL for a failed question.
+            # Fallback is allowed only when the saved report question is an exact normalized match.
+            if _normalize_question_tokens(candidate_question) != _normalize_question_tokens(question):
+                continue
+
+            if score < 100:
                 continue
 
             if best is None or score > best[0]:
@@ -556,6 +568,75 @@ def learning_cycle_page() -> Any:
 
 @router.get("/api/learning-cycle/summary")
 def learning_cycle_summary() -> dict[str, Any]:
+    learning_queue = read_json(LEARNING_QUEUE_JSON, {}) or {}
+
+    if learning_queue:
+        total_log_rows = learning_queue.get("total_log_rows") or 0
+        unique_questions = learning_queue.get("unique_questions") or 0
+        needs_review = learning_queue.get("needs_review_count") or 0
+        open_problems = learning_queue.get("open_count") or 0
+        zero_review = learning_queue.get("zero_review_count") or 0
+        fixed_regression = learning_queue.get("fixed_needs_regression_count") or 0
+        ok_count = learning_queue.get("ok_count") or 0
+
+        summary = {
+            "generated": learning_queue.get("generated_at"),
+            "source": "learning_queue",
+            "inputs": {
+                "log_files": learning_queue.get("used_logs") or learning_queue.get("log_files") or [],
+                "learning_queue_json": str(LEARNING_QUEUE_JSON),
+            },
+            "learning_queue_summary": {
+                "total_log_rows": total_log_rows,
+                "unique_questions": unique_questions,
+                "needs_review": needs_review,
+                "open_problems": open_problems,
+                "zero_row_review": zero_review,
+                "fixed_needs_regression": fixed_regression,
+                "ok": ok_count,
+            },
+            "retest_summary": {
+                "PASS": ok_count + fixed_regression,
+                "ZERO_REVIEW": zero_review,
+                "FAIL": open_problems,
+            },
+            "diagnosis_summary": {
+                "EXPECTED_ZERO": zero_review,
+                "OPEN": open_problems,
+            },
+            "candidate_summary": {
+                "total_candidates": open_problems,
+                "verified_with_rows": fixed_regression,
+                "pending_or_failed": open_problems,
+            },
+            "final_status": {
+                "safe_handled_questions": ok_count + fixed_regression + zero_review,
+                "pass": ok_count + fixed_regression,
+                "expected_zero": zero_review,
+                "needs_work": open_problems,
+                "verified_candidates": fixed_regression,
+                "total_questions": unique_questions,
+            },
+            "outputs": {
+                "learning_queue_json": str(LEARNING_QUEUE_JSON),
+                "learning_queue_md": str(LEARNING_QUEUE_MD),
+            },
+        }
+
+        return {
+            "summary": summary,
+            "summary_md": read_text(LEARNING_QUEUE_MD),
+            "files": {
+                "summary_json": file_info(SUMMARY_JSON),
+                "summary_md": file_info(SUMMARY_MD),
+                "learning_queue_json": file_info(LEARNING_QUEUE_JSON),
+                "learning_queue_md": file_info(LEARNING_QUEUE_MD),
+                "diagnosis_json": file_info(DIAGNOSIS_JSON),
+                "candidate_queries_json": file_info(CANDIDATE_QUERIES_JSON),
+                "expected_zero_json": file_info(EXPECTED_ZERO_JSON),
+            },
+        }
+
     summary = read_json(SUMMARY_JSON, {}) or {}
     return {
         "summary": summary,
@@ -605,6 +686,49 @@ def learning_cycle_retest() -> dict[str, Any]:
 
 @router.get("/api/learning-cycle/diagnosis")
 def learning_cycle_diagnosis() -> dict[str, Any]:
+    learning_queue = read_json(LEARNING_QUEUE_JSON, {}) or {}
+    queue = learning_queue.get("queue") if isinstance(learning_queue.get("queue"), list) else []
+
+    if queue:
+        rows = []
+        for item in queue:
+            status = item.get("status")
+            if status not in {"OPEN", "ZERO_REVIEW"}:
+                continue
+
+            latest = item.get("latest") or {}
+            nlp = item.get("nlp") or {}
+
+            diagnosis_status = "EXPECTED_ZERO" if status == "ZERO_REVIEW" else "OPEN"
+            if "slow_query" in (item.get("reasons") or []):
+                diagnosis_status = "SLOW_QUERY" if status == "OPEN" else "EXPECTED_ZERO"
+
+            rows.append({
+                "question": item.get("question"),
+                "status": diagnosis_status,
+                "classification": diagnosis_status,
+                "source": latest.get("source") or "unknown",
+                "intent": latest.get("intent") or nlp.get("intent"),
+                "row_count": latest.get("row_count"),
+                "confidence": nlp.get("confidence") or latest.get("confidence") or 0.9,
+                "reason": item.get("manual_review_reason"),
+                "explanation": item.get("manual_review_reason"),
+                "sql": latest.get("sql"),
+                "answer": latest.get("answer"),
+                "automation_decision": item.get("automation_decision"),
+                "nlp": nlp,
+                "raw": item,
+            })
+
+        markdown = read_text(LEARNING_QUEUE_MD)
+        return {
+            "count": len(rows),
+            "rows": rows,
+            "markdown": markdown,
+            "file": file_info(LEARNING_QUEUE_JSON),
+            "source": "learning_queue",
+        }
+
     rows = as_list(read_json(DIAGNOSIS_JSON, []))
     return {"count": len(rows), "rows": rows, "markdown": read_text(DIAGNOSIS_MD), "file": file_info(DIAGNOSIS_JSON)}
 

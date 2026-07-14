@@ -360,8 +360,86 @@ def _result(intent: str, sql: str, confidence: float = 0.96) -> dict[str, Any]:
     }
 
 
+
+def _material_from_this_year_list(q: str) -> str | None:
+    quoted = re.search(r'"([^"]+)"', q)
+    if quoted:
+        return _clean_material_name(quoted.group(1))
+
+    ql = _clean(q)
+
+    patterns = [
+        r"\b(?:list|show)\s+(?:me\s+)?(?:all\s+)?([a-zA-Z0-9&.\-_/ ]+?)\s+(?:for\s+)?(?:this\s+year|current\s+year)\b",
+        r"\b(?:list|show)\s+(?:me\s+)?(?:all\s+)?([a-zA-Z0-9&.\-_/ ]+?)\s+purchases?\s+(?:for\s+)?(?:this\s+year|current\s+year)\b",
+    ]
+
+    stop_words = {
+        "purchase", "purchases", "details", "detail", "items", "item",
+        "materials", "material", "received", "receipt", "grn",
+    }
+
+    for pattern in patterns:
+        m = re.search(pattern, ql, flags=re.I)
+        if not m:
+            continue
+
+        material = _clean_material_name(m.group(1))
+        if not material:
+            continue
+
+        tokens = [t for t in re.split(r"[^A-Z0-9]+", material.upper()) if t]
+        tokens = [t for t in tokens if t.lower() not in stop_words]
+        if not tokens:
+            continue
+
+        normalized = " ".join(t[:-1] if len(t) > 3 and t.endswith("S") else t for t in tokens)
+        return _clean_material_name(normalized)
+
+    return None
+
+
+def _this_year_purchase_by_material_select(material: str) -> str:
+    from datetime import datetime
+
+    year = datetime.now().year
+    start_yyyymmdd = f"{year}0101"
+    end_yyyymmdd = f"{year}1231"
+    item_where = _item_filter("INV", material)
+
+    return f"""SELECT *
+FROM (
+    SELECT
+        PO.ORDERNO,
+        PO.ORDERDATE,
+        PO.SUP_CODE,
+        PO.ITEM_CODE,
+        INV.ITEM_NAME,
+        PO.QTY,
+        PO.RATE,
+        PO.NET,
+        PO.INVQTY,
+        PO.STATUS
+    FROM INVENTORY.PURCHASEORDER PO
+    JOIN INVENTORY.INVITEMS INV ON PO.ITEM_CODE = INV.ITEM_CODE
+    WHERE 1 = 1
+      {item_where}
+      AND PO.ORDERDATE BETWEEN '{start_yyyymmdd}' AND '{end_yyyymmdd}'
+    ORDER BY PO.ORDERDATE DESC NULLS LAST, PO.ORDERNO DESC
+)
+WHERE ROWNUM <= 100"""
+
+
 def match_purchase_analytics_template(question: str) -> dict[str, Any] | None:
     q = _clean(question)
+
+    # Current-year purchase list by material.
+    # Example: list me all scanners for this year
+    this_year_material = _material_from_this_year_list(q)
+    if this_year_material and re.search(r"\b(this\s+year|current\s+year)\b", q):
+        sql = _this_year_purchase_by_material_select(this_year_material)
+        result = _result("purchase_this_year_by_material", sql, confidence=0.93)
+        result["parameters"] = {"item_name": this_year_material}
+        return result
 
     # Approved patch: Suppliers by material/item
     # Example: WHO are the suppliers for the item "barcode label"

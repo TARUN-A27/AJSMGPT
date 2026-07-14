@@ -1697,10 +1697,11 @@ def _answer_question_core(question: str) -> dict[str, Any]:
         # Some deterministic log-learning templates already include safe date filters.
         # Do not let the generic date-filter rewriter modify ADMIN.DOCUMENT year queries.
         skip_generic_date_filter = (
-            sql_result.get("source") == "log_learning_router"
+            sql_result.get("source") in {"log_learning_router", "purchase_analytics_router"}
             and sql_result.get("intent") in {
                 "document_details_by_party_code",
                 "stock_by_item_name",
+                "purchase_this_year_by_material",
             }
         )
 
@@ -1717,10 +1718,11 @@ def _answer_question_core(question: str) -> dict[str, Any]:
         # Do not rewrite deterministic ADMIN.DOCUMENT SQL.
         # The correction layer can remove the year filter for document queries.
         skip_known_sql_corrections = (
-            sql_result.get("source") == "log_learning_router"
+            sql_result.get("source") in {"log_learning_router", "purchase_analytics_router"}
             and sql_result.get("intent") in {
                 "document_details_by_party_code",
                 "stock_by_item_name",
+                "purchase_this_year_by_material",
             }
         )
 

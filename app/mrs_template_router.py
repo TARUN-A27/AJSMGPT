@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta
 
 
 BASE_MRS_SELECT = """
@@ -115,12 +116,74 @@ def _sql(where_clause: str, order_by: str = "M.MRSDATE DESC NULLS LAST, M.MRSNO 
     return f"{BASE_MRS_SELECT} WHERE {where_clause} ORDER BY {order_by}"
 
 
+def _last_year_yyyymmdd_range() -> tuple[str, str]:
+    today = datetime.now()
+    start = today - timedelta(days=365)
+    return start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
+
+
+def _pending_stock_without_order_sql() -> str:
+    start_yyyymmdd, end_yyyymmdd = _last_year_yyyymmdd_range()
+
+    return f"""SELECT *
+FROM (
+    SELECT
+        M.MRSDATE,
+        M.MRSNO,
+        M.ITEM_CODE,
+        INV.ITEM_NAME,
+        M.QTY,
+        U.UNIT_NAME,
+        D.DEPT_NAME,
+        C.GROUP_NAME,
+        M.DUEDATE,
+        M.ID,
+        M.REMARKS,
+        M.REASONFORMRS,
+        M.DOCUMENTID,
+        M.DEPTMRSAUTH,
+        M.READYFORAPPROVAL,
+        M.APPROVALSTATUS,
+        M.STORESREJECTIONSTATUS,
+        M.REJECTIONSTATUS,
+        M.ITEMDELETE,
+        M.ISDELETE
+    FROM INVENTORY.MRS_TEMP M
+    JOIN INVENTORY.INVITEMS INV ON M.ITEM_CODE = INV.ITEM_CODE
+    JOIN INVENTORY.DEPT D ON M.DEPT_CODE = D.DEPT_CODE
+    LEFT JOIN INVENTORY.CATA C ON M.GROUP_CODE = C.GROUP_CODE
+    JOIN INVENTORY.UNIT U ON M.UNIT_CODE = U.UNIT_CODE
+    LEFT JOIN INVENTORY.MRS MR ON MR.MRSNO = M.MRSNO AND M.SLNO = MR.SLNO
+    WHERE M.MRSFLAG = 1
+      AND M.MRSDATE >= '{start_yyyymmdd}'
+      AND M.MRSDATE <= '{end_yyyymmdd}'
+      AND (M.MILLCODE = 0 OR M.MILLCODE IS NULL)
+      AND NVL(M.REJECTIONSTATUS, 0) = 0
+      AND NVL(M.STORESREJECTIONSTATUS, 0) = 0
+      AND NVL(M.ITEMDELETE, 0) = 0
+      AND NVL(M.ISDELETE, 0) = 0
+      AND NVL(MR.ORDERNO, 0) = 0
+    ORDER BY M.MRSDATE, M.MRSNO, M.ITEM_CODE, INV.ITEM_NAME
+)
+WHERE ROWNUM <= 100"""
+
+
 def match_mrs_template(question: str) -> dict | None:
     q = question.strip()
     ql = q.lower()
 
-    if not re.search(r"\b(mrs|material requisition|material request)\b", ql):
+    is_pending_stock_question = (
+        re.search(r"\bpending\b", ql)
+        and re.search(r"\b(stock|stocks|material|materials|request|requests)\b", ql)
+    )
+
+    if not is_pending_stock_question and not re.search(r"\b(mrs|material requisition|material request)\b", ql):
         return None
+
+    # Pending stock/material requests not yet converted to purchase order.
+    # Business meaning: active MRS rows with no linked order number.
+    if is_pending_stock_question:
+        return _result("pending_stock_without_order", _pending_stock_without_order_sql(), {})
 
     # MRS details for MRS number 890330
     m = re.search(r"\bmrs\s*(?:number|no|details\s+for\s+mrs\s+number|details\s+for\s+mrs\s+no)?\s*(\d{3,})\b", ql, flags=re.I)

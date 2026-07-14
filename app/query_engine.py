@@ -1817,6 +1817,35 @@ if __name__ == "__main__":
 
 
 def answer_question(question: str, *args, **kwargs):
+    # Business correction: "pending stocks" means pending MRS/material requests
+    # not ITEMSTOCK by item name. Run MRS deterministic route before log-learning.
+    q_lower = question.lower()
+    is_pending_stock_question = (
+        "pending" in q_lower
+        and any(word in q_lower for word in ("stock", "stocks", "material", "materials", "request", "requests"))
+    )
+    if is_pending_stock_question:
+        mrs_match = match_mrs_template(question)
+        if mrs_match:
+            sql_result = mrs_match
+            query_result = run_safe_select(sql_result["sql"])
+            return {
+                "success": True,
+                "question": question,
+                "sql": sql_result["sql"],
+                "explanation": sql_result.get("explanation"),
+                "tables_used": sql_result.get("tables_used", []),
+                "relationships_used": sql_result.get("relationships_used", []),
+                "confidence": sql_result.get("confidence"),
+                "source": sql_result.get("source"),
+                "intent": sql_result.get("intent"),
+                "parameters": sql_result.get("parameters", {}),
+                "columns": query_result.get("columns", []),
+                "rows": query_result.get("rows", []),
+                "row_count": query_result.get("row_count", 0),
+                "retrieved_schema": [],
+            }
+
     """
     Public wrapper around the real query engine.
     Logs every user question to logs/user_questions.jsonl for future tuning.

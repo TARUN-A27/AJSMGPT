@@ -852,14 +852,22 @@
       const counts = regression?.counts || {};
       const latestRun = regression?.latest_run || {};
       const status = runStatus?.status || {};
-      const running = status.running ? "Running" : "Idle";
+      const progress = runStatus?.progress || {};
+      const running = status.running || progress.running ? "Running" : "Idle";
+
+      const total = progress.total ?? counts.latest_run_total ?? latestRun.total ?? 0;
+      const completed = progress.completed ?? latestRun.total ?? 0;
+      const passed = progress.passed ?? counts.latest_run_passed ?? latestRun.passed ?? 0;
+      const failed = progress.failed ?? counts.latest_run_failed ?? latestRun.failed ?? 0;
+      const percent = progress.percent ?? (total ? Math.round((completed / total) * 100) : 0);
+      const currentQuestion = progress.current_question || (running === "Running" ? "Preparing next question..." : "-");
 
       return `
         <section class="cards">
           ${renderMetric("Regression candidates", counts.regression_candidates ?? 0, "Generated from fixed questions")}
           ${renderMetric("Approved cases", counts.approved_cases ?? 0, "Seeded for live regression")}
-          ${renderMetric("Latest passed", counts.latest_run_passed ?? latestRun.passed ?? "-", "Last approved regression run")}
-          ${renderMetric("Latest failed", counts.latest_run_failed ?? latestRun.failed ?? "-", "Must stay zero")}
+          ${renderMetric("Progress", `${completed} / ${total}`, `${percent}% complete`)}
+          ${renderMetric("Passed / Failed", `${passed} / ${failed}`, "Failed must stay zero")}
           ${renderMetric("Run state", running, status.message || "Approved regression")}
         </section>
 
@@ -875,11 +883,17 @@
             </div>
           </div>
           <div class="panel-body">
+            <div style="height:10px; border:1px solid var(--border); border-radius:999px; overflow:hidden; background:#0b0b0b; margin-bottom:14px;">
+              <div style="height:100%; width:${Math.max(0, Math.min(100, Number(percent) || 0))}%; background:#62d26f;"></div>
+            </div>
+
             <div class="status-grid">
-              <div class="status-row"><span>Started</span><strong>${escapeHtml(status.started_at || "-")}</strong></div>
-              <div class="status-row"><span>Finished</span><strong>${escapeHtml(status.finished_at || latestRun.generated_at || "-")}</strong></div>
-              <div class="status-row"><span>Total</span><strong>${escapeHtml(counts.latest_run_total ?? latestRun.total ?? "-")}</strong></div>
-              <div class="status-row"><span>Passed / Failed</span><strong>${escapeHtml(`${counts.latest_run_passed ?? latestRun.passed ?? "-"} / ${counts.latest_run_failed ?? latestRun.failed ?? "-"}`)}</strong></div>
+              <div class="status-row"><span>Completed</span><strong>${escapeHtml(`${completed} / ${total}`)}</strong></div>
+              <div class="status-row"><span>Percent</span><strong>${escapeHtml(`${percent}%`)}</strong></div>
+              <div class="status-row"><span>Passed / Failed</span><strong>${escapeHtml(`${passed} / ${failed}`)}</strong></div>
+              <div class="status-row"><span>Current question</span><strong>${escapeHtml(currentQuestion)}</strong></div>
+              <div class="status-row"><span>Started</span><strong>${escapeHtml(progress.started_at || status.started_at || "-")}</strong></div>
+              <div class="status-row"><span>Finished</span><strong>${escapeHtml(progress.finished_at || status.finished_at || latestRun.generated_at || "-")}</strong></div>
             </div>
 
             <div class="query-slide" style="margin-top:14px;">
@@ -951,10 +965,19 @@
           await refreshRegressionPanel();
 
           const status = await fetchJson("/api/learning-cycle/regression-run-status");
-          if (status?.status?.running) {
-            regressionLastOutput = "Approved regression run is still running...\n" + JSON.stringify(status?.status || {}, null, 2);
+          const progress = status?.progress || {};
+          if (status?.status?.running || progress?.running) {
+            regressionLastOutput =
+              `Approved regression run is running: ${progress.completed ?? "-"} / ${progress.total ?? "-"} (${progress.percent ?? "-"}%)\n` +
+              `Current: ${progress.current_question || "-"}\n` +
+              JSON.stringify(progress, null, 2);
           } else {
-            regressionLastOutput = "Approved regression run finished.\n" + JSON.stringify(status?.summary?.counts || {}, null, 2);
+            regressionLastOutput =
+              "Approved regression run finished.\n" +
+              JSON.stringify({
+                counts: status?.summary?.counts,
+                progress,
+              }, null, 2);
           }
 
           if (!status?.status?.running || checks >= 240) {

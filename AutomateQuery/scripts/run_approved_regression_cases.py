@@ -14,6 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CASES_PATH = PROJECT_ROOT / "AutomateQuery" / "evals" / "approved_regression_cases.jsonl"
 OUT_DIR = PROJECT_ROOT / "AutomateQuery" / "reports" / "regression_runs"
+PROGRESS_PATH = OUT_DIR / "latest_approved_regression_progress.json"
 API_URL = "http://127.0.0.1:8000/ask"
 
 UNSAFE_SQL_WORDS = {
@@ -145,6 +146,48 @@ def check_case(case: dict[str, Any], response: dict[str, Any] | None, transport_
     }
 
 
+def write_progress(
+    *,
+    total: int,
+    completed: int,
+    passed: int,
+    failed: int,
+    current_question: str | None,
+    running: bool,
+    started_at: str | None,
+    finished_at: str | None = None,
+) -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    percent = 0
+    if total:
+        percent = round((completed / total) * 100, 2)
+
+    payload = {
+        "running": running,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "total": total,
+        "completed": completed,
+        "passed": passed,
+        "failed": failed,
+        "percent": percent,
+        "current_question": current_question,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+
+    PROGRESS_PATH.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+
+
+def progress_counts(results: list[dict[str, Any]]) -> tuple[int, int]:
+    passed = sum(1 for item in results if item.get("passed"))
+    failed = sum(1 for item in results if not item.get("passed"))
+    return passed, failed
+
+
 def write_reports(results: list[dict[str, Any]]) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -227,15 +270,49 @@ def write_reports(results: list[dict[str, Any]]) -> None:
 def main() -> int:
     cases = load_cases(CASES_PATH)
     results = []
+    started_at = datetime.now().isoformat(timespec="seconds")
+
+    write_progress(
+        total=len(cases),
+        completed=0,
+        passed=0,
+        failed=0,
+        current_question=None,
+        running=True,
+        started_at=started_at,
+    )
 
     for idx, case in enumerate(cases, start=1):
         question = str(case.get("question") or "").strip()
+        passed_count, failed_count = progress_counts(results)
+
+        write_progress(
+            total=len(cases),
+            completed=len(results),
+            passed=passed_count,
+            failed=failed_count,
+            current_question=question,
+            running=True,
+            started_at=started_at,
+        )
+
         print(f"[{idx}/{len(cases)}] {question}")
 
         transport_ok, response, transport_error, elapsed = post_question(question)
         result = check_case(case, response, transport_ok, transport_error)
         result["transport_elapsed_seconds"] = round(elapsed, 4)
         results.append(result)
+
+        passed_count, failed_count = progress_counts(results)
+        write_progress(
+            total=len(cases),
+            completed=len(results),
+            passed=passed_count,
+            failed=failed_count,
+            current_question=question,
+            running=True,
+            started_at=started_at,
+        )
 
         status = "PASS" if result["passed"] else "FAIL"
         actual = result["actual"]
@@ -251,6 +328,18 @@ def main() -> int:
         )
 
     write_reports(results)
+
+    passed_count, failed_count = progress_counts(results)
+    write_progress(
+        total=len(cases),
+        completed=len(results),
+        passed=passed_count,
+        failed=failed_count,
+        current_question=None,
+        running=False,
+        started_at=started_at,
+        finished_at=datetime.now().isoformat(timespec="seconds"),
+    )
 
     return 0 if all(r["passed"] for r in results) else 1
 

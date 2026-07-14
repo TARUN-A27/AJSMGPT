@@ -42,6 +42,7 @@ REGRESSION_CASES_MD = REPORTS_DIR / "eval_candidates" / "regression_cases.md"
 APPROVED_REGRESSION_JSONL = AUTOMATE_DIR / "evals" / "approved_regression_cases.jsonl"
 APPROVED_REGRESSION_SEED_MD = REPORTS_DIR / "eval_candidates" / "approved_regression_seed.md"
 LATEST_REGRESSION_RUN_JSON = REPORTS_DIR / "regression_runs" / "latest_approved_regression_run.json"
+LATEST_REGRESSION_PROGRESS_JSON = REPORTS_DIR / "regression_runs" / "latest_approved_regression_progress.json"
 LATEST_REGRESSION_RUN_MD = REPORTS_DIR / "regression_runs" / "latest_approved_regression_run.md"
 
 BUILD_REGRESSION_SCRIPT = AUTOMATE_DIR / "scripts" / "build_regression_candidates.py"
@@ -858,6 +859,13 @@ REGRESSION_RUN_STATUS: dict[str, Any] = {
 }
 
 
+def _read_regression_progress() -> dict[str, Any]:
+    progress = read_json(LATEST_REGRESSION_PROGRESS_JSON, {}) or {}
+    if not isinstance(progress, dict):
+        return {}
+    return progress
+
+
 def _approved_regression_worker() -> None:
     with REGRESSION_RUN_LOCK:
         REGRESSION_RUN_STATUS.update({
@@ -877,100 +885,48 @@ def _approved_regression_worker() -> None:
             "message": "Approved regression run finished.",
             "result": result,
         })
+
+
+def _start_approved_regression() -> dict[str, Any]:
+    with REGRESSION_RUN_LOCK:
+        if REGRESSION_RUN_STATUS.get("running"):
+            return {
+                "started": False,
+                "message": "Approved regression run is already running.",
+                "status": dict(REGRESSION_RUN_STATUS),
+                "progress": _read_regression_progress(),
+                "summary": learning_cycle_regression_summary(),
+            }
+
+        REGRESSION_RUN_STATUS.update({
+            "running": True,
+            "started_at": now_iso(),
+            "finished_at": None,
+            "message": "Approved regression run is starting.",
+            "result": None,
+        })
+        status = dict(REGRESSION_RUN_STATUS)
+
+    thread = threading.Thread(target=_approved_regression_worker, daemon=True)
+    thread.start()
+
+    return {
+        "started": True,
+        "message": "Approved regression run started.",
+        "status": status,
+        "progress": _read_regression_progress(),
+        "summary": learning_cycle_regression_summary(),
+    }
 
 
 @router.post("/api/learning-cycle/run-approved-regression")
 def learning_cycle_run_approved_regression() -> dict[str, Any]:
-    with REGRESSION_RUN_LOCK:
-        if REGRESSION_RUN_STATUS.get("running"):
-            return {
-                "started": False,
-                "message": "Approved regression run is already running.",
-                "status": dict(REGRESSION_RUN_STATUS),
-                "summary": learning_cycle_regression_summary(),
-            }
-
-    thread = threading.Thread(target=_approved_regression_worker, daemon=True)
-    thread.start()
-
-    with REGRESSION_RUN_LOCK:
-        status = dict(REGRESSION_RUN_STATUS)
-
-    return {
-        "started": True,
-        "message": "Approved regression run started.",
-        "status": status,
-        "summary": learning_cycle_regression_summary(),
-    }
-
-
-@router.get("/api/learning-cycle/regression-run-status")
-def learning_cycle_regression_run_status() -> dict[str, Any]:
-    with REGRESSION_RUN_LOCK:
-        status = dict(REGRESSION_RUN_STATUS)
-
-    return {
-        "status": status,
-        "summary": learning_cycle_regression_summary(),
-    }
-
-
-
-
-REGRESSION_RUN_LOCK = threading.Lock()
-REGRESSION_RUN_STATUS: dict[str, Any] = {
-    "running": False,
-    "started_at": None,
-    "finished_at": None,
-    "message": "No approved regression run started yet.",
-    "result": None,
-}
-
-
-def _approved_regression_worker() -> None:
-    with REGRESSION_RUN_LOCK:
-        REGRESSION_RUN_STATUS.update({
-            "running": True,
-            "started_at": now_iso(),
-            "finished_at": None,
-            "message": "Approved regression run is running.",
-            "result": None,
-        })
-
-    result = _run_automate_script(RUN_APPROVED_REGRESSION_SCRIPT, timeout_seconds=3600)
-
-    with REGRESSION_RUN_LOCK:
-        REGRESSION_RUN_STATUS.update({
-            "running": False,
-            "finished_at": now_iso(),
-            "message": "Approved regression run finished.",
-            "result": result,
-        })
+    return _start_approved_regression()
 
 
 @router.post("/api/learning-cycle/start-approved-regression")
 def learning_cycle_start_approved_regression() -> dict[str, Any]:
-    with REGRESSION_RUN_LOCK:
-        if REGRESSION_RUN_STATUS.get("running"):
-            return {
-                "started": False,
-                "message": "Approved regression run is already running.",
-                "status": dict(REGRESSION_RUN_STATUS),
-                "summary": learning_cycle_regression_summary(),
-            }
-
-    thread = threading.Thread(target=_approved_regression_worker, daemon=True)
-    thread.start()
-
-    with REGRESSION_RUN_LOCK:
-        status = dict(REGRESSION_RUN_STATUS)
-
-    return {
-        "started": True,
-        "message": "Approved regression run started.",
-        "status": status,
-        "summary": learning_cycle_regression_summary(),
-    }
+    return _start_approved_regression()
 
 
 @router.get("/api/learning-cycle/regression-run-status")
@@ -978,8 +934,14 @@ def learning_cycle_regression_run_status() -> dict[str, Any]:
     with REGRESSION_RUN_LOCK:
         status = dict(REGRESSION_RUN_STATUS)
 
+    progress = _read_regression_progress()
+    if progress.get("running") and not status.get("running"):
+        status["running"] = True
+        status["message"] = "Approved regression run is running."
+
     return {
         "status": status,
+        "progress": progress,
         "summary": learning_cycle_regression_summary(),
     }
 

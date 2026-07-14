@@ -41,6 +41,8 @@ REGRESSION_CASES_JSON = REPORTS_DIR / "eval_candidates" / "regression_cases.json
 REGRESSION_CASES_MD = REPORTS_DIR / "eval_candidates" / "regression_cases.md"
 APPROVED_REGRESSION_JSONL = AUTOMATE_DIR / "evals" / "approved_regression_cases.jsonl"
 APPROVED_REGRESSION_SEED_MD = REPORTS_DIR / "eval_candidates" / "approved_regression_seed.md"
+DEFERRED_REGRESSION_JSONL = AUTOMATE_DIR / "evals" / "deferred_regression_cases.jsonl"
+DEFERRED_REGRESSION_MD = REPORTS_DIR / "eval_candidates" / "deferred_regression_cases.md"
 LATEST_REGRESSION_RUN_JSON = REPORTS_DIR / "regression_runs" / "latest_approved_regression_run.json"
 LATEST_REGRESSION_PROGRESS_JSON = REPORTS_DIR / "regression_runs" / "latest_approved_regression_progress.json"
 LATEST_REGRESSION_RUN_MD = REPORTS_DIR / "regression_runs" / "latest_approved_regression_run.md"
@@ -791,15 +793,21 @@ def _run_automate_script(script_path: Path, timeout_seconds: int = 900) -> dict[
 def learning_cycle_regression_summary() -> dict[str, Any]:
     regression_payload = read_json(REGRESSION_CASES_JSON, {}) or {}
     approved_cases = read_jsonl(APPROVED_REGRESSION_JSONL)
+    deferred_cases = read_jsonl(DEFERRED_REGRESSION_JSONL)
     latest_run = read_json(LATEST_REGRESSION_RUN_JSON, {}) or {}
 
     latest_run_results = latest_run.get("results") if isinstance(latest_run.get("results"), list) else []
     failed_results = [item for item in latest_run_results if not item.get("passed")]
+    deferred_memory = [item for item in deferred_cases if item.get("status") == "deferred_memory_required"]
+    deferred_hr = [item for item in deferred_cases if item.get("status") == "deferred_hr_scope"]
 
     return {
         "counts": {
             "regression_candidates": _regression_case_count(regression_payload),
             "approved_cases": len(approved_cases),
+            "deferred_cases": len(deferred_cases),
+            "deferred_memory": len(deferred_memory),
+            "deferred_hr": len(deferred_hr),
             "latest_run_total": latest_run.get("total"),
             "latest_run_passed": latest_run.get("passed"),
             "latest_run_failed": latest_run.get("failed"),
@@ -812,8 +820,13 @@ def learning_cycle_regression_summary() -> dict[str, Any]:
             "failed": latest_run.get("failed"),
             "failed_preview": failed_results[:20],
         },
+        "deferred": {
+            "memory_required": deferred_memory[:50],
+            "hr_scope": deferred_hr[:50],
+        },
         "reports": {
             "approved_seed_md": read_text(APPROVED_REGRESSION_SEED_MD)[:12000],
+            "deferred_md": read_text(DEFERRED_REGRESSION_MD)[:12000],
             "latest_run_md": read_text(LATEST_REGRESSION_RUN_MD)[:12000],
         },
         "files": {
@@ -821,6 +834,8 @@ def learning_cycle_regression_summary() -> dict[str, Any]:
             "regression_cases_md": file_info(REGRESSION_CASES_MD),
             "approved_regression_jsonl": file_info(APPROVED_REGRESSION_JSONL),
             "approved_seed_md": file_info(APPROVED_REGRESSION_SEED_MD),
+            "deferred_regression_jsonl": file_info(DEFERRED_REGRESSION_JSONL),
+            "deferred_regression_md": file_info(DEFERRED_REGRESSION_MD),
             "latest_run_json": file_info(LATEST_REGRESSION_RUN_JSON),
             "latest_run_md": file_info(LATEST_REGRESSION_RUN_MD),
         },

@@ -861,11 +861,14 @@
       const failed = progress.failed ?? counts.latest_run_failed ?? latestRun.failed ?? 0;
       const percent = progress.percent ?? (total ? Math.round((completed / total) * 100) : 0);
       const currentQuestion = progress.current_question || (running === "Running" ? "Preparing next question..." : "-");
+      const deferredMemory = counts.deferred_memory ?? 0;
+      const deferredHr = counts.deferred_hr ?? 0;
 
       return `
         <section class="cards">
           ${renderMetric("Regression candidates", counts.regression_candidates ?? 0, "Generated from fixed questions")}
           ${renderMetric("Approved cases", counts.approved_cases ?? 0, "Seeded for live regression")}
+          ${renderMetric("Deferred", counts.deferred_cases ?? 0, `Memory: ${deferredMemory}, HR: ${deferredHr}`)}
           ${renderMetric("Progress", `${completed} / ${total}`, `${percent}% complete`)}
           ${renderMetric("Passed / Failed", `${passed} / ${failed}`, "Failed must stay zero")}
           ${renderMetric("Run state", running, status.message || "Approved regression")}
@@ -900,6 +903,11 @@
               <div class="query-slide-title">Regression action output</div>
               <pre id="regressionActionOutput">${escapeHtml(regressionLastOutput)}</pre>
             </div>
+
+            <details>
+              <summary>Deferred regression cases</summary>
+              <pre>${escapeHtml(regression?.reports?.deferred_md || "No deferred regression cases yet.")}</pre>
+            </details>
 
             <details>
               <summary>Latest regression run report</summary>

@@ -47,25 +47,28 @@
       "name": "supplier",
       "aliases": ["supplier", "vendor", "party"],
       "columns": [
-        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.85, "evidence": "metadata and recorded foreign key"},
-        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
-        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "confidence": 0.8, "evidence": "metadata and purchase analytics router"}
+        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["entity_filter", "identifier", "join_identifier"], "confidence": 0.85, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["entity_filter", "identifier", "join_identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["display", "grouping", "entity_filter"], "confidence": 0.8, "evidence": "metadata and purchase analytics router"}
       ]
     },
     {
       "name": "supplier_name",
       "aliases": ["supplier name", "vendor name", "party name"],
-      "columns": [{"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and purchase analytics router"}]
+      "columns": [{"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["display", "grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and purchase analytics router"}]
     },
     {
       "name": "supplier_identifier",
       "aliases": ["supplier code", "vendor code", "party code"],
-      "columns": [{"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"}]
+      "columns": [
+        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"}
+      ]
     },
     {
       "name": "material",
       "aliases": ["material", "item", "item name", "material name"],
-      "columns": [{"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and current business routers"}]
+      "columns": [{"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["display", "grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and current business routers"}]
     },
     {
       "name": "item_identifier",

@@ -37,8 +37,26 @@ class SchemaGroundingTests(unittest.TestCase):
             dimensions=[Dimension(concept="supplier", grouping=True)], date_range=DATE_RANGE,
         ))
         self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.PURCHASEORDER", "SCM.PARTYMASTER"])
+        self.assertEqual([path.constraint_names for path in result.allowed_relationship_paths], [["SUPCODE_PARTYMASTER-PARTYCODE"]])
+        columns = {(column.full_table_name, column.column_name): column.role for column in result.selected_columns}
+        self.assertEqual(columns[("SCM.PARTYMASTER", "PARTYNAME")], "grouping")
+        self.assertEqual(columns[("INVENTORY.PURCHASEORDER", "SUP_CODE")], "join_identifier")
+        self.assertNotIn("grouping", [column.role for column in result.selected_columns if column.column_name == "SUP_CODE"])
+
+    def test_purchase_supplier_code_keeps_anchor_identifier_without_display_table(self):
+        result = ground_query_plan(plan(
+            "purchase", "purchase", operation="ranking",
+            measures=[Measure(concept="purchase value", aggregation=Aggregation.SUM)],
+            dimensions=[Dimension(concept="supplier code", grouping=True)],
+        ))
+        self.assert_grounded(result)
         self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.PURCHASEORDER"])
-        self.assertEqual({column.column_name for column in result.selected_columns}, {"NET", "ORDERDATE", "SUP_CODE"})
+        self.assertEqual(result.allowed_relationship_paths, [])
+        self.assertEqual(
+            [(column.full_table_name, column.column_name, column.role) for column in result.selected_columns],
+            [("INVENTORY.PURCHASEORDER", "NET", "measure"), ("INVENTORY.PURCHASEORDER", "SUP_CODE", "grouping")],
+        )
 
     def test_purchase_by_material_uses_only_verified_item_path(self):
         result = ground_query_plan(plan(
@@ -63,7 +81,13 @@ class SchemaGroundingTests(unittest.TestCase):
         ))
         self.assert_grounded(result)
         self.assertEqual([path.constraint_names for path in result.allowed_relationship_paths], [["FK_ISSUE"]])
-        self.assertEqual({column.column_name for column in result.selected_columns}, {"ISSUEDATE", "ITEM_NAME", "QTY"})
+        columns = {(column.full_table_name, column.column_name): column.role for column in result.selected_columns}
+        self.assertEqual(
+            {column_name for _, column_name in columns},
+            {"CODE", "ISSUEDATE", "ITEM_CODE", "ITEM_NAME", "QTY"},
+        )
+        self.assertEqual(columns[("INVENTORY.INVITEMS", "ITEM_NAME")], "grouping")
+        self.assertEqual(columns[("INVENTORY.ISSUE", "CODE")], "join_identifier")
 
     def test_supplier_lookup_needs_only_party_master(self):
         result = ground_query_plan(plan("purchase", "supplier", operation="lookup", dimensions=[Dimension(concept="supplier name", grouping=True)]))

@@ -183,6 +183,34 @@ def _source_summary(plan: QueryPlan) -> dict:
     }
 
 
+def _path_tables(start: str, path: list[dict]) -> list[str]:
+    """Return the ordered table traversal for a verified relationship path."""
+    tables = [start]
+    current = start
+    for edge in path:
+        if edge["from_table"] == current:
+            current = edge["to_table"]
+        elif edge["to_table"] == current:
+            current = edge["from_table"]
+        else:
+            raise RuntimeError("Relationship path is not contiguous.")
+        tables.append(current)
+    return tables
+
+
+def _add_join_identifiers(path: list[dict], selected_columns: list[GroundedColumn]) -> None:
+    """Expose only verified FK endpoints needed to reach a display table."""
+    for edge in path:
+        for table_key, column_key in (("from_table", "from_column"), ("to_table", "to_column")):
+            selected_columns.append(GroundedColumn(
+                full_table_name=edge[table_key],
+                column_name=edge[column_key],
+                logical_concept="relationship_identifier",
+                role="join_identifier",
+                confidence=edge["confidence"],
+            ))
+
+
 def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
     """Ground only V1 catalog concepts; never generate SQL or access external services."""
     catalog, metadata_columns, metadata_edges = _load_inputs()
@@ -234,9 +262,10 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
         for edge in path:
             selected_tables.update((edge["from_table"], edge["to_table"]))
         if path:
-            path_model = RelationshipPath(constraint_names=[edge["constraint_name"] for edge in path], tables=[anchors[0]] + [edge["to_table"] if edge["from_table"] == anchors[0] else edge["from_table"] for edge in path], confidence=min(edge["confidence"] for edge in path))
+            path_model = RelationshipPath(constraint_names=[edge["constraint_name"] for edge in path], tables=_path_tables(anchors[0], path), confidence=min(edge["confidence"] for edge in path))
             if path_model not in paths:
                 paths.append(path_model)
+            _add_join_identifiers(path, selected_columns)
         selected_columns.append(GroundedColumn(full_table_name=target_table, column_name=column["column"], logical_concept=concept["name"], role=role, confidence=column["confidence"]))
         result.evidence.append(GroundingEvidence(requirement=f"{requirement_type}:{phrase}", logical_concept=concept["name"], source=column["evidence"], confidence=column["confidence"]))
         confidences.append(column["confidence"])

@@ -99,6 +99,35 @@ class NLPApiTests(unittest.TestCase):
         with patch.dict(os.environ, {"NLP_QUERY_PLAN_API_ENABLED": "true"}), patch("app.nlp_router.extract_query_plan", side_effect=QueryPlanValidationError("invalid")):
             self.assertEqual(self.client.post("/v1/nlp/understand", json={"question": "purchase value"}).status_code, 422)
 
+    def test_ground_disabled_returns_404(self) -> None:
+        with patch.dict(os.environ, {"NLP_GROUNDING_API_ENABLED": "false"}):
+            self.assertEqual(self.client.post("/v1/nlp/ground", json={"question": "purchase value"}).status_code, 404)
+
+    def test_ground_enabled_returns_complete_pipeline(self) -> None:
+        from app.query_plan import QueryPlan
+
+        plan = QueryPlan.model_validate({
+            "original_question": "purchase value",
+            "domain": "purchase",
+            "operation": "aggregate",
+            "business_subject": {"concept": "purchase"},
+            "measures": [{"concept": "purchase value", "aggregation": "sum"}],
+            "confidence": 0.9,
+        })
+        with patch.dict(os.environ, {"NLP_GROUNDING_API_ENABLED": "true"}), patch("app.nlp_router.extract_query_plan", return_value=plan) as extractor:
+            response = self.client.post("/v1/nlp/ground", json={"question": "purchase value"})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(set(body), {"correction", "analysis", "query_plan", "grounding", "requires_clarification"})
+        self.assertEqual(body["query_plan"]["domain"], "purchase")
+        self.assertTrue(body["grounding"]["selected_tables"])
+        self.assertFalse(body["requires_clarification"])
+        self.assertIsNotNone(extractor.call_args.kwargs["nlp_analysis"])
+
+    def test_ground_model_failure_is_502(self) -> None:
+        with patch.dict(os.environ, {"NLP_GROUNDING_API_ENABLED": "true"}), patch("app.nlp_router.extract_query_plan", side_effect=QueryPlanExtractionError("offline")):
+            self.assertEqual(self.client.post("/v1/nlp/ground", json={"question": "purchase value"}).status_code, 502)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

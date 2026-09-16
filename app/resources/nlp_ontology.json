@@ -1,0 +1,30 @@
+{
+  "domains": {
+    "purchase": ["purchase", "purchased", "procurement", "buying", "order"],
+    "mrs": ["mrs", "material requisition", "requisition", "indent"],
+    "consumption": ["consumption", "consumed", "consume", "issued", "issue"]
+  },
+  "operations": {
+    "detail": ["detail", "details", "show", "list", "display"],
+    "aggregate": ["total", "sum", "average", "count", "how much"],
+    "trend": ["trend", "over time", "monthly", "by month"],
+    "ranking": ["top", "bottom", "highest", "lowest", "rank"],
+    "comparison": ["compare", "versus", "vs", "difference"],
+    "lookup": ["find", "lookup", "search", "which"]
+  },
+  "measures": {
+    "quantity": ["quantity", "qty", "quantities"],
+    "value": ["value", "amount", "cost", "spend"],
+    "rate": ["rate", "price", "unit price"],
+    "count": ["count", "number of", "how many"]
+  },
+  "dimensions": {
+    "item": ["item", "items"],
+    "material": ["material", "materials", "product", "products"],
+    "supplier": ["supplier", "suppliers", "vendor", "vendors", "party", "parties"],
+    "department": ["department", "departments", "dept"],
+    "date": ["date", "day", "today", "yesterday"],
+    "month": ["month", "months", "monthly"],
+    "year": ["year", "years", "annual"]
+  }
+}

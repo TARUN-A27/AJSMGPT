@@ -6,9 +6,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.query_engine import answer_question
+from app.nlp_router import router as nlp_router
 
 
 app = FastAPI(title="AJSMGPT API")
+app.include_router(nlp_router)
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 TEMPLATES_DIR = BASE_DIR / "templates"

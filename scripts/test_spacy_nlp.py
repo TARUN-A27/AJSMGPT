@@ -33,10 +33,31 @@ class SpacyQuestionAnalyzerTests(unittest.TestCase):
         self.assertEqual(analyze_question_with_spacy("Top 10 suppliers").ranking_limit, 10)
         self.assertEqual(analyze_question_with_spacy("Bottom 5 materials").ranking_limit, 5)
 
+    def test_primary_operation_priorities(self) -> None:
+        self.assertEqual(
+            analyze_question_with_spacy("Show top 10 suppliers by purchase value in the last 6 months").primary_operation,
+            "ranking",
+        )
+        self.assertEqual(analyze_question_with_spacy("Compare top 10 suppliers").primary_operation, "comparison")
+
     def test_date_expressions(self) -> None:
         self.assertIn("last 6 months", analyze_question_with_spacy("Consumption last 6 months").date_expressions)
         self.assertIn("in 2026", analyze_question_with_spacy("Purchases in 2026").date_expressions)
         self.assertIn("between january and march", analyze_question_with_spacy("Purchases between January and March").date_expressions)
+
+    def test_temporal_filter_is_not_time_grouping(self) -> None:
+        result = analyze_question_with_spacy("Show top 10 suppliers by purchase value in the last 6 months")
+        self.assertIn("last 6 months", result.date_expressions)
+        self.assertFalse(result.has_explicit_time_grouping)
+        self.assertIsNone(result.time_grouping_granularity)
+        self.assertNotIn("month", result.detected_dimensions)
+
+    def test_explicit_temporal_grouping(self) -> None:
+        for question in ("purchase value by month in the last 6 months", "monthly purchase value"):
+            result = analyze_question_with_spacy(question)
+            self.assertTrue(result.has_explicit_time_grouping)
+            self.assertEqual(result.time_grouping_granularity, "month")
+            self.assertIn("month", result.detected_dimensions)
 
     def test_comparison_and_negation(self) -> None:
         result = analyze_question_with_spacy("Compare higher purchase value versus last month, excluding returns")

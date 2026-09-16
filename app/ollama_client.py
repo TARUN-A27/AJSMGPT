@@ -31,26 +31,32 @@ def get_embedding(text: str) -> list[float]:
     return data["embedding"]
 
 
-def chat_with_qwen(system_prompt: str, user_prompt: str) -> str:
+def chat_with_qwen(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    think: bool | None = None,
+    num_predict: int | None = None,
+    temperature: float | None = None,
+) -> str:
+    options = {"temperature": 0.1 if temperature is None else temperature}
+    if num_predict is not None:
+        options["num_predict"] = num_predict
+    payload = {
+        "model": OLLAMA_CHAT_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "stream": False,
+        "options": options,
+    }
+    if think is not None:
+        payload["think"] = think
+
     response = requests.post(
         f"{OLLAMA_URL}/api/chat",
-        json={
-            "model": OLLAMA_CHAT_MODEL,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt
-                }
-            ],
-            "stream": False,
-            "options": {
-                "temperature": 0.1
-            }
-        },
+        json=payload,
         timeout=180
     )
 

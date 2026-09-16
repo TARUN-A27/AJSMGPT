@@ -4,6 +4,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -15,6 +16,7 @@ from app.query_plan_extractor import (
     QueryPlanValidationError,
     extract_query_plan,
 )
+from app.spacy_nlp import analyze_question_with_spacy
 
 
 def plan_json(**overrides) -> str:
@@ -44,6 +46,14 @@ class Calls:
 
 
 class QueryPlanExtractorTests(unittest.TestCase):
+    def test_default_runtime_path_disables_thinking_and_bounds_output(self) -> None:
+        with patch("app.query_plan_extractor.chat_with_qwen", return_value=plan_json(original_question="Question")) as chat:
+            extract_query_plan("Question")
+        self.assertEqual(
+            chat.call_args.kwargs,
+            {"think": False, "temperature": 0.0, "num_predict": 1000},
+        )
+
     def test_purchase_aggregate(self) -> None:
         call = Calls(plan_json(original_question="What is total purchases?"))
         plan = extract_query_plan("What is total purchases?", model_call=call)
@@ -77,7 +87,7 @@ class QueryPlanExtractorTests(unittest.TestCase):
 
     def test_no_json_object(self) -> None:
         call = Calls("not structured", "still not structured")
-        with self.assertRaises(QueryPlanResponseError):
+        with self.assertRaises(QueryPlanValidationError):
             extract_query_plan("Question", model_call=call)
         self.assertEqual(len(call.calls), 2)
 
@@ -99,7 +109,7 @@ class QueryPlanExtractorTests(unittest.TestCase):
 
     def test_two_invalid_responses_stop_after_one_correction(self) -> None:
         call = Calls("{broken", "{also broken")
-        with self.assertRaises(QueryPlanResponseError):
+        with self.assertRaises(QueryPlanValidationError):
             extract_query_plan("Question", model_call=call)
         self.assertEqual(len(call.calls), 2)
 
@@ -114,6 +124,134 @@ class QueryPlanExtractorTests(unittest.TestCase):
         restored = type(plan).model_validate(json.loads(plan.model_dump_json()))
         self.assertEqual(restored, plan)
         self.assertNotEqual(EntityStatus.UNRESOLVED.value, "resolved")
+
+    def test_compact_spacy_evidence_is_included(self) -> None:
+        question = "Show top 10 suppliers by purchase value last month"
+        call = Calls(plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": True}],
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+        ))
+        extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        prompt = call.calls[0][1]
+        self.assertIn('"ranking_limit":10', prompt)
+        self.assertIn('"primary_operation":"ranking"', prompt)
+        self.assertIn('"has_explicit_time_grouping":false', prompt)
+        self.assertIn('"time_grouping_granularity":null', prompt)
+        self.assertNotIn('"lemmas"', prompt)
+        self.assertNotIn('"meaningful_tokens"', prompt)
+
+    def test_injected_two_argument_model_call_remains_compatible(self) -> None:
+        call = Calls(plan_json(original_question="Question"))
+        self.assertEqual(extract_query_plan("Question", model_call=call).original_question, "Question")
+
+    @patch("app.ollama_client.requests.post")
+    def test_chat_defaults_preserve_existing_payload(self, post: Mock) -> None:
+        from app.ollama_client import chat_with_qwen
+
+        post.return_value.json.return_value = {"message": {"content": "ok"}}
+        chat_with_qwen("system", "user")
+        payload = post.call_args.kwargs["json"]
+        self.assertNotIn("think", payload)
+        self.assertEqual(payload["options"], {"temperature": 0.1})
+
+    @patch("app.ollama_client.requests.post")
+    def test_chat_optional_controls_are_sent(self, post: Mock) -> None:
+        from app.ollama_client import chat_with_qwen
+
+        post.return_value.json.return_value = {"message": {"content": "ok"}}
+        chat_with_qwen("system", "user", think=False, num_predict=900, temperature=0.0)
+        payload = post.call_args.kwargs["json"]
+        self.assertIs(payload["think"], False)
+        self.assertEqual(payload["options"]["num_predict"], 900)
+        self.assertEqual(payload["options"]["temperature"], 0.0)
+
+    def test_semantic_failure_is_corrected_once(self) -> None:
+        question = "Show top 10 suppliers by purchase value in the last 6 months"
+        invalid = plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+        )
+        corrected = plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": True}],
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+        )
+        call = Calls(invalid, corrected)
+        plan = extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertTrue(plan.dimensions[0].grouping)
+        self.assertEqual(len(call.calls), 2)
+        self.assertIn("Semantic violations:", call.calls[1][1])
+
+    def test_unused_month_dimension_is_corrected(self) -> None:
+        question = "Show purchase value in the last 6 months"
+        invalid = plan_json(
+            original_question=question,
+            dimensions=[{"concept": "month", "grouping": False}],
+        )
+        corrected = plan_json(original_question=question)
+        call = Calls(invalid, corrected)
+        self.assertEqual(
+            extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question)).dimensions,
+            [],
+        )
+
+    def test_date_filter_only_month_grouping_is_normalized_without_retry(self) -> None:
+        question = "Show top 10 suppliers by purchase value in the last 6 months"
+        raw = plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[
+                {"concept": "supplier", "grouping": True},
+                {"concept": "month", "grouping": True},
+            ],
+            date_range={"kind": "relative", "original_text": "last 6 months"},
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+            requested_output={"fields": ["supplier", "value", "month"]},
+        )
+        call = Calls(raw)
+        result = extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual([dimension.concept for dimension in result.dimensions], ["supplier"])
+        self.assertEqual(result.requested_output.fields, ["supplier", "value"])
+        self.assertEqual(len(call.calls), 1)
+
+    def test_explicit_month_grouping_is_retained(self) -> None:
+        question = "Show monthly purchase value by supplier in the last 6 months"
+        raw = plan_json(
+            original_question=question,
+            operation="trend",
+            dimensions=[
+                {"concept": "month", "grouping": True},
+                {"concept": "supplier", "grouping": True},
+            ],
+            date_range={"kind": "relative", "original_text": "last 6 months"},
+            requested_output={"fields": ["month", "supplier", "value"]},
+        )
+        result = extract_query_plan(question, model_call=Calls(raw), nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual([dimension.concept for dimension in result.dimensions], ["month", "supplier"])
+        self.assertIn("month", result.requested_output.fields)
+
+    def test_malformed_then_semantic_failure_has_no_extra_retry(self) -> None:
+        question = "Show top 10 suppliers by purchase value"
+        semantic_error = plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+        )
+        call = Calls("{broken", semantic_error)
+        with self.assertRaises(QueryPlanValidationError):
+            extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual(len(call.calls), 2)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,134 @@
+{
+  "version": "1.0",
+  "evidence": "Local schema metadata, recorded foreign-key metadata, and existing AJSMGPT business routing code.",
+  "domains": [
+    {
+      "name": "purchase",
+      "aliases": ["purchase", "purchasing", "purchase order", "po"],
+      "primary_tables": ["INVENTORY.PURCHASEORDER"],
+      "confidence": 0.9
+    },
+    {
+      "name": "mrs",
+      "aliases": ["mrs", "material requisition", "material request"],
+      "primary_tables": ["INVENTORY.MRS_TEMP"],
+      "confidence": 0.85
+    },
+    {
+      "name": "consumption",
+      "aliases": ["consumption", "issue", "issued"],
+      "primary_tables": ["INVENTORY.ISSUE"],
+      "confidence": 0.85
+    },
+    {
+      "name": "supplier_lookup",
+      "aliases": ["supplier", "vendor", "party"],
+      "primary_tables": ["SCM.PARTYMASTER"],
+      "confidence": 0.8
+    }
+  ],
+  "concepts": [
+    {
+      "name": "purchase_quantity",
+      "aliases": ["purchase quantity", "quantity", "qty"],
+      "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "QTY", "roles": ["measure"], "confidence": 0.9, "evidence": "metadata and purchase analytics router"}]
+    },
+    {
+      "name": "purchase_value",
+      "aliases": ["purchase value", "value", "net value", "amount"],
+      "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "NET", "roles": ["measure"], "confidence": 0.85, "evidence": "metadata and purchase analytics router"}]
+    },
+    {
+      "name": "purchase_date",
+      "aliases": ["purchase date", "order date", "date"],
+      "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "ORDERDATE", "roles": ["date_filter", "grouping"], "confidence": 0.8, "evidence": "metadata and purchase analytics router"}]
+    },
+    {
+      "name": "supplier",
+      "aliases": ["supplier", "vendor", "party"],
+      "columns": [
+        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.85, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "confidence": 0.8, "evidence": "metadata and purchase analytics router"}
+      ]
+    },
+    {
+      "name": "supplier_name",
+      "aliases": ["supplier name", "vendor name", "party name"],
+      "columns": [{"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and purchase analytics router"}]
+    },
+    {
+      "name": "supplier_identifier",
+      "aliases": ["supplier code", "vendor code", "party code"],
+      "columns": [{"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"}]
+    },
+    {
+      "name": "material",
+      "aliases": ["material", "item", "item name", "material name"],
+      "columns": [{"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and current business routers"}]
+    },
+    {
+      "name": "item_identifier",
+      "aliases": ["item code", "material code", "item identifier"],
+      "columns": [
+        {"table": "INVENTORY.INVITEMS", "column": "ITEM_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign keys"},
+        {"table": "INVENTORY.PURCHASEORDER", "column": "ITEM_CODE", "roles": ["entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
+        {"table": "INVENTORY.MRS_TEMP", "column": "ITEM_CODE", "roles": ["entity_filter", "identifier"], "confidence": 0.85, "evidence": "metadata"},
+        {"table": "INVENTORY.ISSUE", "column": "CODE", "roles": ["entity_filter", "identifier"], "confidence": 0.85, "evidence": "metadata and recorded foreign key"}
+      ]
+    },
+    {
+      "name": "mrs_quantity",
+      "aliases": ["mrs quantity", "quantity", "qty"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "QTY", "roles": ["measure"], "confidence": 0.85, "evidence": "metadata and mrs router"}]
+    },
+    {
+      "name": "mrs_date",
+      "aliases": ["mrs date", "request date", "date"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "MRSDATE", "roles": ["date_filter", "grouping"], "confidence": 0.8, "evidence": "metadata and mrs router"}]
+    },
+    {
+      "name": "department",
+      "aliases": ["department", "dept"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "DEPT_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.7, "evidence": "metadata; no MRS_TEMP-to-DEPT foreign key is catalogued"}]
+    },
+    {
+      "name": "department_name",
+      "aliases": ["department name", "dept name"],
+      "columns": [{"table": "INVENTORY.DEPT", "column": "DEPT_NAME", "roles": ["grouping", "entity_filter"], "confidence": 0.65, "evidence": "metadata; relationship path is not recorded"}]
+    },
+    {
+      "name": "consumption_quantity",
+      "aliases": ["consumption quantity", "issued quantity", "quantity", "qty"],
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "QTY", "roles": ["measure"], "confidence": 0.85, "evidence": "metadata"}]
+    },
+    {
+      "name": "consumption_value",
+      "aliases": ["consumption value", "issue value", "issued value"],
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEVALUE", "roles": ["measure"], "confidence": 0.8, "evidence": "metadata"}]
+    },
+    {
+      "name": "consumption_date",
+      "aliases": ["consumption date", "issue date", "issued date", "date"],
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEDATE", "roles": ["date_filter", "grouping"], "confidence": 0.8, "evidence": "metadata"}]
+    },
+    {
+      "name": "consumption_status",
+      "aliases": ["issue status", "consumption status"],
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "STATUS", "roles": ["status"], "confidence": 0.65, "evidence": "metadata; status values are not catalogued"}]
+    },
+    {
+      "name": "name",
+      "aliases": ["name"],
+      "columns": [
+        {"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["grouping", "entity_filter"], "confidence": 0.5, "evidence": "metadata"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "confidence": 0.5, "evidence": "metadata"}
+      ]
+    }
+  ],
+  "relationships": [
+    {"from_table": "INVENTORY.PURCHASEORDER", "from_column": "ITEM_CODE", "to_table": "INVENTORY.INVITEMS", "to_column": "ITEM_CODE", "constraint_name": "ITEMCODE_INVITEMS-ITEMCODE", "confidence": 1.0, "evidence": "schema_relationships.json"},
+    {"from_table": "INVENTORY.PURCHASEORDER", "from_column": "SUP_CODE", "to_table": "SCM.PARTYMASTER", "to_column": "PARTYCODE", "constraint_name": "SUPCODE_PARTYMASTER-PARTYCODE", "confidence": 1.0, "evidence": "schema_relationships.json"},
+    {"from_table": "INVENTORY.ISSUE", "from_column": "CODE", "to_table": "INVENTORY.INVITEMS", "to_column": "ITEM_CODE", "constraint_name": "FK_ISSUE", "confidence": 1.0, "evidence": "schema_relationships.json"}
+  ]
+}

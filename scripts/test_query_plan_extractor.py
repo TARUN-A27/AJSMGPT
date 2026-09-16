@@ -147,6 +147,15 @@ class QueryPlanExtractorTests(unittest.TestCase):
         call = Calls(plan_json(original_question="Question"))
         self.assertEqual(extract_query_plan("Question", model_call=call).original_question, "Question")
 
+    def test_corrected_input_preserves_raw_original_question(self) -> None:
+        call = Calls(plan_json(original_question="show supplier purchase quantity"))
+        result = extract_query_plan(
+            "show supplier purchase quantity",
+            original_question="show suplier purchse qunatity",
+            model_call=call,
+        )
+        self.assertEqual(result.original_question, "show suplier purchse qunatity")
+
     @patch("app.ollama_client.requests.post")
     def test_chat_defaults_preserve_existing_payload(self, post: Mock) -> None:
         from app.ollama_client import chat_with_qwen

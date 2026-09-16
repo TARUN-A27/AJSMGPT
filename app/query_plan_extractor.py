@@ -76,7 +76,11 @@ def _extract_json_object(response: str) -> dict[str, Any]:
     raise QueryPlanResponseError("Model response contained no JSON object.")
 
 
-def _parse_plan(response: str, nlp_analysis: NLPAnalysis | None = None) -> QueryPlan:
+def _parse_plan(
+    response: str,
+    nlp_analysis: NLPAnalysis | None = None,
+    original_question: str | None = None,
+) -> QueryPlan:
     try:
         data = _extract_json_object(response)
     except QueryPlanResponseError:
@@ -85,6 +89,8 @@ def _parse_plan(response: str, nlp_analysis: NLPAnalysis | None = None) -> Query
         plan = QueryPlan.model_validate(data)
     except ValidationError as exc:
         raise QueryPlanValidationError("Model JSON did not satisfy the QueryPlan contract.") from exc
+    if original_question is not None:
+        plan = plan.model_copy(update={"original_question": original_question.strip()})
     return validate_query_plan_semantics(plan, nlp_analysis)
 
 
@@ -126,11 +132,17 @@ def _spacy_evidence_text(analysis: NLPAnalysis) -> str:
 
 
 def extract_query_plan(
-    question: str, *, model_call: ModelCall | None = None, nlp_analysis: NLPAnalysis | None = None
+    question: str,
+    *,
+    model_call: ModelCall | None = None,
+    nlp_analysis: NLPAnalysis | None = None,
+    original_question: str | None = None,
 ) -> QueryPlan:
     """Return a validated logical plan, with one correction attempt for bad output."""
     if not isinstance(question, str) or not question.strip():
         raise QueryPlanExtractionError("Question cannot be empty.")
+    if original_question is not None and (not isinstance(original_question, str) or not original_question.strip()):
+        raise QueryPlanExtractionError("Original question cannot be empty.")
 
     call_model = model_call or _query_plan_model_call
     prompt_parts = [f"Question: {question.strip()}"]
@@ -147,13 +159,13 @@ def extract_query_plan(
         raise QueryPlanExtractionError("Unable to obtain a model response.") from exc
 
     try:
-        return _parse_plan(response, nlp_analysis)
+        return _parse_plan(response, nlp_analysis, original_question)
     except (QueryPlanResponseError, QueryPlanValidationError, QueryPlanSemanticValidationError) as first_error:
         try:
             corrected = call_model("Return one JSON object only.", _correction_prompt(first_error, response, nlp_analysis))
         except Exception as exc:
             raise QueryPlanExtractionError("Unable to obtain a corrected model response.") from exc
         try:
-            return _parse_plan(corrected, nlp_analysis)
+            return _parse_plan(corrected, nlp_analysis, original_question)
         except (QueryPlanResponseError, QueryPlanValidationError, QueryPlanSemanticValidationError) as exc:
             raise QueryPlanValidationError("Corrected model JSON did not satisfy the QueryPlan contract.") from exc

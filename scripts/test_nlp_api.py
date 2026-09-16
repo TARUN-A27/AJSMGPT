@@ -32,6 +32,15 @@ class NLPApiTests(unittest.TestCase):
         self.assertIn("purchase", analysis["detected_domains"])
         self.assertIn("original_question", analysis)
 
+    def test_analyze_returns_correction_and_corrected_analysis(self) -> None:
+        with patch.dict(os.environ, {"NLP_ANALYSIS_API_ENABLED": "true"}):
+            response = self.client.post("/v1/nlp/analyze", json={"question": "show suplier purchse qunatity"})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["correction"]["corrected_question"], "show supplier purchase quantity")
+        self.assertTrue(body["correction"]["was_corrected"])
+        self.assertEqual(body["analysis"]["original_question"], "show supplier purchase quantity")
+
     def test_empty_question_returns_422(self) -> None:
         with patch.dict(os.environ, {"NLP_ANALYSIS_API_ENABLED": "true"}):
             self.assertEqual(self.client.post("/v1/nlp/analyze", json={"question": "  "}).status_code, 422)
@@ -55,6 +64,26 @@ class NLPApiTests(unittest.TestCase):
         self.assertEqual(response.json()["query_plan"]["domain"], "purchase")
         self.assertFalse(response.json()["requires_clarification"])
         self.assertIsNotNone(extractor.call_args.kwargs["nlp_analysis"])
+
+    def test_understand_uses_corrected_question_and_preserves_raw_question(self) -> None:
+        from app.query_plan import QueryPlan
+
+        raw = "show suplier purchse qunatity"
+        corrected = "show supplier purchase quantity"
+        plan = QueryPlan.model_validate({
+            "original_question": raw,
+            "domain": "purchase",
+            "operation": "aggregate",
+            "business_subject": {"concept": "purchases"},
+            "measures": [{"concept": "quantity", "aggregation": "sum"}],
+            "confidence": 0.9,
+        })
+        with patch.dict(os.environ, {"NLP_QUERY_PLAN_API_ENABLED": "true"}), patch("app.nlp_router.extract_query_plan", return_value=plan) as extractor:
+            response = self.client.post("/v1/nlp/understand", json={"question": raw})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(extractor.call_args.args[0], corrected)
+        self.assertEqual(extractor.call_args.kwargs["original_question"], raw)
+        self.assertEqual(response.json()["query_plan"]["original_question"], raw)
 
     def test_understand_empty_question_does_not_call_model(self) -> None:
         with patch.dict(os.environ, {"NLP_QUERY_PLAN_API_ENABLED": "true"}), patch("app.nlp_router.extract_query_plan") as extractor:

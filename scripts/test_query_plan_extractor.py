@@ -46,6 +46,20 @@ class Calls:
 
 
 class QueryPlanExtractorTests(unittest.TestCase):
+    def test_missing_relative_date_text_is_restored_from_spacy(self) -> None:
+        analysis = analyze_question_with_spacy("show purchases in the last 30 days")
+        call = Calls(plan_json(
+            original_question="placeholder",
+            date_range={"kind": "relative", "start": "30 days ago", "end": "now", "original_text": None},
+        ))
+        plan = extract_query_plan("show purchases in the last 30 days", model_call=call, nlp_analysis=analysis)
+        self.assertEqual(plan.date_range.original_text, "last 30 days")
+
+    def test_non_empty_relative_date_text_is_preserved(self) -> None:
+        analysis = analyze_question_with_spacy("show purchases in the last 30 days")
+        call = Calls(plan_json(date_range={"kind": "relative", "start": "30 days ago", "end": "now", "original_text": "past 30 days"}))
+        plan = extract_query_plan("show purchases in the last 30 days", model_call=call, nlp_analysis=analysis)
+        self.assertEqual(plan.date_range.original_text, "past 30 days")
     def test_default_runtime_path_disables_thinking_and_bounds_output(self) -> None:
         with patch("app.query_plan_extractor.chat_with_qwen", return_value=plan_json(original_question="Question")) as chat:
             extract_query_plan("Question")

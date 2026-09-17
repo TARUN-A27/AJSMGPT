@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -91,6 +92,16 @@ def _parse_plan(
         raise QueryPlanValidationError("Model JSON did not satisfy the QueryPlan contract.") from exc
     if original_question is not None:
         plan = plan.model_copy(update={"original_question": original_question.strip()})
+    if plan.date_range is not None and plan.date_range.kind.value == "relative" and not plan.date_range.original_text:
+        expressions = (nlp_analysis.date_expressions if nlp_analysis is not None else [])
+        restored = next((value.strip() for value in expressions if isinstance(value, str) and value.strip()), None)
+        if restored is None and nlp_analysis is not None:
+            match = re.search(r"\b(?:last|past|previous)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:months?|days?)\b", nlp_analysis.normalized_question, re.IGNORECASE)
+            restored = match.group(0) if match else None
+        if restored:
+            plan = plan.model_copy(update={
+                "date_range": plan.date_range.model_copy(update={"original_text": restored})
+            })
     return validate_query_plan_semantics(plan, nlp_analysis)
 
 

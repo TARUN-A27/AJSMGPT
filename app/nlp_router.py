@@ -7,6 +7,13 @@ import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 
+from app.grounded_sql_generator import (
+    GroundedSqlModelUnavailableError,
+    GroundedSqlResponseError,
+    GroundedSqlResult,
+    generate_grounded_sql,
+)
+from app.grounded_sql_validator import GroundedSqlValidationError
 from app.query_plan import QueryPlan
 from app.query_plan_extractor import (
     QueryPlanExtractionError,
@@ -54,6 +61,15 @@ class NLPGroundResponse(BaseModel):
     requires_clarification: bool
 
 
+class NLPSqlPreviewResponse(BaseModel):
+    correction: TextCorrectionResult
+    analysis: NLPAnalysis
+    query_plan: QueryPlan
+    grounding: GroundedSchemaPlan
+    sql_preview: GroundedSqlResult
+    requires_clarification: bool
+
+
 def _enabled() -> bool:
     return os.getenv("NLP_ANALYSIS_API_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -64,6 +80,10 @@ def _query_plan_enabled() -> bool:
 
 def _grounding_enabled() -> bool:
     return os.getenv("NLP_GROUNDING_API_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _sql_preview_enabled() -> bool:
+    return os.getenv("NLP_SQL_PREVIEW_API_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 @router.post("/v1/nlp/analyze", response_model=NLPAnalyzeResponse)
@@ -135,3 +155,43 @@ def ground(request: NLPAnalyzeRequest) -> NLPGroundResponse:
         raise HTTPException(status_code=502, detail="Question understanding model is unavailable.") from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="NLP grounding is unavailable.") from exc
+
+
+@router.post("/v1/nlp/sql-preview", response_model=NLPSqlPreviewResponse)
+def sql_preview(request: NLPAnalyzeRequest) -> NLPSqlPreviewResponse:
+    if not _sql_preview_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    try:
+        correction = correct_question_text(request.question)
+        analysis = analyze_question_with_spacy(correction.corrected_question)
+        plan = extract_query_plan(
+            correction.corrected_question,
+            nlp_analysis=analysis,
+            original_question=correction.original_question,
+        )
+        if plan.requires_clarification:
+            raise GroundedSqlValidationError("QueryPlan requires clarification.")
+        grounding = ground_query_plan(plan)
+        if not grounding.is_grounded:
+            raise GroundedSqlValidationError("QueryPlan could not be grounded safely.")
+        preview = generate_grounded_sql(plan, grounding)
+        return NLPSqlPreviewResponse(
+            correction=correction,
+            analysis=analysis,
+            query_plan=plan,
+            grounding=grounding,
+            sql_preview=preview,
+            requires_clarification=False,
+        )
+    except (NLPAnalysisError, TextCorrectionError) as exc:
+        raise HTTPException(status_code=422, detail="Question could not be analyzed.") from exc
+    except (QueryPlanResponseError, QueryPlanValidationError) as exc:
+        raise HTTPException(status_code=422, detail="Model output could not be validated.") from exc
+    except QueryPlanExtractionError as exc:
+        raise HTTPException(status_code=502, detail="Question understanding model is unavailable.") from exc
+    except GroundedSqlModelUnavailableError as exc:
+        raise HTTPException(status_code=502, detail="SQL preview model is unavailable.") from exc
+    except (GroundedSqlResponseError, GroundedSqlValidationError) as exc:
+        raise HTTPException(status_code=422, detail="SQL preview could not be validated.") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="SQL preview is unavailable.") from exc

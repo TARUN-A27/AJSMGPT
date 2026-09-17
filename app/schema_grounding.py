@@ -118,6 +118,8 @@ def _requirements(plan: QueryPlan) -> list[tuple[str, str, str]]:
     for entity in plan.entities:
         requirements.append(("entity", entity.concept, "entity_filter"))
     for query_filter in plan.filters:
+        if plan.date_range and query_filter.concept.lower() in {"date", "time", "period"}:
+            continue
         requirements.append(("filter", query_filter.concept, "entity_filter"))
     if plan.date_range and plan.date_range.kind.value != "unspecified":
         requirements.append(("date_range", "date", "date_filter"))

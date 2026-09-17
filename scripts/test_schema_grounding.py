@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from app.query_plan import (
-    Aggregation, BusinessSubject, DateRange, DateRangeKind, Dimension,
+    Aggregation, BusinessSubject, DateRange, DateRangeKind, Dimension, FilterOperator, QueryFilter,
     EntityReference, EntityStatus, Measure, QueryPlan,
 )
 from app.schema_grounding import ground_query_plan
@@ -43,6 +43,22 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertEqual(columns[("SCM.PARTYMASTER", "PARTYNAME")], "grouping")
         self.assertEqual(columns[("INVENTORY.PURCHASEORDER", "SUP_CODE")], "join_identifier")
         self.assertNotIn("grouping", [column.role for column in result.selected_columns if column.column_name == "SUP_CODE"])
+
+    def test_generic_date_filter_is_satisfied_by_date_range(self):
+        result = ground_query_plan(plan(
+            "purchase", "purchase", operation="ranking",
+            measures=[Measure(concept="purchase value", aggregation=Aggregation.SUM)],
+            dimensions=[Dimension(concept="supplier", grouping=True)],
+            date_range=DATE_RANGE,
+        ).model_copy(update={"filters": [QueryFilter(concept="date", operator=FilterOperator.GREATER_THAN, value="30 days ago", value_type="date")] }))
+        self.assert_grounded(result)
+        self.assertFalse(result.reject_reasons)
+        self.assertIn(("INVENTORY.PURCHASEORDER", "ORDERDATE", "date_filter"),
+                      [(c.full_table_name, c.column_name, c.role) for c in result.selected_columns])
+
+    def test_plan_without_date_range_does_not_acquire_one(self):
+        result = ground_query_plan(plan("purchase", "purchase"))
+        self.assertFalse(any(c.role == "date_filter" for c in result.selected_columns))
 
     def test_purchase_supplier_code_keeps_anchor_identifier_without_display_table(self):
         result = ground_query_plan(plan(

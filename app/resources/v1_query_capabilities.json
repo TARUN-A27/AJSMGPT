@@ -1,0 +1,64 @@
+{
+  "version": "1.0",
+  "policy": "Only questions represented by a supported family, allowed operation, and the verified business schema catalog may execute.",
+  "families": [
+    {
+      "name": "purchase_orders",
+      "status": "supported",
+      "domains": ["purchase"],
+      "operations": ["detail", "aggregate", "ranking"],
+      "verified_concepts": ["purchase quantity", "purchase value", "purchase date", "supplier", "supplier name", "supplier code", "material", "item code"],
+      "limitations": ["No status-code meanings are defined.", "No financial-year rules are defined."]
+    },
+    {
+      "name": "supplier_lookup",
+      "status": "supported",
+      "domains": ["purchase", "supplier_lookup"],
+      "operations": ["lookup"],
+      "subject_aliases": ["supplier", "vendor", "party"],
+      "verified_concepts": ["supplier", "supplier name", "supplier code"],
+      "limitations": []
+    },
+    {
+      "name": "material_lookup",
+      "status": "supported",
+      "domains": ["purchase", "material_lookup"],
+      "operations": ["lookup"],
+      "subject_aliases": ["material", "item"],
+      "verified_concepts": ["material", "item name", "item code"],
+      "limitations": []
+    },
+    {
+      "name": "stock",
+      "status": "unsupported",
+      "domains": ["stock", "inventory"],
+      "operations": [],
+      "verified_concepts": [],
+      "limitations": ["No verified V1 stock measure or stock-value business definition is catalogued.", "No verified stock snapshot/date semantics are catalogued."]
+    },
+    {
+      "name": "grn",
+      "status": "unsupported",
+      "domains": ["grn", "goods receipt", "goods receipt note"],
+      "operations": [],
+      "verified_concepts": [],
+      "limitations": ["No verified V1 GRN table, columns, or relationship path is catalogued."]
+    },
+    {
+      "name": "mrs",
+      "status": "supported",
+      "domains": ["mrs"],
+      "operations": ["detail", "aggregate", "ranking"],
+      "verified_concepts": ["mrs quantity", "mrs date", "department code", "item code"],
+      "limitations": ["Department-name lookup is unsupported because no verified MRS-to-department relationship is catalogued."]
+    },
+    {
+      "name": "consumption",
+      "status": "supported",
+      "domains": ["consumption", "issue", "issued"],
+      "operations": ["detail", "aggregate", "ranking"],
+      "verified_concepts": ["consumption quantity", "consumption value", "consumption date", "material", "item code"],
+      "limitations": ["Issue status meanings are unsupported because status values are not catalogued."]
+    }
+  ]
+}

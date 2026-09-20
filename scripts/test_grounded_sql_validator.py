@@ -107,6 +107,14 @@ class GroundedSqlValidatorTests(unittest.TestCase):
         sql = PURCHASE_RANKING_SQL.replace("-6", "-1")
         validate_grounded_sql(sql, plan, grounding)
 
+    def test_last_month_rejects_wrong_month_count(self) -> None:
+        plan = self.plan.model_copy(update={
+            "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text="last month")
+        })
+        grounding = ground_query_plan(plan)
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(PURCHASE_RANKING_SQL, plan, grounding)
+
     def test_last_thirty_days_remains_day_based(self) -> None:
         plan = self.plan.model_copy(update={
             "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text="last 30 days")
@@ -263,6 +271,7 @@ GROUP BY m.DEPT_CODE"""
 FROM INVENTORY.ISSUE issue
 JOIN INVENTORY.INVITEMS items ON issue.CODE = items.ITEM_CODE
 WHERE issue.ISSUEDATE >= ADD_MONTHS(TRUNC(SYSDATE), -1)
+AND issue.ISSUEDATE < TRUNC(SYSDATE) + 1
 GROUP BY items.ITEM_NAME"""
         validate_grounded_sql(sql, plan, grounding)
 
@@ -339,6 +348,21 @@ GROUP BY items.ITEM_NAME"""
             "FETCH FIRST 10 ROWS ONLY", ""
         ), GroundedSqlSemanticError)
 
+    def test_rejects_sort_direction_attached_to_wrong_field(self) -> None:
+        sql = PURCHASE_RANKING_SQL.replace(
+            "ORDER BY total_purchase_value DESC",
+            "ORDER BY total_purchase_value ASC, pm.PARTYNAME DESC",
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, self.plan, self.grounding)
+
+    def test_rejects_nested_select_limit_as_outer_limit(self) -> None:
+        sql = "WITH unused_rows AS (SELECT po.NET FROM INVENTORY.PURCHASEORDER po FETCH FIRST 10 ROWS ONLY) " + PURCHASE_RANKING_SQL.replace(
+            "FETCH FIRST 10 ROWS ONLY", ""
+        )
+        with self.assertRaises(UnsafeGroundedSqlError):
+            validate_grounded_sql(sql, self.plan, self.grounding)
+
     def test_rejects_limit_with_oracle_specific_error(self) -> None:
         sql = PURCHASE_RANKING_SQL.replace("FETCH FIRST 10 ROWS ONLY", "LIMIT 10")
         with self.assertRaisesRegex(
@@ -366,6 +390,69 @@ GROUP BY items.ITEM_NAME"""
                 plan,
                 grounding,
             )
+
+    def test_rejects_transformed_entity_literal_alongside_bind(self) -> None:
+        plan = QueryPlan(
+            original_question="purchases for supplier ABC",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            entities=[EntityReference(
+                concept="supplier", selected_value="ABC", confidence=0.9,
+                status=EntityStatus.RESOLVED,
+            )],
+            confidence=0.9,
+        )
+        grounding = ground_query_plan(plan)
+        sql = """SELECT po.SUP_CODE
+FROM INVENTORY.PURCHASEORDER po
+WHERE po.SUP_CODE = :supplier OR po.SUP_CODE LIKE 'ABC%'"""
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_rejects_unrequested_filters_on_grounded_measure(self) -> None:
+        plan = QueryPlan(
+            original_question="total purchase value",
+            domain="purchase",
+            operation="aggregate",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase value", aggregation=Aggregation.SUM)],
+            confidence=0.9,
+        )
+        grounding = ground_query_plan(plan)
+        for predicate in ("po.NET > 0", "po.NET = '0'", "po.NET IS NOT NULL"):
+            with self.subTest(predicate=predicate), self.assertRaises(GroundedSqlSemanticError):
+                validate_grounded_sql(
+                    "SELECT SUM(po.NET) AS total_value FROM INVENTORY.PURCHASEORDER po WHERE " + predicate,
+                    plan,
+                    grounding,
+                )
+
+    def test_rejects_filter_operator_mismatch_and_extra_predicate(self) -> None:
+        plan = QueryPlan(
+            original_question="purchase for supplier containing abc",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            filters=[QueryFilter(
+                concept="supplier",
+                operator=FilterOperator.CONTAINS,
+                value="abc",
+                value_type="string",
+            )],
+            confidence=0.9,
+        )
+        grounding = ground_query_plan(plan)
+        for predicate in (
+            "po.SUP_CODE = :supplier",
+            "po.SUP_CODE LIKE :supplier OR po.SUP_CODE IS NULL",
+        ):
+            with self.subTest(predicate=predicate), self.assertRaises(GroundedSqlSemanticError):
+                validate_grounded_sql(
+                    "SELECT po.SUP_CODE FROM INVENTORY.PURCHASEORDER po WHERE " + predicate,
+                    plan,
+                    grounding,
+                )
 
 
 if __name__ == "__main__":

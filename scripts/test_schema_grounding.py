@@ -110,6 +110,19 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assert_grounded(result)
         self.assertEqual([table.full_table_name for table in result.selected_tables], ["SCM.PARTYMASTER"])
 
+    def test_material_lookup_needs_only_verified_item_master(self):
+        result = ground_query_plan(plan(
+            "purchase",
+            "material",
+            operation="lookup",
+            dimensions=[Dimension(concept="material", grouping=True)],
+        ))
+        self.assert_grounded(result)
+        self.assertEqual(
+            [table.full_table_name for table in result.selected_tables],
+            ["INVENTORY.INVITEMS"],
+        )
+
     def test_unverified_department_name_path_is_rejected(self):
         result = ground_query_plan(plan("mrs", "mrs", dimensions=[Dimension(concept="department name", grouping=True)]))
         self.assertFalse(result.is_grounded)

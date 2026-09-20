@@ -14,6 +14,13 @@ from app.grounded_sql_generator import (
     generate_grounded_sql,
 )
 from app.grounded_sql_validator import GroundedSqlValidationError
+from app.nlp_execution import (
+    ExecutionRejectedError,
+    ExecutionResultError,
+    NLPExecuteResponse,
+    execute_nlp_query,
+)
+from app.oracle_client import OracleExecutionError, OracleUnavailableError
 from app.query_plan import QueryPlan
 from app.query_plan_extractor import (
     QueryPlanExtractionError,
@@ -84,6 +91,10 @@ def _grounding_enabled() -> bool:
 
 def _sql_preview_enabled() -> bool:
     return os.getenv("NLP_SQL_PREVIEW_API_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _execution_enabled() -> bool:
+    return os.getenv("NLP_QUERY_EXECUTION_API_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 @router.post("/v1/nlp/analyze", response_model=NLPAnalyzeResponse)
@@ -195,3 +206,32 @@ def sql_preview(request: NLPAnalyzeRequest) -> NLPSqlPreviewResponse:
         raise HTTPException(status_code=422, detail="SQL preview could not be validated.") from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="SQL preview is unavailable.") from exc
+
+
+@router.post("/v1/nlp/execute", response_model=NLPExecuteResponse)
+def execute(request: NLPAnalyzeRequest) -> NLPExecuteResponse:
+    if not _execution_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    try:
+        return execute_nlp_query(request.question)
+    except ExecutionRejectedError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=exc.response.model_dump(mode="json"),
+        ) from None
+    except (NLPAnalysisError, TextCorrectionError) as exc:
+        raise HTTPException(status_code=422, detail="Question could not be analyzed.") from exc
+    except (QueryPlanResponseError, QueryPlanValidationError) as exc:
+        raise HTTPException(status_code=422, detail="Model output could not be validated.") from exc
+    except QueryPlanExtractionError as exc:
+        raise HTTPException(status_code=502, detail="Question understanding model is unavailable.") from exc
+    except GroundedSqlModelUnavailableError as exc:
+        raise HTTPException(status_code=502, detail="SQL generation model is unavailable.") from exc
+    except (GroundedSqlResponseError, GroundedSqlValidationError) as exc:
+        raise HTTPException(status_code=422, detail="Generated SQL could not be validated.") from exc
+    except OracleUnavailableError as exc:
+        raise HTTPException(status_code=503, detail="Oracle is unavailable.") from exc
+    except (OracleExecutionError, ExecutionResultError) as exc:
+        raise HTTPException(status_code=502, detail="Safe query execution failed.") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="NLP query execution is unavailable.") from exc

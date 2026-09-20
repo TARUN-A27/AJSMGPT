@@ -144,6 +144,8 @@ def _domain(catalog: dict, plan: QueryPlan) -> dict | None:
         subject = _normalise(plan.business_subject.concept)
         if subject in {"supplier", "vendor", "party"}:
             return next(domain for domain in catalog["domains"] if domain["name"] == "supplier_lookup")
+        if subject in {"material", "item"}:
+            return next(domain for domain in catalog["domains"] if domain["name"] == "material_lookup")
     target = _normalise(plan.domain)
     for domain in catalog["domains"]:
         if target == _normalise(domain["name"]) or target in {_normalise(alias) for alias in domain["aliases"]}:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from app.query_plan import Aggregation, DateRangeKind, EntityStatus, QueryPlan
+from app.query_plan import Aggregation, DateRangeKind, EntityStatus, FilterOperator, QueryPlan
 from app.schema_grounding import GroundedSchemaPlan
 
 
@@ -64,6 +64,9 @@ _SQL_KEYWORDS = _ALIAS_STOP_WORDS | {
     "ROW", "ONLY", "NEXT", "DISTINCT", "ALL", "CASE", "WHEN", "THEN", "ELSE", "END",
     "WITH", "RECURSIVE", "SYSDATE", "CURRENT_DATE", "CURRENT_TIMESTAMP", "ROWNUM", "LIMIT",
 }
+_ALLOWED_FUNCTIONS = {
+    "ADD_MONTHS", "AVG", "COUNT", "MAX", "MIN", "ROUND", "SUM", "TRUNC",
+}
 
 
 @dataclass(frozen=True)
@@ -94,6 +97,10 @@ def _relative_date_requirement(query_plan: QueryPlan) -> tuple[str, int] | None:
             r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(months?|days?)\b",
             text, re.IGNORECASE,
         )
+    if not match:
+        implicit = re.search(r"\b(?:last|past|previous)\s+(months?|days?)\b", text, re.IGNORECASE)
+        if implicit:
+            return ("months" if implicit.group(1).lower().startswith("month") else "days", 1)
     if not match:
         return None
     number = match.group(1).lower()
@@ -161,10 +168,14 @@ def _basic_safety(sql: str) -> str:
         raise UnsafeGroundedSqlError("Semicolons and multiple statements are not allowed.")
     if '"' in sql:
         raise UnsafeGroundedSqlError("Quoted identifiers are outside the preview SQL subset.")
+    if "@" in sql:
+        raise UnsafeGroundedSqlError("Database links are not allowed.")
 
     masked = _mask_string_literals(sql.strip())
-    if not re.match(r"^(?:SELECT\b|WITH\b)", masked, re.IGNORECASE):
-        raise UnsafeGroundedSqlError("Only one SELECT or WITH statement is allowed.")
+    if not re.match(r"^SELECT\b", masked, re.IGNORECASE):
+        raise UnsafeGroundedSqlError("V1 execution requires one top-level SELECT without CTEs.")
+    if len(re.findall(r"\bSELECT\b", masked, re.IGNORECASE)) != 1:
+        raise UnsafeGroundedSqlError("V1 execution allows exactly one SELECT keyword.")
     for keyword in _BLOCKED_KEYWORDS:
         if re.search(rf"\b{keyword}\b", masked, re.IGNORECASE):
             raise UnsafeGroundedSqlError(f"Blocked SQL keyword: {keyword}.")
@@ -172,10 +183,24 @@ def _basic_safety(sql: str) -> str:
         raise OracleDialectGroundedSqlError(
             "Oracle SQL does not support LIMIT; use FETCH FIRST <N> ROWS ONLY."
         )
+    if re.search(r"\bFOR\s+UPDATE\b", masked, re.IGNORECASE):
+        raise UnsafeGroundedSqlError("SELECT FOR UPDATE is not allowed.")
+    if re.search(r"\b(?:UNION|MINUS|INTERSECT)\b", masked, re.IGNORECASE):
+        raise UnsafeGroundedSqlError("Set operations are outside the V1 SQL subset.")
     if re.search(r"\bSELECT\s+(?:DISTINCT\s+)?(?:[A-Z][A-Z0-9_$#]*\s*\.\s*)?\*", masked, re.IGNORECASE):
         raise UnsafeGroundedSqlError("SELECT * is not allowed.")
     if re.search(rf"\b{_IDENTIFIER}\s*\.\s*\*", masked, re.IGNORECASE):
         raise UnsafeGroundedSqlError("Wildcard column selection is not allowed.")
+    function_names = {
+        match.group(1).upper()
+        for match in re.finditer(rf"\b({_IDENTIFIER})\s*\(", masked, re.IGNORECASE)
+        if match.group(1).upper() not in _SQL_KEYWORDS
+    }
+    unsupported_functions = sorted(function_names - _ALLOWED_FUNCTIONS)
+    if unsupported_functions:
+        raise UnsafeGroundedSqlError(
+            "Unsupported SQL function(s): " + ", ".join(unsupported_functions) + "."
+        )
     return masked
 
 
@@ -371,6 +396,20 @@ def _clause(masked_sql: str, start: str, stops: str) -> str:
     return match.group(1) if match else ""
 
 
+def _split_sql_list(fragment: str) -> list[str]:
+    items: list[str] = []
+    depth = 0
+    start = 0
+    for index, char in enumerate(fragment + ","):
+        depth += (char == "(") - (char == ")")
+        if char == "," and depth == 0:
+            item = fragment[start:index].strip()
+            if item:
+                items.append(item)
+            start = index + 1
+    return items
+
+
 def _validate_measures_and_grouping(
     masked_sql: str,
     query_plan: QueryPlan,
@@ -463,11 +502,76 @@ def _validate_sort_limit_and_date(
 ) -> None:
     unqualified_columns = _unqualified_column_map(grounding, references)
     order_part = _clause(masked_sql, r"ORDER\s+BY", r"\bFETCH\b|\bOFFSET\b")
+    order_terms = _split_sql_list(order_part)
+    select_part = _select_fragment(masked_sql)
     violations: list[str] = []
-    for instruction in query_plan.sorting:
+    for sort_index, instruction in enumerate(sorted(query_plan.sorting, key=lambda item: item.priority)):
         direction = instruction.direction.value.upper()
-        if not order_part or not re.search(rf"\b{direction}\b", order_part, re.IGNORECASE):
+        if sort_index >= len(order_terms):
+            violations.append(f"Required sort field is missing from ORDER BY: {instruction.field_concept}.")
+            continue
+        order_term = order_terms[sort_index]
+        if not re.search(rf"\b{direction}\b", order_term, re.IGNORECASE):
             violations.append(f"Required sort direction is missing: {direction}.")
+            continue
+        concept = _normalise_concept(instruction.field_concept)
+        measure = next(
+            (
+                item
+                for item in query_plan.measures
+                if concept in {_normalise_concept(item.concept), _normalise_concept(item.alias or "")}
+            ),
+            None,
+        )
+        dimension = next(
+            (item for item in query_plan.dimensions if concept == _normalise_concept(item.concept)),
+            None,
+        )
+        sort_matches = False
+        if measure is not None:
+            aggregate_names = {
+                Aggregation.SUM: "SUM",
+                Aggregation.COUNT: "COUNT",
+                Aggregation.COUNT_DISTINCT: "COUNT",
+                Aggregation.AVERAGE: "AVG",
+                Aggregation.MINIMUM: "MIN",
+                Aggregation.MAXIMUM: "MAX",
+            }
+            columns = _columns_for_requirement(grounding, measure.concept, "measure")
+            aliases: list[str] = []
+            for column in columns:
+                for variant in _reference_variants(column, references.aliases, unqualified_columns):
+                    function = aggregate_names.get(measure.aggregation)
+                    expression = (
+                        rf"{function}\s*\(\s*(?:DISTINCT\s+)?{_column_pattern(variant).pattern}\s*\)"
+                        if function
+                        else _column_pattern(variant).pattern
+                    )
+                    alias_match = re.search(
+                        rf"{expression}\s+(?:AS\s+)?({_IDENTIFIER})\b",
+                        select_part,
+                        re.IGNORECASE,
+                    )
+                    if alias_match:
+                        aliases.append(alias_match.group(1))
+                    if re.search(expression, order_term, re.IGNORECASE):
+                        sort_matches = True
+            if measure.alias:
+                aliases.append(measure.alias)
+            sort_matches = sort_matches or any(
+                re.search(rf"\b{re.escape(alias)}\b", order_term, re.IGNORECASE)
+                for alias in aliases
+            )
+        elif dimension is not None:
+            columns = _columns_for_requirement(grounding, dimension.concept, "grouping")
+            sort_matches = any(
+                _contains_column(order_term, column, references.aliases, unqualified_columns)
+                for column in columns
+            )
+        if not sort_matches:
+            violations.append(
+                f"Required sort field is missing from ORDER BY: {instruction.field_concept}."
+            )
 
     if query_plan.limit is not None:
         limit = query_plan.limit
@@ -547,6 +651,37 @@ def _validate_sort_limit_and_date(
                 r"\b(?:SYSDATE|CURRENT_DATE|CURRENT_TIMESTAMP|ADD_MONTHS|TRUNC)\b", where_part, re.IGNORECASE
             ):
                 violations.append("Relative date filter must use Oracle current-date semantics.")
+        elif query_plan.date_range.kind is DateRangeKind.ABSOLUTE:
+            absolute_filter_valid = False
+            lower_operator = r">=" if query_plan.date_range.inclusive_start else r">(?!\s*=)"
+            upper_operator = r"<=" if query_plan.date_range.inclusive_end else r"<(?!\s*=)"
+            for date_column in date_columns:
+                for variant in _reference_variants(date_column, references.aliases, unqualified_columns):
+                    column_ref = _column_pattern(variant).pattern
+                    between = re.search(
+                        rf"{column_ref}\s+BETWEEN\s+:{_IDENTIFIER}\s+AND\s+:{_IDENTIFIER}",
+                        where_part,
+                        re.IGNORECASE,
+                    ) if query_plan.date_range.inclusive_start and query_plan.date_range.inclusive_end else None
+                    lower = re.search(
+                        rf"{column_ref}\s*{lower_operator}\s*:{_IDENTIFIER}",
+                        where_part,
+                        re.IGNORECASE,
+                    )
+                    upper = re.search(
+                        rf"{column_ref}\s*{upper_operator}\s*:{_IDENTIFIER}",
+                        where_part,
+                        re.IGNORECASE,
+                    )
+                    if between or (lower and upper):
+                        absolute_filter_valid = True
+                        break
+                if absolute_filter_valid:
+                    break
+            if not absolute_filter_valid:
+                violations.append(
+                    "Absolute date filters require named start and end binds on the grounded date column."
+                )
     if violations:
         raise GroundedSqlSemanticError("; ".join(violations))
 
@@ -569,6 +704,104 @@ def _filter_requirements(query_plan: QueryPlan) -> list[tuple[str, list[object]]
     return requirements
 
 
+def _predicate_matches(
+    where_part: str,
+    grounding: GroundedSchemaPlan,
+    references: _SqlReferences,
+    concept: str,
+    operator_pattern: str,
+) -> tuple[set[tuple[int, int]], set[tuple[int, int]]]:
+    candidates = grounding.entity_column_candidates.get(concept) or _columns_for_requirement(
+        grounding, concept, "entity_filter"
+    )
+    all_occurrences: set[tuple[int, int]] = set()
+    approved: set[tuple[int, int]] = set()
+    unqualified_columns = _unqualified_column_map(grounding, references)
+    for candidate in candidates:
+        for variant in _reference_variants(candidate.upper(), references.aliases, unqualified_columns):
+            column_pattern = _column_pattern(variant).pattern
+            all_occurrences.update(
+                match.span()
+                for match in re.finditer(column_pattern, where_part, re.IGNORECASE)
+            )
+            approved.update(
+                match.span()
+                for match in re.finditer(
+                    rf"{column_pattern}{operator_pattern}",
+                    where_part,
+                    re.IGNORECASE,
+                )
+            )
+    def outermost(spans: set[tuple[int, int]]) -> set[tuple[int, int]]:
+        return {
+            span
+            for span in spans
+            if not any(
+                other != span and other[0] <= span[0] and span[1] <= other[1]
+                for other in spans
+            )
+        }
+
+    return outermost(all_occurrences), outermost(approved)
+
+
+def _validate_filter_operators(
+    masked_sql: str,
+    query_plan: QueryPlan,
+    grounding: GroundedSchemaPlan,
+    references: _SqlReferences,
+) -> None:
+    where_part = _clause(
+        masked_sql,
+        "WHERE",
+        r"\bGROUP\s+BY\b|\bORDER\s+BY\b|\bFETCH\b|\bOFFSET\b",
+    )
+    bind = rf":{_IDENTIFIER}"
+    for entity in query_plan.entities:
+        if entity.status is EntityStatus.NOT_REQUIRED:
+            continue
+        occurrences, approved = _predicate_matches(
+            where_part,
+            grounding,
+            references,
+            entity.concept,
+            rf"\s*=\s*{bind}",
+        )
+        if len(occurrences) != 1 or len(approved) != 1:
+            raise GroundedSqlSemanticError(
+                f"Resolved entity filter must use exactly one equality bind: {entity.concept}."
+            )
+
+    operator_patterns = {
+        FilterOperator.EQUALS: rf"\s*=\s*{bind}",
+        FilterOperator.NOT_EQUALS: rf"\s*(?:<>|!=)\s*{bind}",
+        FilterOperator.CONTAINS: rf"\s+LIKE\s*{bind}",
+        FilterOperator.STARTS_WITH: rf"\s+LIKE\s*{bind}",
+        FilterOperator.IN: rf"\s+IN\s*\(\s*{bind}(?:\s*,\s*{bind})*\s*\)",
+        FilterOperator.GREATER_THAN: rf"\s*>\s*{bind}",
+        FilterOperator.GREATER_THAN_OR_EQUAL: rf"\s*>=\s*{bind}",
+        FilterOperator.LESS_THAN: rf"\s*<\s*{bind}",
+        FilterOperator.LESS_THAN_OR_EQUAL: rf"\s*<=\s*{bind}",
+        FilterOperator.BETWEEN: rf"\s+BETWEEN\s*{bind}\s+AND\s+{bind}",
+        FilterOperator.IS_NULL: r"\s+IS\s+NULL\b",
+        FilterOperator.IS_NOT_NULL: r"\s+IS\s+NOT\s+NULL\b",
+    }
+    for item in query_plan.filters:
+        if query_plan.date_range and _normalise_concept(item.concept) in {"date", "time", "period"}:
+            continue
+        occurrences, approved = _predicate_matches(
+            where_part,
+            grounding,
+            references,
+            item.concept,
+            operator_patterns[item.operator],
+        )
+        if len(occurrences) != 1 or len(approved) != 1:
+            raise GroundedSqlSemanticError(
+                f"Filter operator does not match the QueryPlan contract: {item.concept}."
+            )
+
+
 def _validate_entity_binds(
     sql: str,
     masked_sql: str,
@@ -576,12 +809,78 @@ def _validate_entity_binds(
     grounding: GroundedSchemaPlan,
     references: _SqlReferences,
 ) -> None:
+    if re.search(r"'(?:''|[^'])*'", sql):
+        raise GroundedSqlSemanticError(
+            "Filter predicates must use named binds rather than quoted string literals."
+        )
+    _validate_filter_operators(masked_sql, query_plan, grounding, references)
     requirements = _filter_requirements(query_plan)
+    filter_concepts = [
+        entity.concept
+        for entity in query_plan.entities
+        if entity.status is not EntityStatus.NOT_REQUIRED
+    ]
+    filter_concepts.extend(
+        item.concept
+        for item in query_plan.filters
+        if not (
+            query_plan.date_range
+            and _normalise_concept(item.concept) in {"date", "time", "period"}
+        )
+    )
+    has_date_filter = bool(
+        query_plan.date_range and query_plan.date_range.kind is not DateRangeKind.UNSPECIFIED
+    )
+    where_part = _clause(
+        masked_sql,
+        "WHERE",
+        r"\bGROUP\s+BY\b|\bORDER\s+BY\b|\bFETCH\b|\bOFFSET\b",
+    )
+    if where_part and not filter_concepts and not has_date_filter:
+        raise GroundedSqlSemanticError("Generated SQL contains an unrequested WHERE filter.")
+
+    allowed_filter_columns = {
+        candidate.upper()
+        for concept in filter_concepts
+        for candidate in (
+            grounding.entity_column_candidates.get(concept)
+            or _columns_for_concept(grounding, concept)
+        )
+    }
+    if has_date_filter:
+        allowed_filter_columns.update(
+            f"{column.full_table_name}.{column.column_name}".upper()
+            for column in grounding.selected_columns
+            if column.role == "date_filter"
+        )
+    for column in grounding.selected_columns:
+        full_column = f"{column.full_table_name}.{column.column_name}".upper()
+        if full_column in allowed_filter_columns:
+            continue
+        if any(
+            _column_pattern(variant).search(where_part)
+            for variant in _reference_variants(full_column, references.aliases)
+        ):
+            raise GroundedSqlSemanticError(
+                f"Generated SQL filters an unrequested column: {full_column}."
+            )
+
+    numeric_scan = where_part
+    relative = _relative_date_requirement(query_plan)
+    if relative:
+        count = relative[1]
+        numeric_scan = re.sub(rf"-\s*{count}\b", "", numeric_scan)
+        numeric_scan = re.sub(r"\+\s*1\b", "", numeric_scan)
+    if re.search(r"(?<![:A-Z0-9_$#])\d+(?:\.\d+)?(?![A-Z0-9_$#])", numeric_scan, re.IGNORECASE):
+        raise GroundedSqlSemanticError("Filter literals must be represented by validated named binds.")
+
     if not requirements:
         return
     unqualified_columns = _unqualified_column_map(grounding, references)
     for concept, values in requirements:
-        candidates = grounding.entity_column_candidates.get(concept) or _columns_for_concept(grounding, concept)
+        candidates = grounding.entity_column_candidates.get(concept) or _columns_for_requirement(
+            grounding, concept, "entity_filter"
+        )
         candidate_present = any(
             _contains_column(masked_sql, candidate.upper(), references.aliases, unqualified_columns)
             for candidate in candidates

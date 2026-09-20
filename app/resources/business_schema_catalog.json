@@ -25,6 +25,12 @@
       "aliases": ["supplier", "vendor", "party"],
       "primary_tables": ["SCM.PARTYMASTER"],
       "confidence": 0.8
+    },
+    {
+      "name": "material_lookup",
+      "aliases": ["material", "item"],
+      "primary_tables": ["INVENTORY.INVITEMS"],
+      "confidence": 0.85
     }
   ],
   "concepts": [
@@ -47,37 +53,37 @@
       "name": "supplier",
       "aliases": ["supplier", "vendor", "party"],
       "columns": [
-        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["entity_filter", "identifier", "join_identifier"], "confidence": 0.85, "evidence": "metadata and recorded foreign key"},
-        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["entity_filter", "identifier", "join_identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
-        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["display", "grouping", "entity_filter"], "confidence": 0.8, "evidence": "metadata and purchase analytics router"}
+        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["entity_filter", "identifier", "join_identifier"], "datatype_category": "TEXT", "confidence": 0.85, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["entity_filter", "identifier", "join_identifier"], "datatype_category": "TEXT", "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["display", "grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.8, "evidence": "metadata and purchase analytics router"}
       ]
     },
     {
       "name": "supplier_name",
       "aliases": ["supplier name", "vendor name", "party name"],
-      "columns": [{"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["display", "grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and purchase analytics router"}]
+      "columns": [{"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["display", "grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.85, "evidence": "metadata and purchase analytics router"}]
     },
     {
       "name": "supplier_identifier",
       "aliases": ["supplier code", "vendor code", "party code"],
       "columns": [
-        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
-        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"}
+        {"table": "INVENTORY.PURCHASEORDER", "column": "SUP_CODE", "roles": ["grouping", "entity_filter", "identifier"], "datatype_category": "TEXT", "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYCODE", "roles": ["grouping", "entity_filter", "identifier"], "datatype_category": "TEXT", "confidence": 0.9, "evidence": "metadata and recorded foreign key"}
       ]
     },
     {
       "name": "material",
       "aliases": ["material", "item", "item name", "material name"],
-      "columns": [{"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["display", "grouping", "entity_filter"], "confidence": 0.85, "evidence": "metadata and current business routers"}]
+      "columns": [{"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["display", "grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.85, "evidence": "metadata and current business routers"}]
     },
     {
       "name": "item_identifier",
       "aliases": ["item code", "material code", "item identifier"],
       "columns": [
-        {"table": "INVENTORY.INVITEMS", "column": "ITEM_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign keys"},
-        {"table": "INVENTORY.PURCHASEORDER", "column": "ITEM_CODE", "roles": ["entity_filter", "identifier"], "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
-        {"table": "INVENTORY.MRS_TEMP", "column": "ITEM_CODE", "roles": ["entity_filter", "identifier"], "confidence": 0.85, "evidence": "metadata"},
-        {"table": "INVENTORY.ISSUE", "column": "CODE", "roles": ["entity_filter", "identifier"], "confidence": 0.85, "evidence": "metadata and recorded foreign key"}
+        {"table": "INVENTORY.INVITEMS", "column": "ITEM_CODE", "roles": ["grouping", "entity_filter", "identifier"], "datatype_category": "TEXT", "confidence": 0.9, "evidence": "metadata and recorded foreign keys"},
+        {"table": "INVENTORY.PURCHASEORDER", "column": "ITEM_CODE", "roles": ["entity_filter", "identifier"], "datatype_category": "TEXT", "confidence": 0.9, "evidence": "metadata and recorded foreign key"},
+        {"table": "INVENTORY.MRS_TEMP", "column": "ITEM_CODE", "roles": ["entity_filter", "identifier"], "datatype_category": "TEXT", "confidence": 0.85, "evidence": "metadata"},
+        {"table": "INVENTORY.ISSUE", "column": "CODE", "roles": ["entity_filter", "identifier"], "datatype_category": "TEXT", "confidence": 0.85, "evidence": "metadata and recorded foreign key"}
       ]
     },
     {
@@ -93,12 +99,12 @@
     {
       "name": "department",
       "aliases": ["department", "dept"],
-      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "DEPT_CODE", "roles": ["grouping", "entity_filter", "identifier"], "confidence": 0.7, "evidence": "metadata; no MRS_TEMP-to-DEPT foreign key is catalogued"}]
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "DEPT_CODE", "roles": ["grouping", "entity_filter", "identifier"], "datatype_category": "NUMERIC", "confidence": 0.7, "evidence": "metadata; no MRS_TEMP-to-DEPT foreign key is catalogued"}]
     },
     {
       "name": "department_name",
       "aliases": ["department name", "dept name"],
-      "columns": [{"table": "INVENTORY.DEPT", "column": "DEPT_NAME", "roles": ["grouping", "entity_filter"], "confidence": 0.65, "evidence": "metadata; relationship path is not recorded"}]
+      "columns": [{"table": "INVENTORY.DEPT", "column": "DEPT_NAME", "roles": ["grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.65, "evidence": "metadata; relationship path is not recorded"}]
     },
     {
       "name": "consumption_quantity",
@@ -118,14 +124,14 @@
     {
       "name": "consumption_status",
       "aliases": ["issue status", "consumption status"],
-      "columns": [{"table": "INVENTORY.ISSUE", "column": "STATUS", "roles": ["status"], "confidence": 0.65, "evidence": "metadata; status values are not catalogued"}]
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "STATUS", "roles": ["status"], "datatype_category": "NUMERIC", "confidence": 0.65, "evidence": "metadata; status values are not catalogued"}]
     },
     {
       "name": "name",
       "aliases": ["name"],
       "columns": [
-        {"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["grouping", "entity_filter"], "confidence": 0.5, "evidence": "metadata"},
-        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "confidence": 0.5, "evidence": "metadata"}
+        {"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.5, "evidence": "metadata"},
+        {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.5, "evidence": "metadata"}
       ]
     }
   ],

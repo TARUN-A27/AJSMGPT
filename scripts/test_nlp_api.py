@@ -51,6 +51,7 @@ class _DirectNLPClient:
         "/v1/nlp/understand": nlp_router.understand,
         "/v1/nlp/ground": nlp_router.ground,
         "/v1/nlp/sql-preview": nlp_router.sql_preview,
+        "/v1/nlp/execute": nlp_router.execute,
     }
 
     def post(self, path: str, json: dict) -> _DirectResponse:
@@ -273,6 +274,7 @@ class NLPApiTests(unittest.TestCase):
             "understand": "/v1/nlp/understand",
             "ground": "/v1/nlp/ground",
             "sql_preview": "/v1/nlp/sql-preview",
+            "execute": "/v1/nlp/execute",
             "ask": "/ask",
         }
         self.assertEqual({name: str(app.url_path_for(name)) for name in expected}, expected)

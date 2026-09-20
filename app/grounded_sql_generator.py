@@ -179,9 +179,10 @@ def _parse_result(response: str) -> GroundedSqlResult:
 
 
 def _align_selected_fields(result: GroundedSqlResult) -> GroundedSqlResult:
-    match = re.search(r"\bSELECT\s+(.*?)\s+FROM\b", result.sql, re.IGNORECASE | re.DOTALL)
-    if not match:
+    matches = list(re.finditer(r"\bSELECT\s+(.*?)\s+FROM\b", result.sql, re.IGNORECASE | re.DOTALL))
+    if not matches:
         return result
+    match = matches[-1]
     body, fields, depth, start = match.group(1), [], 0, 0
     for index, char in enumerate(body + ","):
         depth += (char == "(") - (char == ")")

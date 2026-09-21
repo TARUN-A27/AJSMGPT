@@ -197,6 +197,51 @@ class QueryPlanSemanticValidatorTests(unittest.TestCase):
         unchanged = normalize_recency_sorting(ranking)
         self.assertEqual(unchanged.dimensions, [])
 
+    def test_recency_sort_with_date_range_is_allowed(self) -> None:
+        # fix.md #6a: real Qwen plan for "latest issue for yarn in 2024" --
+        # sorting=[date desc] + an absolute date range, NO date dimension
+        # declared. The recency normalizer adds a sort-only `date` dimension;
+        # the date-range rule must not then reject that injected dimension.
+        question = "latest issue for yarn in 2024"
+        detail = plan(
+            original_question=question,
+            domain="consumption",
+            operation="detail",
+            business_subject={"concept": "issue"},
+            measures=[],
+            dimensions=[],
+            entities=[{"concept": "material", "original_value": "yarn"}],
+            sorting=[{"field_concept": "date", "direction": "desc", "priority": 0}],
+            date_range={"kind": "absolute", "start": "2024-01-01", "end": "2024-12-31", "original_text": "in 2024"},
+            limit=1,
+            requested_output={"fields": []},
+        )
+        normalized = validate_query_plan_semantics(detail, analyze_question_with_spacy(question))
+        self.assertEqual([d.concept for d in normalized.dimensions], ["date"])
+        self.assertFalse(normalized.dimensions[0].grouping)
+
+    def test_model_declared_date_dimension_with_only_a_date_range_is_still_rejected(self) -> None:
+        # Guard against loosening: the same plan but with the model itself
+        # declaring `date` as a dimension (and spaCy evidencing it so the
+        # temporal normalizer keeps it) must still trip the date-range rule.
+        question = "latest issue for yarn on date in 2024"
+        analysis = analyze_question_with_spacy(question)
+        analysis = analysis.model_copy(update={"detected_dimensions": ["date"], "has_explicit_time_grouping": False})
+        detail = plan(
+            original_question=question,
+            domain="consumption",
+            operation="detail",
+            business_subject={"concept": "issue"},
+            measures=[],
+            dimensions=[{"concept": "date", "grouping": False}],
+            sorting=[{"field_concept": "date", "direction": "desc", "priority": 0}],
+            date_range={"kind": "absolute", "start": "2024-01-01", "end": "2024-12-31", "original_text": "in 2024"},
+            limit=1,
+            requested_output={"fields": ["date"]},
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "not justified by a date range alone"):
+            validate_query_plan_semantics(detail, analysis)
+
     # -- lookup output exemption ------------------------------------------
 
     def test_lookup_dimension_without_output_field_is_allowed(self) -> None:
@@ -218,6 +263,78 @@ class QueryPlanSemanticValidatorTests(unittest.TestCase):
             operation="detail",
             measures=[],
             dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "does not affect grouping or requested output"):
+            validate_query_plan_semantics(detail)
+
+    # -- entity restated as a dimension (fix.md #6b) -------------------------
+
+    def test_dimension_that_restates_an_entity_filter_is_dropped(self) -> None:
+        # Real Qwen plan for "last supply from supplier Prime compu systems":
+        # the supplier appears both as the entity filter and as an
+        # ungrouped, non-output dimension. The dimension is redundant.
+        detail = plan(
+            original_question="last supply from supplier Prime compu systems",
+            operation="detail",
+            measures=[],
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            entities=[{"concept": "supplier", "original_value": "Prime compu systems"}],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+            limit=1,
+            requested_output={"fields": []},
+        )
+        normalized = validate_query_plan_semantics(detail)
+        self.assertNotIn("supplier", [d.concept for d in normalized.dimensions])
+        self.assertEqual(normalized.entities[0].original_value, "Prime compu systems")
+
+    def test_entity_dimension_is_kept_when_it_is_grouping_or_output(self) -> None:
+        grouped = plan(
+            operation="detail",
+            measures=[],
+            dimensions=[{"concept": "supplier", "grouping": True}],
+            entities=[{"concept": "supplier", "original_value": "ABC"}],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        self.assertEqual([d.concept for d in validate_query_plan_semantics(grouped).dimensions], ["supplier"])
+        as_output = plan(
+            operation="detail",
+            measures=[],
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            entities=[{"concept": "supplier", "original_value": "ABC"}],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": ["supplier"]},
+        )
+        self.assertEqual([d.concept for d in validate_query_plan_semantics(as_output).dimensions], ["supplier"])
+
+    def test_lookup_keeps_dimension_that_matches_an_entity_concept(self) -> None:
+        # In a lookup the dimension is the implied answer field; it must stay
+        # even when it shares a concept with an entity filter.
+        lookup = plan(
+            original_question="which supplier code is supplier ABC",
+            operation="lookup",
+            measures=[],
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            entities=[{"concept": "supplier", "original_value": "ABC"}],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        self.assertEqual([d.concept for d in validate_query_plan_semantics(lookup).dimensions], ["supplier"])
+
+    def test_non_entity_dimension_without_output_is_still_rejected(self) -> None:
+        # Guard: the normalizer only removes a dimension that names an entity
+        # concept; an unrelated dangling dimension still fails as before.
+        detail = plan(
+            operation="detail",
+            measures=[],
+            dimensions=[{"concept": "department", "grouping": False}],
+            entities=[{"concept": "supplier", "original_value": "ABC"}],
             sorting=[],
             limit=None,
             requested_output={"fields": []},

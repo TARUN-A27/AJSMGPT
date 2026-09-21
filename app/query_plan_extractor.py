@@ -17,6 +17,7 @@ from app.query_plan_semantic_validator import (
     validate_query_plan_semantics,
 )
 from app.spacy_nlp import NLPAnalysis
+from app.v1_capabilities import evaluate_capability
 
 
 class QueryPlanExtractionError(RuntimeError):
@@ -51,6 +52,14 @@ For "last/latest/recent N" or "first/earliest N" questions (records, not a calen
 sorting entry on the relevant date concept (descending for last/latest/recent, ascending for first/earliest) and
 limit=N. For the same wording without an explicit N, use operation=detail with that same sorting entry and no limit.
 Dimensions only affect requested output or grouping. Date ranges are filters, not dimensions. Ranking by an aggregate requires grouping=true for the ranked result dimension.
+Always set business_subject to the thing the question is about (e.g. purchase, mrs, issue, supplier, material); a plan
+with only entities and no business_subject, measure, or dimension is invalid.
+An entity is a specific supplier or material named in the question. entities[].concept must be exactly one of these
+tokens: supplier, supplier_name, supplier_identifier, material, item_identifier. Use supplier when a supplier is named by
+name or code, supplier_name for a name only, supplier_identifier for a code only, material for an item name, and
+item_identifier for an item code. Put the spoken value in entities[].original_value; never use the value itself as the
+concept. A filtered entity is not also a dimension: do not repeat it in dimensions unless the user asked to group or
+list by it.
 Return one JSON object only."""
 
 
@@ -113,6 +122,14 @@ def _parse_plan(
                 "date_range": plan.date_range.model_copy(update={"original_text": restored})
             })
     plan = _apply_deterministic_overrides(plan, nlp_analysis)
+    if not evaluate_capability(plan).supported:
+        # The capability gate in execute_nlp_query rejects this exact plan
+        # (same decision, plan unchanged by the normalizers below), so it can
+        # never execute. Skipping semantic checks lets the pipeline answer
+        # "GRN is not supported in V1" instead of a misleading "model JSON did
+        # not satisfy the contract". Anything the gate would accept is still
+        # fully validated here.
+        return plan
     return validate_query_plan_semantics(plan, nlp_analysis)
 
 
@@ -227,6 +244,7 @@ def _correction_prompt(
     error: QueryPlanExtractionError | QueryPlanSemanticValidationError,
     response: str,
     nlp_analysis: NLPAnalysis | None,
+    question: str,
 ) -> str:
     """Keep the retry bounded to the failed response and contract."""
     if isinstance(error, QueryPlanSemanticValidationError):
@@ -234,6 +252,9 @@ def _correction_prompt(
         evidence = _spacy_evidence_text(nlp_analysis) if nlp_analysis is not None else "{}"
         return "\n".join(
             (
+                f"Question: {question}",
+                "Your previous QueryPlan was rejected. Return a corrected QueryPlan that removes every "
+                "violation below; do not return the previous JSON unchanged.",
                 f"Semantic violations: {error}",
                 f"Previous JSON: {previous_json}",
                 f"Required JSON schema: {_schema_text()}",
@@ -244,6 +265,9 @@ def _correction_prompt(
     detail = _format_validation_errors(cause) if isinstance(cause, ValidationError) else str(error)
     return "\n".join(
         (
+            f"Question: {question}",
+            "Your previous response was rejected. Return a corrected QueryPlan JSON object that fixes "
+            "the error below; do not return the previous response unchanged.",
             f"Validation/parsing error: {detail}",
             f"Previous model response: {response}",
             f"Required JSON schema: {_schema_text()}",
@@ -294,7 +318,7 @@ def extract_query_plan(
         return _parse_plan(response, nlp_analysis, original_question)
     except (QueryPlanResponseError, QueryPlanValidationError, QueryPlanSemanticValidationError) as first_error:
         try:
-            corrected = call_model("Return one JSON object only.", _correction_prompt(first_error, response, nlp_analysis))
+            corrected = call_model(SYSTEM_PROMPT, _correction_prompt(first_error, response, nlp_analysis, question.strip()))
         except Exception as exc:
             raise QueryPlanExtractionError("Unable to obtain a corrected model response.") from exc
         try:

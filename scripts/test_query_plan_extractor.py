@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -11,12 +12,15 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.query_plan import EntityStatus
 from app.query_plan_extractor import (
+    SYSTEM_PROMPT,
     QueryPlanExtractionError,
     QueryPlanResponseError,
     QueryPlanValidationError,
     extract_query_plan,
 )
 from app.spacy_nlp import analyze_question_with_spacy
+from app.v1_capabilities import evaluate_capability
+from app.entity_resolution import resolvable_concepts
 
 
 def plan_json(**overrides) -> str:
@@ -212,6 +216,120 @@ class QueryPlanExtractorTests(unittest.TestCase):
         self.assertTrue(plan.dimensions[0].grouping)
         self.assertEqual(len(call.calls), 2)
         self.assertIn("Semantic violations:", call.calls[1][1])
+
+    def test_correction_round_keeps_full_instructions(self) -> None:
+        # fix.md #6 cross-cutting: in the 47-question eval the retry returned the
+        # first JSON unchanged in 19/20 cases. The retry used to run with the
+        # system prompt "Return one JSON object only." -- no question, no
+        # extraction rules -- so the model had nothing to correct against.
+        question = "Show top 10 suppliers by purchase value in the last 6 months"
+        invalid = plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+        )
+        corrected = plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": True}],
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+        )
+        call = Calls(invalid, corrected)
+        extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        retry_system, retry_user = call.calls[1]
+        self.assertEqual(retry_system, SYSTEM_PROMPT)
+        self.assertIn(f"Question: {question}", retry_user)
+        self.assertIn("do not return the previous JSON unchanged", retry_user)
+
+    # -- unsupported domains bypass semantic validation (fix.md #6, gate ordering)
+
+    def test_unsupported_domain_plan_is_returned_for_the_capability_gate(self) -> None:
+        # Real Qwen shape for "how many qty received in last one year?" made
+        # deliberately semantically INVALID (sort on a concept the plan never
+        # declares): with the bypass removed this raises. Domain grn is not a
+        # V1 family, so evaluate_capability rejects it and the plan must come
+        # back for that gate to say "GRN is not supported".
+        question = "how many qty received in last one year?"
+        response = plan_json(
+            original_question=question,
+            domain="grn",
+            operation="detail",
+            business_subject={"concept": "receipt"},
+            measures=[{"concept": "quantity"}],
+            sorting=[{"field_concept": "ghost column", "direction": "desc", "priority": 0}],
+            date_range={"kind": "relative", "original_text": "last one year"},
+            requested_output={"fields": ["quantity"]},
+            confidence=0.8,
+        )
+        call = Calls(response)
+        plan = extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual(plan.domain, "grn")
+        self.assertFalse(evaluate_capability(plan).supported)
+        self.assertEqual(len(call.calls), 1)
+
+    def test_capability_supported_plan_is_validated_regardless_of_domain_label(self) -> None:
+        # Review finding: evaluate_capability maps ANY domain with
+        # operation=lookup + a supplier/material subject to a supported
+        # family, and accepts domain aliases (purchasing, po, ...). Such
+        # plans can execute, so they must never skip semantic validation.
+        question = "who supplies keyboard"
+        lookup_with_ghost_sort = plan_json(
+            original_question=question,
+            domain="grn",
+            operation="lookup",
+            business_subject={"concept": "supplier"},
+            measures=[],
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            entities=[{"concept": "material", "original_value": "keyboard"}],
+            sorting=[{"field_concept": "ghost column", "direction": "desc", "priority": 0}],
+        )
+        call = Calls(lookup_with_ghost_sort, lookup_with_ghost_sort)
+        with self.assertRaises(QueryPlanValidationError):
+            extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual(len(call.calls), 2)
+
+        question = "rank suppliers by purchase value"
+        alias_domain_bad_ranking = plan_json(
+            original_question=question,
+            domain="purchasing",
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[],
+            limit=None,
+        )
+        call = Calls(alias_domain_bad_ranking, alias_domain_bad_ranking)
+        with self.assertRaises(QueryPlanValidationError):
+            extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual(len(call.calls), 2)
+
+    def test_supported_domain_plan_is_still_semantically_validated(self) -> None:
+        question = "Show top 10 suppliers by purchase value in the last 6 months"
+        invalid = plan_json(
+            original_question=question,
+            operation="ranking",
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[{"field_concept": "value", "direction": "desc", "priority": 0}],
+            limit=10,
+        )
+        call = Calls(invalid, invalid)
+        with self.assertRaises(QueryPlanValidationError):
+            extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual(len(call.calls), 2)
+
+    def test_system_prompt_entity_concepts_match_the_resolver(self) -> None:
+        # The prompt's allowed entity concepts must be exactly the resolver's
+        # verified sources, so the two cannot drift apart.
+        match = re.search(r"must be exactly one of these\s+tokens:\s*([^.]+)\.", SYSTEM_PROMPT)
+        self.assertIsNotNone(match)
+        listed = {token.strip() for token in match.group(1).split(",")}
+        self.assertEqual(listed, set(resolvable_concepts()))
+        flat = " ".join(SYSTEM_PROMPT.split())
+        self.assertIn("never use the value itself as the concept", flat)
+        self.assertIn("Always set business_subject", flat)
+        self.assertIn("A filtered entity is not also a dimension", flat)
 
     def test_unused_month_dimension_is_corrected(self) -> None:
         question = "Show purchase value in the last 6 months"

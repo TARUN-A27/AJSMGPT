@@ -125,9 +125,44 @@ def normalize_recency_sorting(plan: QueryPlan) -> QueryPlan:
     return normalized
 
 
+def normalize_entity_dimensions(plan: QueryPlan) -> QueryPlan:
+    """Drop a dimension that merely restates an entity filter.
+
+    Qwen frequently emits `entities=[supplier: "Prime compu systems"]` AND
+    `dimensions=[supplier, grouping=false]` for "last supply from supplier
+    Prime compu systems" (fix.md #6b). The dimension carries no grouping and
+    no output role -- the entity filter is the meaning -- and would only trip
+    "Dimension does not affect grouping or requested output". Removing it
+    changes nothing the plan asks for. Lookups are left alone: there the
+    dimension is the implied answer field, exactly as that rule already treats it.
+    """
+    if plan.operation.lower() == "lookup" or not plan.entities or not plan.dimensions:
+        return plan
+    entity_concepts = {entity.concept.lower() for entity in plan.entities}
+    output_fields = {field.lower() for field in plan.requested_output.fields}
+    redundant = [
+        dimension
+        for dimension in plan.dimensions
+        if not dimension.grouping
+        and dimension.concept.lower() in entity_concepts
+        and dimension.concept.lower() not in output_fields
+    ]
+    if not redundant:
+        return plan
+    normalized = plan.model_copy(deep=True)
+    normalized.dimensions = [dimension for dimension in normalized.dimensions if dimension not in redundant]
+    return normalized
+
+
 def validate_query_plan_semantics(plan: QueryPlan, nlp_analysis: NLPAnalysis | None = None) -> QueryPlan:
     """Validate logical output relationships without relying on physical data sources."""
     plan = normalize_temporal_dimensions(plan, nlp_analysis)
+    plan = normalize_entity_dimensions(plan)
+    # Date dimensions the MODEL declared (after the date-range cleanup above).
+    # normalize_recency_sorting may add a sort-only, grouping=False date
+    # dimension for "last/latest" plans; that one is justified by the sort,
+    # not by the date range, so the date-range rule below must not judge it.
+    declared_dimensions = {dimension.concept.lower() for dimension in plan.dimensions}
     plan = normalize_recency_sorting(plan)
     violations: list[str] = []
     dimensions = {dimension.concept.lower(): dimension for dimension in plan.dimensions}
@@ -171,7 +206,12 @@ def validate_query_plan_semantics(plan: QueryPlan, nlp_analysis: NLPAnalysis | N
         # today, since this specific check never had a detail exemption.
         if not dimension.grouping and not is_output and operation != "lookup":
             violations.append(f"Dimension '{name}' does not affect grouping or requested output.")
-        if name in _DATE_DIMENSIONS and date_only_evidence and not date_grouping_requested:
+        if (
+            name in _DATE_DIMENSIONS
+            and name in declared_dimensions
+            and date_only_evidence
+            and not date_grouping_requested
+        ):
             violations.append(f"Date dimension '{name}' is not justified by a date range alone.")
 
     output_field_exempt = operation in _OUTPUT_ONLY_OPERATIONS

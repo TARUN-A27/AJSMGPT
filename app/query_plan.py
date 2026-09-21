@@ -80,8 +80,8 @@ class EntityReference(BaseModel):
     normalized_value: str | None = None
     selected_value: str | None = None
     candidates: list[str] = Field(default_factory=list)
-    confidence: float = Field(ge=0, le=1)
-    status: EntityStatus
+    confidence: float = Field(default=0.5, ge=0, le=1)
+    status: EntityStatus = EntityStatus.UNRESOLVED
 
     @model_validator(mode="after")
     def validate_resolution(self) -> "EntityReference":
@@ -129,7 +129,7 @@ class Comparison(BaseModel):
 class SortInstruction(BaseModel):
     field_concept: str
     direction: SortDirection
-    priority: int = Field(ge=0)
+    priority: int = Field(default=0, ge=0)
 
 
 class RequestedOutput(BaseModel):

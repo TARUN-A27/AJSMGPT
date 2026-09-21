@@ -5,6 +5,7 @@ import unittest
 from app.grounded_sql_validator import (
     GroundedSqlGroundingError,
     GroundedSqlSemanticError,
+    GroundedSqlValidationError,
     OracleDialectGroundedSqlError,
     UnsafeGroundedSqlError,
     validate_grounded_sql,
@@ -239,6 +240,29 @@ JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
 WHERE items.ITEM_NAME = :material_name"""
         validate_grounded_sql(sql, plan, grounding)
 
+    def test_valid_material_preview_when_bind_name_collides_with_column_name(self) -> None:
+        """Regression for Phase 9C: a bind named after its own column, e.g.
+        `ITEM_NAME = :ITEM_NAME`, must not be double-counted as two column
+        occurrences. Same fixture as test_valid_material_purchase_preview_uses_bind,
+        only the bind name differs."""
+        plan = QueryPlan(
+            original_question="purchases for material bearing",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            entities=[EntityReference(
+                concept="material", original_value="bearing", confidence=0.8, status=EntityStatus.UNRESOLVED
+            )],
+            requested_output=RequestedOutput(fields=["material"]),
+            confidence=0.85,
+        )
+        grounding = ground_query_plan(plan)
+        sql = """SELECT items.ITEM_NAME
+FROM INVENTORY.PURCHASEORDER po
+JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
+WHERE items.ITEM_NAME = :ITEM_NAME"""
+        validate_grounded_sql(sql, plan, grounding)
+
     def test_valid_mrs_preview(self) -> None:
         plan = QueryPlan(
             original_question="mrs quantity by department",
@@ -410,6 +434,40 @@ WHERE po.SUP_CODE = :supplier OR po.SUP_CODE LIKE 'ABC%'"""
         with self.assertRaises(GroundedSqlSemanticError):
             validate_grounded_sql(sql, plan, grounding)
 
+    # -- Phase 9b fixes ---------------------------------------------------
+
+    def test_bind_named_limit_does_not_trigger_the_limit_dialect_error(self) -> None:
+        # A bind literally named `:limit` must not be mistaken for the
+        # unsupported MySQL/Postgres LIMIT clause; it should still be
+        # rejected, but for the real reason (no literal row count present).
+        sql = PURCHASE_RANKING_SQL.replace("FETCH FIRST 10 ROWS ONLY", "FETCH FIRST :limit ROWS ONLY")
+        try:
+            validate_grounded_sql(sql, self.plan, self.grounding)
+            self.fail("Expected a rejection for the missing literal row limit.")
+        except OracleDialectGroundedSqlError:
+            self.fail("A `:limit` bind name must not trigger the LIMIT dialect check.")
+        except GroundedSqlSemanticError as exc:
+            self.assertIn("row limit", str(exc).lower())
+
+    def test_real_limit_clause_is_still_rejected_next_to_a_limit_named_bind(self) -> None:
+        # Guards against a regression that disables the LIMIT check entirely
+        # instead of just excluding bind-name matches.
+        sql = PURCHASE_RANKING_SQL.replace("FETCH FIRST 10 ROWS ONLY", "LIMIT :limit")
+        with self.assertRaisesRegex(
+            OracleDialectGroundedSqlError, "Oracle SQL does not support LIMIT",
+        ):
+            validate_grounded_sql(sql, self.plan, self.grounding)
+
+    def test_to_date_rejection_names_the_bind_fix(self) -> None:
+        plan = absolute_purchase_ranking_plan()
+        grounding = ground_query_plan(plan)
+        sql = FULLY_QUALIFIED_PURCHASE_RANKING_SQL.replace(
+            "BETWEEN :start_date AND :end_date",
+            ">= TO_DATE('2025-01-01', 'YYYY-MM-DD')",
+        )
+        with self.assertRaisesRegex(UnsafeGroundedSqlError, "named bind parameters"):
+            validate_grounded_sql(sql, plan, grounding)
+
     def test_rejects_unrequested_filters_on_grounded_measure(self) -> None:
         plan = QueryPlan(
             original_question="total purchase value",
@@ -453,6 +511,104 @@ WHERE po.SUP_CODE = :supplier OR po.SUP_CODE LIKE 'ABC%'"""
                     plan,
                     grounding,
                 )
+
+
+class MrsCompoundConditionTests(unittest.TestCase):
+    def _plan(self, concept: str) -> QueryPlan:
+        return QueryPlan(
+            original_question="mrs compound condition test",
+            domain="mrs",
+            operation="detail",
+            business_subject=BusinessSubject(concept="mrs"),
+            entities=[
+                EntityReference(
+                    concept="mrs number", original_value="890330", selected_value="890330",
+                    confidence=0.9, status=EntityStatus.RESOLVED,
+                ),
+                EntityReference(
+                    concept=concept, original_value="1", selected_value="1",
+                    confidence=0.9, status=EntityStatus.RESOLVED,
+                ),
+            ],
+            confidence=0.9,
+        )
+
+    def test_rejected_with_both_columns_and_or_is_valid(self):
+        plan = self._plan("mrs rejected")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M "
+            "WHERE M.MRSNO = :mrs_number AND (M.REJECTIONSTATUS = 1 OR M.STORESREJECTIONSTATUS = 1)"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_approved_with_both_columns_and_and_is_valid(self):
+        plan = self._plan("mrs approved")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M "
+            "WHERE M.MRSNO = :mrs_number AND M.APPROVALSTATUS = 1 AND M.READYFORAPPROVAL = 1"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_alias_and_whitespace_variations_are_tolerated(self):
+        plan = self._plan("mrs rejected")
+        grounding = ground_query_plan(plan)
+        sql = """SELECT m.MRSNO
+FROM INVENTORY.MRS_TEMP m
+WHERE m.MRSNO = :mrs_number AND (   m.REJECTIONSTATUS  =  1   OR   m.STORESREJECTIONSTATUS  =  1   )"""
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_rejected_with_only_one_column_is_rejected(self):
+        plan = self._plan("mrs rejected")
+        grounding = ground_query_plan(plan)
+        sql = "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number AND M.REJECTIONSTATUS = 1"
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_rejected_using_and_instead_of_or_is_rejected(self):
+        plan = self._plan("mrs rejected")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number "
+            "AND M.REJECTIONSTATUS = 1 AND M.STORESREJECTIONSTATUS = 1"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_approved_using_or_instead_of_and_is_rejected(self):
+        plan = self._plan("mrs approved")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number "
+            "AND M.APPROVALSTATUS = 1 OR M.READYFORAPPROVAL = 1"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_approved_with_only_one_column_is_rejected(self):
+        plan = self._plan("mrs approved")
+        grounding = ground_query_plan(plan)
+        sql = "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number AND M.APPROVALSTATUS = 1"
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_ungrounded_substitute_column_is_rejected(self):
+        plan = self._plan("mrs approved")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number "
+            "AND M.APPROVALSTATUS = 1 AND M.STATUS = 1"
+        )
+        with self.assertRaises(GroundedSqlValidationError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_compound_condition_omitted_is_rejected(self):
+        plan = self._plan("mrs rejected")
+        grounding = ground_query_plan(plan)
+        sql = "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number"
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
 
 
 if __name__ == "__main__":

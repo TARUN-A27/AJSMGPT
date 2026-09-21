@@ -56,6 +56,46 @@ class TextCorrectionTests(unittest.TestCase):
         self.assertEqual(result.corrections[0].corrected_token, "purchase")
         self.assertGreater(result.corrections[0].edit_distance, 0)
 
+    def test_date_never_becomes_rate(self) -> None:
+        result = correct_question_text("material mouse last purchased date?")
+        self.assertEqual(result.corrected_question, "material mouse last purchased date?")
+        self.assertFalse(result.was_corrected)
+
+    def test_rate_remains_rate(self) -> None:
+        result = correct_question_text("material mouse last purchased rate?")
+        self.assertEqual(result.corrected_question, "material mouse last purchased rate?")
+        self.assertFalse(result.was_corrected)
+
+    def test_supplied_never_becomes_supplier(self) -> None:
+        result = correct_question_text("who supplied the keyboard")
+        self.assertEqual(result.corrected_question, "who supplied the keyboard")
+        self.assertFalse(result.was_corrected)
+
+    def test_lattest_becomes_latest(self) -> None:
+        result = correct_question_text("dell lattest purchase order no?")
+        self.assertIn("latest", result.corrected_question)
+        self.assertNotIn("lattest", result.corrected_question)
+
+    def test_two_word_quoted_value_is_unchanged(self) -> None:
+        question = 'Last 5 purchase details of "dell system"'
+        self.assertEqual(correct_question_text(question).corrected_question, question)
+
+    def test_uppercase_quoted_value_is_unchanged(self) -> None:
+        question = 'WHO are the suppliers for the item "BARCODE CHROMO LABEL"'
+        self.assertEqual(correct_question_text(question).corrected_question, question)
+
+    def test_multiword_lowercase_quoted_value_interior_word_is_unchanged(self) -> None:
+        # A typo inside a 3+-word quoted span must not be corrected: the
+        # interior word carries no quote character of its own, so it needs
+        # cross-chunk quote-state tracking (not just per-chunk protection)
+        # to stay verbatim.
+        question = 'show "dell qunatity system" stock'
+        self.assertEqual(correct_question_text(question).corrected_question, question)
+
+    def test_typo_outside_quotes_is_still_corrected(self) -> None:
+        result = correct_question_text('purchse rate of "dell system"')
+        self.assertEqual(result.corrected_question, 'purchase rate of "dell system"')
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

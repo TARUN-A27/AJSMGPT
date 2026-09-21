@@ -151,6 +151,113 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertEqual(loader.call_count, 1)
         self.assertTrue(all(table.full_table_name.startswith(("INVENTORY.", "SCM.")) for table in result.selected_tables))
 
+    def test_mrs_number_grounds_without_join(self):
+        result = ground_query_plan(plan(
+            "mrs", "mrs",
+            entities=[EntityReference(
+                concept="mrs number", original_value="890330", selected_value="890330",
+                confidence=0.9, status=EntityStatus.RESOLVED,
+            )],
+        ))
+        self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.MRS_TEMP"])
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "MRSNO"), columns)
+        self.assertEqual(columns[("INVENTORY.MRS_TEMP", "MRSNO")].logical_concept, "mrs_number")
+
+    def test_mrs_due_date_grounds_without_join(self):
+        result = ground_query_plan(plan(
+            "mrs", "mrs",
+            dimensions=[Dimension(concept="mrs due date", grouping=False)],
+            date_range=DATE_RANGE,
+        ))
+        self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.MRS_TEMP"])
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "DUEDATE"), columns)
+        self.assertEqual(columns[("INVENTORY.MRS_TEMP", "DUEDATE")].logical_concept, "mrs_due_date")
+        # The plan's own date_range still resolves through the existing generic
+        # mrs_date concept, independent of the new mrs_due_date concept.
+        self.assertIn(("INVENTORY.MRS_TEMP", "MRSDATE"), columns)
+
+    def test_mrs_rejection_reason_grounds_as_display_without_status_semantics(self):
+        result = ground_query_plan(plan(
+            "mrs", "mrs",
+            dimensions=[Dimension(concept="rejection reason", grouping=False)],
+        ))
+        self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.MRS_TEMP"])
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "REASONFORREJECTIONSTORES"), columns)
+        self.assertEqual(columns[("INVENTORY.MRS_TEMP", "REASONFORREJECTIONSTORES")].logical_concept, "mrs_rejection_reason")
+        # A generic catch-all "mrs status" is still not a catalogued concept;
+        # only the specific bounded conditions below are supported.
+        status_result = ground_query_plan(plan("mrs", "mrs", dimensions=[Dimension(concept="mrs status", grouping=True)]))
+        self.assertFalse(status_result.is_grounded)
+
+    def _entity_plan(self, concept):
+        return plan(
+            "mrs", "mrs",
+            entities=[EntityReference(
+                concept=concept, original_value="1", selected_value="1",
+                confidence=0.9, status=EntityStatus.RESOLVED,
+            )],
+        )
+
+    def test_mrs_hold_flag_grounds_without_join(self):
+        result = ground_query_plan(self._entity_plan("mrs hold"))
+        self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.MRS_TEMP"])
+        columns = {(c.full_table_name, c.column_name): c for c in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "HOLDINGSTATUS"), columns)
+        self.assertEqual(columns[("INVENTORY.MRS_TEMP", "HOLDINGSTATUS")].logical_concept, "mrs_hold_flag")
+        self.assertEqual(result.compound_conditions, [])
+
+    def test_mrs_ready_for_approval_grounds_without_join(self):
+        result = ground_query_plan(self._entity_plan("ready for approval"))
+        self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.MRS_TEMP"])
+        columns = {(c.full_table_name, c.column_name): c for c in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "READYFORAPPROVAL"), columns)
+        self.assertEqual(columns[("INVENTORY.MRS_TEMP", "READYFORAPPROVAL")].logical_concept, "mrs_ready_for_approval")
+
+    def test_mrs_rejected_grounds_to_both_columns_with_or(self):
+        result = ground_query_plan(self._entity_plan("mrs rejected"))
+        self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.MRS_TEMP"])
+        self.assertEqual(len(result.compound_conditions), 1)
+        condition = result.compound_conditions[0]
+        self.assertEqual(condition.logical_concept, "mrs_rejected")
+        self.assertEqual(condition.combinator, "OR")
+        self.assertEqual(
+            set(condition.columns),
+            {"INVENTORY.MRS_TEMP.REJECTIONSTATUS", "INVENTORY.MRS_TEMP.STORESREJECTIONSTATUS"},
+        )
+        selected = {(c.full_table_name, c.column_name) for c in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "REJECTIONSTATUS"), selected)
+        self.assertIn(("INVENTORY.MRS_TEMP", "STORESREJECTIONSTATUS"), selected)
+
+    def test_mrs_approved_grounds_to_both_columns_with_and(self):
+        result = ground_query_plan(self._entity_plan("mrs approved"))
+        self.assert_grounded(result)
+        self.assertEqual([table.full_table_name for table in result.selected_tables], ["INVENTORY.MRS_TEMP"])
+        self.assertEqual(len(result.compound_conditions), 1)
+        condition = result.compound_conditions[0]
+        self.assertEqual(condition.logical_concept, "mrs_approved")
+        self.assertEqual(condition.combinator, "AND")
+        self.assertEqual(
+            set(condition.columns),
+            {"INVENTORY.MRS_TEMP.APPROVALSTATUS", "INVENTORY.MRS_TEMP.READYFORAPPROVAL"},
+        )
+
+    def test_compound_condition_columns_are_catalog_verified(self):
+        # _catalog_is_verified() already runs on every ground_query_plan()
+        # call and raises RuntimeError if any column (including compound
+        # ones) is not in the verified metadata; reaching a grounded result
+        # at all is itself proof every compound column passed that check.
+        result = ground_query_plan(self._entity_plan("mrs rejected"))
+        self.assertTrue(result.is_grounded)
+
 
 if __name__ == "__main__":
     unittest.main()

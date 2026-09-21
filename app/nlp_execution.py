@@ -15,6 +15,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.entity_resolution import oracle_entity_lookup, resolvable_concepts, resolve_plan_entities
 from app.grounded_sql_generator import GroundedSqlResult, generate_grounded_sql
 from app.grounded_sql_validator import GroundedSqlValidationError, validate_grounded_sql
 from app.oracle_client import (
@@ -154,11 +155,24 @@ class SelectRunner(Protocol):
     ) -> Mapping[str, Any]: ...
 
 
+def _default_resolve_entities(plan: QueryPlan) -> QueryPlan:
+    """Verify every entity against the verified ERP master data.
+
+    This is an identity-verification read, entirely separate from the
+    business-execution `runner()` call below: it goes through
+    `oracle_entity_lookup` -> `run_safe_select` directly, never through
+    `deps.runner`, so it can never be counted as, or substitute for, the
+    single business-execution call.
+    """
+    return resolve_plan_entities(plan, oracle_entity_lookup)
+
+
 @dataclass(frozen=True)
 class NLPExecutionDependencies:
     correct_text: Callable[[str], TextCorrectionResult] = correct_question_text
     analyze: Callable[[str], NLPAnalysis] = analyze_question_with_spacy
     extract_plan: Callable[..., QueryPlan] = extract_query_plan
+    resolve_entities: Callable[[QueryPlan], QueryPlan] = _default_resolve_entities
     ground_plan: Callable[[QueryPlan], GroundedSchemaPlan] = ground_query_plan
     generate_sql: Callable[..., GroundedSqlResult] = generate_grounded_sql
     runner: SelectRunner | None = None
@@ -411,6 +425,11 @@ def build_bind_parameters(
             continue
         if plan.date_range and _normalise(item.concept) in {"date", "time", "period"}:
             continue
+        if item.concept in resolvable_concepts():
+            raise ParameterBindingError(
+                f"Concept '{item.concept}' requires verified entity resolution and cannot "
+                "be bound as a raw filter value."
+            )
         _map_requirement(
             sql,
             grounding,
@@ -632,6 +651,10 @@ def execute_nlp_query(
         nlp_analysis=analysis,
         original_question=correction.original_question,
     )
+    # Discard any status/selected_value the model claimed and independently
+    # verify every entity against the ERP master data before anything below
+    # trusts it. This is the only place UNRESOLVED -> RESOLVED may happen.
+    plan = deps.resolve_entities(plan)
     capability = evaluate_capability(plan)
     ambiguities = [item.reason for item in plan.ambiguities if item.blocking]
     unresolved = [

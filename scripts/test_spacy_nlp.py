@@ -82,6 +82,82 @@ class SpacyQuestionAnalyzerTests(unittest.TestCase):
         analyze_question_with_spacy("MRS details")
         self.assertIs(_ANALYZER.nlp, pipeline)
 
+    # -- recency / limits --------------------------------------------------
+
+    def test_recency_with_explicit_number_sets_limit(self) -> None:
+        self.assertEqual(analyze_question_with_spacy("last 5 purchase details").recency_limit, 5)
+        self.assertEqual(analyze_question_with_spacy("latest 10 orders").recency_limit, 10)
+        self.assertEqual(analyze_question_with_spacy("first 3 supplies").recency_limit, 3)
+
+    def test_recency_direction(self) -> None:
+        self.assertEqual(analyze_question_with_spacy("latest purchase order").recency_direction, "desc")
+        self.assertEqual(analyze_question_with_spacy("last supply of mouse").recency_direction, "desc")
+        self.assertEqual(analyze_question_with_spacy("recent issue for yarn").recency_direction, "desc")
+        self.assertEqual(analyze_question_with_spacy("first supply of mouse").recency_direction, "asc")
+        self.assertEqual(analyze_question_with_spacy("earliest purchase").recency_direction, "asc")
+
+    def test_recency_does_not_fire_on_date_phrases(self) -> None:
+        for question in ("last month", "last year", "last one year", "last 6 months", "last 30 days"):
+            result = analyze_question_with_spacy(question)
+            self.assertIsNone(result.recency_limit, question)
+            self.assertIn(question, result.date_expressions)
+
+    def test_last_year_and_last_n_days_are_date_expressions(self) -> None:
+        self.assertIn("last year", analyze_question_with_spacy("purchases last year").date_expressions)
+        self.assertIn("last one year", analyze_question_with_spacy("price in last one year").date_expressions)
+        self.assertIn("last 30 days", analyze_question_with_spacy("received in last 30 days").date_expressions)
+
+    def test_on_yyyymmdd_is_a_date_expression(self) -> None:
+        result = analyze_question_with_spacy("attendance for empcode 165224 on 20260212")
+        self.assertIn("on 20260212", result.date_expressions)
+
+    # -- quoted entities -----------------------------------------------------
+
+    def test_quoted_entities_are_captured_verbatim(self) -> None:
+        self.assertEqual(analyze_question_with_spacy('what is the price of "Keyboard"').quoted_entities, ["Keyboard"])
+        self.assertEqual(analyze_question_with_spacy('"dell system" stock').quoted_entities, ["dell system"])
+        self.assertEqual(
+            analyze_question_with_spacy('suppliers for the item "BARCODE CHROMO LABEL"').quoted_entities,
+            ["BARCODE CHROMO LABEL"],
+        )
+
+    # -- entity boundaries -----------------------------------------------------
+
+    def test_entity_span_drops_trailing_preposition(self) -> None:
+        result = analyze_question_with_spacy("last purchase rate of barcode scanner in 2026")
+        self.assertIn("barcode scanner", result.candidate_entity_spans)
+        self.assertNotIn("barcode scanner in", result.candidate_entity_spans)
+
+    # -- contextual numeric identifiers --------------------------------------
+
+    def test_contextual_numeric_identifiers_are_captured(self) -> None:
+        self.assertIn("890330", analyze_question_with_spacy("MRS number 890330").contextual_identifiers)
+        self.assertIn("890330", analyze_question_with_spacy("MRS no 890330").contextual_identifiers)
+        self.assertIn("800967", analyze_question_with_spacy("supplier 800967").contextual_identifiers)
+        self.assertIn("12345", analyze_question_with_spacy("order no 12345").contextual_identifiers)
+
+    def test_bare_numbers_are_not_treated_as_identifiers(self) -> None:
+        self.assertEqual(analyze_question_with_spacy("show 5 items").contextual_identifiers, [])
+
+    # -- negation -------------------------------------------------------------
+
+    def test_no_is_not_negation_in_identifier_context(self) -> None:
+        self.assertEqual(analyze_question_with_spacy('"dell" latest purchase order no?').negations, [])
+        self.assertEqual(analyze_question_with_spacy("MRS no 445").negations, [])
+        self.assertEqual(analyze_question_with_spacy("supplier no 800967").negations, [])
+
+    def test_genuine_negation_still_detected(self) -> None:
+        self.assertIn("no", analyze_question_with_spacy("no returns accepted").negations)
+        self.assertIn("without", analyze_question_with_spacy("purchases without GST").negations)
+
+    # -- unsupported-domain vocabulary (advisory only) -------------------------
+
+    def test_stock_and_grn_vocabulary_is_recognized_as_a_domain(self) -> None:
+        self.assertIn("stock", analyze_question_with_spacy("keyboard stock").detected_domains)
+        self.assertIn("stock", analyze_question_with_spacy("dell system inventory").detected_domains)
+        self.assertIn("grn", analyze_question_with_spacy("GRN for supplier 800967").detected_domains)
+        self.assertIn("grn", analyze_question_with_spacy("how many qty received in last one year").detected_domains)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

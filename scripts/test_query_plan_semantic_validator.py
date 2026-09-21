@@ -8,7 +8,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.query_plan import QueryPlan
-from app.query_plan_semantic_validator import QueryPlanSemanticValidationError, normalize_temporal_dimensions, validate_query_plan_semantics
+from app.query_plan_semantic_validator import (
+    QueryPlanSemanticValidationError,
+    has_conflicting_ranking_directions,
+    normalize_recency_sorting,
+    normalize_temporal_dimensions,
+    validate_query_plan_semantics,
+)
 from app.spacy_nlp import analyze_question_with_spacy
 
 
@@ -137,6 +143,172 @@ class QueryPlanSemanticValidatorTests(unittest.TestCase):
             requested_output={"fields": ["supplier"]},
         )
         validate_query_plan_semantics(detail)
+
+    # -- recency normalizer ---------------------------------------------------
+
+    def test_recency_normalizer_adds_ungrouped_date_dimension(self) -> None:
+        detail = plan(
+            original_question="last purchase details of mouse",
+            operation="detail",
+            measures=[],
+            dimensions=[],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        normalized = validate_query_plan_semantics(detail)
+        self.assertEqual([d.concept for d in normalized.dimensions], ["purchase date"])
+        self.assertFalse(normalized.dimensions[0].grouping)
+        self.assertIn("purchase date", normalized.requested_output.fields)
+
+    def test_recency_normalizer_never_sets_grouping_true(self) -> None:
+        detail = plan(
+            operation="detail",
+            measures=[],
+            dimensions=[],
+            sorting=[{"field_concept": "mrs date", "direction": "asc", "priority": 0}],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        normalized = normalize_recency_sorting(detail)
+        self.assertFalse(normalized.dimensions[0].grouping)
+
+    def test_recency_normalizer_does_not_touch_non_date_sort_fields(self) -> None:
+        # A blanket normalizer would silently bypass "sorting field
+        # unavailable" for any hallucinated sort target; it must stay
+        # scoped to date concepts only.
+        detail = plan(
+            operation="detail",
+            measures=[],
+            dimensions=[],
+            sorting=[{"field_concept": "supplier rating", "direction": "desc", "priority": 0}],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "Sorting field 'supplier rating' is unavailable"):
+            validate_query_plan_semantics(detail)
+
+    def test_recency_normalizer_only_applies_to_detail_and_lookup(self) -> None:
+        ranking = plan(
+            operation="ranking",
+            dimensions=[],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+        )
+        unchanged = normalize_recency_sorting(ranking)
+        self.assertEqual(unchanged.dimensions, [])
+
+    # -- lookup output exemption ------------------------------------------
+
+    def test_lookup_dimension_without_output_field_is_allowed(self) -> None:
+        lookup = plan(
+            original_question="who supplies keyboard",
+            operation="lookup",
+            measures=[],
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        validate_query_plan_semantics(lookup)
+
+    def test_detail_dimension_without_output_field_is_still_rejected(self) -> None:
+        # Detail's existing behavior at this check must stay unchanged: only
+        # "lookup" is exempted, not "detail".
+        detail = plan(
+            operation="detail",
+            measures=[],
+            dimensions=[{"concept": "supplier", "grouping": False}],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": []},
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "does not affect grouping or requested output"):
+            validate_query_plan_semantics(detail)
+
+    # -- unknown operation on a supported domain -----------------------------
+
+    def test_unknown_operation_on_supported_domain_is_rejected(self) -> None:
+        invalid = plan(
+            domain="purchase",
+            operation="unknown",
+            dimensions=[],
+            sorting=[],
+            limit=None,
+            confidence=0.6,
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "Operation 'unknown' is not usable"):
+            validate_query_plan_semantics(invalid)
+
+    def test_unknown_operation_on_unsupported_domain_is_not_caught_here(self) -> None:
+        # Left to the capability gate downstream, which has the catalogued
+        # unsupported-family message; this validator must not duplicate it.
+        stock = plan(
+            domain="stock",
+            operation="unknown",
+            dimensions=[],
+            sorting=[],
+            limit=None,
+            confidence=0.5,
+        )
+        validate_query_plan_semantics(stock)
+
+    # -- fail-closed: "due" without a nameable date concept ------------------
+
+    def test_due_without_nameable_date_concept_requires_clarification(self) -> None:
+        mrs_due = plan(
+            original_question="MRS due in 2026",
+            domain="mrs",
+            operation="detail",
+            measures=[],
+            dimensions=[],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": []},
+            date_range={"kind": "absolute", "start": "2026-01-01", "end": "2026-12-31", "original_text": "in 2026"},
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "does not name which date concept"):
+            validate_query_plan_semantics(mrs_due)
+
+    def test_due_with_explicit_due_date_concept_is_allowed(self) -> None:
+        mrs_due = plan(
+            original_question="MRS due in 2026",
+            domain="mrs",
+            operation="detail",
+            measures=[],
+            dimensions=[{"concept": "mrs due date", "grouping": False}],
+            sorting=[],
+            limit=None,
+            requested_output={"fields": ["mrs due date"]},
+            date_range={"kind": "absolute", "start": "2026-01-01", "end": "2026-12-31", "original_text": "in 2026"},
+        )
+        validate_query_plan_semantics(mrs_due)
+
+    # -- fail-closed: conflicting ranking directions -------------------------
+
+    def test_conflicting_ranking_measures_are_rejected(self) -> None:
+        conflicting = plan(
+            original_question="list who is given highest rate and who is given lowest rate?",
+            measures=[
+                {"concept": "rate", "aggregation": "maximum"},
+                {"concept": "rate", "aggregation": "minimum"},
+            ],
+            sorting=[{"field_concept": "rate", "direction": "desc", "priority": 0}],
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "conflicting ranking directions"):
+            validate_query_plan_semantics(conflicting)
+
+    def test_has_conflicting_ranking_directions_detects_opposite_sort_instructions(self) -> None:
+        conflicting = plan(
+            measures=[{"concept": "rate", "aggregation": "sum"}],
+            sorting=[
+                {"field_concept": "rate", "direction": "asc", "priority": 0},
+                {"field_concept": "rate", "direction": "desc", "priority": 1},
+            ],
+        )
+        self.assertTrue(has_conflicting_ranking_directions(conflicting))
+
+    def test_single_direction_ranking_is_not_conflicting(self) -> None:
+        self.assertFalse(has_conflicting_ranking_directions(plan()))
 
 
 if __name__ == "__main__":

@@ -57,6 +57,22 @@ class GroundingRejection(BaseModel):
     reason: str
 
 
+class GroundedCompoundCondition(BaseModel):
+    """A bounded, catalog-declared boolean combination of verified columns.
+
+    This exists only for concepts whose business meaning requires combining
+    two or more physical flag columns (e.g. an MRS "rejected" status is
+    REJECTIONSTATUS=1 OR STORESREJECTIONSTATUS=1). The combinator and the
+    exact columns come from the catalog, never from the model: Qwen is told
+    which columns/operator are required, but the boolean structure itself is
+    fixed here and re-checked verbatim by the SQL validator.
+    """
+
+    logical_concept: str
+    combinator: str
+    columns: list[str]
+
+
 class GroundedSchemaPlan(BaseModel):
     source_query_plan: dict
     candidate_schemas: list[str]
@@ -68,6 +84,7 @@ class GroundedSchemaPlan(BaseModel):
     confidence: float = Field(ge=0, le=1)
     ambiguities: list[GroundingAmbiguity] = Field(default_factory=list)
     reject_reasons: list[GroundingRejection] = Field(default_factory=list)
+    compound_conditions: list[GroundedCompoundCondition] = Field(default_factory=list)
 
     @property
     def is_grounded(self) -> bool:
@@ -98,9 +115,14 @@ def _catalog_is_verified(catalog: dict, metadata_columns: dict[str, set[str]], m
         for edge in metadata_edges
     }
     for concept in catalog["concepts"]:
-        for column in concept["columns"]:
+        for column in concept.get("columns", []):
             if column["table"] not in metadata_columns or column["column"] not in metadata_columns[column["table"]]:
                 raise RuntimeError("Business schema catalog contains an unverified column.")
+        compound = concept.get("compound_condition")
+        if compound:
+            for column in compound["columns"]:
+                if column["table"] not in metadata_columns or column["column"] not in metadata_columns[column["table"]]:
+                    raise RuntimeError("Business schema catalog contains an unverified compound-condition column.")
     for edge in catalog["relationships"]:
         record = (edge["from_table"], edge["from_column"], edge["to_table"], edge["to_column"], edge["constraint_name"])
         if record not in actual_edges:
@@ -133,10 +155,30 @@ def _matching_columns(catalog: dict, phrase: str, role: str) -> list[tuple[dict,
         aliases = {_normalise(concept["name"]), *(_normalise(alias) for alias in concept["aliases"])}
         if target not in aliases:
             continue
-        for column in concept["columns"]:
+        for column in concept.get("columns", []):
             if role in column["roles"]:
                 matches.append((concept, column))
     return matches
+
+
+def _matching_compound_concept(catalog: dict, phrase: str, role: str) -> dict | None:
+    """Bounded lookup for a compound-condition concept (never a free-form match).
+
+    Compound conditions only ever satisfy an entity/filter requirement (role
+    "entity_filter"): they represent "is this record in state X", not a
+    measure, grouping dimension, or generic date filter.
+    """
+    if role != "entity_filter":
+        return None
+    target = _normalise(phrase)
+    for concept in catalog["concepts"]:
+        compound = concept.get("compound_condition")
+        if not compound:
+            continue
+        aliases = {_normalise(concept["name"]), *(_normalise(alias) for alias in concept["aliases"])}
+        if target in aliases:
+            return concept
+    return None
 
 
 def _domain(catalog: dict, plan: QueryPlan) -> dict | None:
@@ -220,7 +262,15 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
     catalog, metadata_columns, metadata_edges = _load_inputs()
     _catalog_is_verified(catalog, metadata_columns, metadata_edges)
     domain = _domain(catalog, query_plan)
-    schemas = sorted({table.split(".", 1)[0] for item in catalog["domains"] for table in item["primary_tables"]} | {column["table"].split(".", 1)[0] for concept in catalog["concepts"] for column in concept["columns"]})
+    schemas = sorted(
+        {table.split(".", 1)[0] for item in catalog["domains"] for table in item["primary_tables"]}
+        | {column["table"].split(".", 1)[0] for concept in catalog["concepts"] for column in concept.get("columns", [])}
+        | {
+            column["table"].split(".", 1)[0]
+            for concept in catalog["concepts"]
+            for column in concept.get("compound_condition", {}).get("columns", [])
+        }
+    )
     result = GroundedSchemaPlan(source_query_plan=_source_summary(query_plan), candidate_schemas=schemas, confidence=0.0)
     if domain is None:
         result.reject_reasons.append(GroundingRejection(requirement="domain", reason="Domain is outside the V1 business schema catalog."))
@@ -232,9 +282,48 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
     paths: list[RelationshipPath] = []
     confidences = [domain["confidence"]]
 
+    compound_conditions: list[GroundedCompoundCondition] = []
+
     for requirement_type, phrase, role in _requirements(query_plan):
         candidates = _matching_columns(catalog, phrase, role)
         if not candidates:
+            compound_concept = _matching_compound_concept(catalog, phrase, role)
+            if compound_concept is not None:
+                compound = compound_concept["compound_condition"]
+                out_of_scope = [
+                    col for col in compound["columns"] if col["table"] not in anchors
+                ]
+                if out_of_scope:
+                    result.reject_reasons.append(GroundingRejection(
+                        requirement=f"{requirement_type}:{phrase}",
+                        reason="Compound condition requires a table outside the V1 domain anchor; no join is supported for compound conditions.",
+                    ))
+                    continue
+                for col in compound["columns"]:
+                    selected_columns.append(GroundedColumn(
+                        full_table_name=col["table"], column_name=col["column"],
+                        logical_concept=compound_concept["name"], role="entity_filter",
+                        confidence=compound_concept.get("confidence", 0.8),
+                    ))
+                compound_column_names = [f"{col['table']}.{col['column']}" for col in compound["columns"]]
+                compound_conditions.append(GroundedCompoundCondition(
+                    logical_concept=compound_concept["name"],
+                    combinator=compound["combinator"],
+                    columns=compound_column_names,
+                ))
+                # Record under the literal plan phrase (not just the catalog's
+                # canonical name), so the SQL validator can recognise this
+                # requirement as a compound condition regardless of which
+                # alias the plan used -- the same lookup ordinary entity
+                # concepts already rely on.
+                result.entity_column_candidates[phrase] = sorted(compound_column_names)
+                result.evidence.append(GroundingEvidence(
+                    requirement=f"{requirement_type}:{phrase}", logical_concept=compound_concept["name"],
+                    source=compound_concept.get("evidence", "metadata"),
+                    confidence=compound_concept.get("confidence", 0.8),
+                ))
+                confidences.append(compound_concept.get("confidence", 0.8))
+                continue
             domain_aliases = {_normalise(domain["name"]), *(_normalise(alias) for alias in domain["aliases"])}
             if requirement_type == "business_subject" and _normalise(phrase) in domain_aliases:
                 continue
@@ -278,6 +367,7 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
     unique_columns = {(item.full_table_name, item.column_name, item.role): item for item in selected_columns}
     result.selected_columns = sorted(unique_columns.values(), key=lambda item: (item.full_table_name, item.column_name, item.role))
     result.allowed_relationship_paths = sorted(paths, key=lambda item: (item.constraint_names, item.tables))
+    result.compound_conditions = sorted(compound_conditions, key=lambda item: item.logical_concept)
     table_roles = {table: "anchor" if table in anchors else "related" for table in selected_tables}
     result.selected_tables = [GroundedTable(full_table_name=table, role=table_roles[table], confidence=domain["confidence"] if table in anchors else 1.0) for table in sorted(selected_tables)]
     if result.reject_reasons or any(item.blocking for item in result.ambiguities):

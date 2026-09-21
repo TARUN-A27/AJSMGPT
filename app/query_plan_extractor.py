@@ -10,9 +10,10 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.ollama_client import chat_with_qwen
-from app.query_plan import QueryPlan
+from app.query_plan import DateRange, DateRangeKind, QueryPlan, SortDirection
 from app.query_plan_semantic_validator import (
     QueryPlanSemanticValidationError,
+    has_conflicting_ranking_directions,
     validate_query_plan_semantics,
 )
 from app.spacy_nlp import NLPAnalysis
@@ -33,13 +34,22 @@ class QueryPlanValidationError(QueryPlanExtractionError):
 ModelCall = Callable[[str, str], str]
 QUERY_PLAN_NUM_PREDICT = 1000
 
+_IN_YEAR_PATTERN = re.compile(r"\bin\s+((?:19|20)\d{2})\b", re.IGNORECASE)
+_ON_YYYYMMDD_PATTERN = re.compile(r"\bon\s+((?:19|20)\d{2})(\d{2})(\d{2})\b", re.IGNORECASE)
+
 
 SYSTEM_PROMPT = """Interpret an ERP business question into one JSON object matching the supplied QueryPlan JSON schema.
 This is question understanding only: never generate SQL, and never invent tables, columns, joins, or resolved database values.
 Keep entity text as the user spoke it. Preserve uncertainty as ambiguities; use null or empty fields rather than guessing.
 Use calibrated confidence, and make ambiguity blocking when competing interpretations would materially change the answer.
-Supported domains are purchase, mrs, consumption, and unknown. Use unknown when none fits.
-Operations are detail, aggregate, trend, ranking, comparison, lookup, and unknown. Select the closest operation without implying implementation details.
+Recognized domains are purchase, mrs, consumption, stock, grn, and unknown. A domain describes the question's real-world
+subject even when it is not yet a supported family; use unknown only when no real-world subject can be identified at all.
+Operations are detail, aggregate, trend, ranking, comparison, lookup, and unknown. Select the closest operation without
+implying implementation details. Use unknown only when the intent genuinely cannot be determined, not merely because no
+operation feels like a perfect fit.
+For "last/latest/recent N" or "first/earliest N" questions (records, not a calendar range), use operation=detail with a
+sorting entry on the relevant date concept (descending for last/latest/recent, ascending for first/earliest) and
+limit=N. For the same wording without an explicit N, use operation=detail with that same sorting entry and no limit.
 Dimensions only affect requested output or grouping. Date ranges are filters, not dimensions. Ranking by an aggregate requires grouping=true for the ranked result dimension.
 Return one JSON object only."""
 
@@ -96,13 +106,121 @@ def _parse_plan(
         expressions = (nlp_analysis.date_expressions if nlp_analysis is not None else [])
         restored = next((value.strip() for value in expressions if isinstance(value, str) and value.strip()), None)
         if restored is None and nlp_analysis is not None:
-            match = re.search(r"\b(?:last|past|previous)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:months?|days?)\b", nlp_analysis.normalized_question, re.IGNORECASE)
+            match = re.search(r"\b(?:last|past|previous)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:months?|days?|years?)\b", nlp_analysis.normalized_question, re.IGNORECASE)
             restored = match.group(0) if match else None
         if restored:
             plan = plan.model_copy(update={
                 "date_range": plan.date_range.model_copy(update={"original_text": restored})
             })
+    plan = _apply_deterministic_overrides(plan, nlp_analysis)
     return validate_query_plan_semantics(plan, nlp_analysis)
+
+
+def _normalise_value(text: str) -> str:
+    return " ".join(text.split()).lower()
+
+
+def _apply_deterministic_overrides(plan: QueryPlan, nlp_analysis: NLPAnalysis | None) -> QueryPlan:
+    """Let explicit user signals override contradictory Qwen output.
+
+    Every branch here only corrects a field the plan already asserts (a
+    limit value, a date range, an existing entity's text, an existing sort
+    instruction's direction, or a missing ranking limit the plan already
+    implies) — none of it invents a new entity, schema concept, join, or
+    business status the model itself never referenced.
+    """
+    if nlp_analysis is None:
+        return plan
+
+    updates: dict[str, object] = {}
+
+    # "last 5" / "latest 10" / "first 3": an explicit row count always wins,
+    # and a date_range Qwen invented from that same wording (no genuine date
+    # evidence anywhere in the question) must be cleared rather than risk
+    # grounding to the wrong column.
+    if nlp_analysis.recency_limit is not None:
+        updates["limit"] = nlp_analysis.recency_limit
+        if (
+            plan.date_range is not None
+            and plan.date_range.kind != DateRangeKind.UNSPECIFIED
+            and not nlp_analysis.date_expressions
+        ):
+            updates["date_range"] = None
+
+    # "in 2026" / "on 20260212": an explicit calendar date always wins.
+    question_text = nlp_analysis.normalized_question
+    day_match = _ON_YYYYMMDD_PATTERN.search(question_text)
+    year_match = _IN_YEAR_PATTERN.search(question_text)
+    if day_match:
+        year, month, day = day_match.groups()
+        updates["date_range"] = DateRange(
+            kind=DateRangeKind.ABSOLUTE, start=f"{year}-{month}-{day}", end=f"{year}-{month}-{day}",
+            original_text=day_match.group(0),
+        )
+    elif year_match:
+        year = year_match.group(1)
+        updates["date_range"] = DateRange(
+            kind=DateRangeKind.ABSOLUTE, start=f"{year}-01-01", end=f"{year}-12-31",
+            original_text=year_match.group(0),
+        )
+
+    if updates:
+        plan = plan.model_copy(update=updates)
+
+    # Quoted / contextual-identifier values: correct an existing entity's
+    # text to match exactly what the user wrote (case, spacing); never
+    # invent an entity for a value the model never referenced at all.
+    authoritative_values = list(nlp_analysis.quoted_entities) + list(nlp_analysis.contextual_identifiers)
+    if authoritative_values and plan.entities:
+        exact_by_normalised = {_normalise_value(value): value for value in authoritative_values}
+        updated_entities = []
+        for entity in plan.entities:
+            if entity.original_value:
+                exact = exact_by_normalised.get(_normalise_value(entity.original_value))
+                if exact is not None and exact != entity.original_value:
+                    entity = entity.model_copy(update={"original_value": exact})
+            updated_entities.append(entity)
+        plan = plan.model_copy(update={"entities": updated_entities})
+
+    # Recency direction: correct the direction of a sort instruction the
+    # model already wrote for a date concept; never add one it never wrote.
+    if nlp_analysis.recency_direction and plan.sorting:
+        target_direction = SortDirection.DESC if nlp_analysis.recency_direction == "desc" else SortDirection.ASC
+        updated_sorting = []
+        for instruction in plan.sorting:
+            if "date" in instruction.field_concept.lower() and instruction.direction != target_direction:
+                instruction = instruction.model_copy(update={"direction": target_direction})
+            updated_sorting.append(instruction)
+        plan = plan.model_copy(update={"sorting": updated_sorting})
+
+    # Superlative ranking without an explicit number ("which supplier is
+    # given lowest price?"): default limit=1 only when the ranking is a
+    # single, unambiguous direction; never for a genuinely compound question
+    # ("highest and lowest"), which is left for the semantic validator to
+    # reject as requiring clarification.
+    if (
+        plan.operation.lower() == "ranking"
+        and plan.limit is None
+        and not has_conflicting_ranking_directions(plan)
+    ):
+        plan = plan.model_copy(update={"limit": 1})
+
+    return plan
+
+
+def _format_validation_errors(exc: ValidationError) -> str:
+    """Turn pydantic's error list into field-level guidance the model can act on.
+
+    Each entry is only a JSON field path plus a constraint message (e.g.
+    "sorting.0.priority: Input should be greater than or equal to 0") — the
+    same information `exc.errors()` already carries, with no stack trace or
+    runtime detail attached.
+    """
+    lines = []
+    for error in exc.errors():
+        field = ".".join(str(part) for part in error.get("loc", ())) or "(root)"
+        lines.append(f"field: {field}; error: {error.get('type', 'invalid')}; expected: {error.get('msg', 'a valid value')}")
+    return "\n".join(lines)
 
 
 def _correction_prompt(
@@ -122,9 +240,11 @@ def _correction_prompt(
                 f"spaCy evidence: {evidence}",
             )
         )
+    cause = error.__cause__
+    detail = _format_validation_errors(cause) if isinstance(cause, ValidationError) else str(error)
     return "\n".join(
         (
-            f"Validation/parsing error: {error}",
+            f"Validation/parsing error: {detail}",
             f"Previous model response: {response}",
             f"Required JSON schema: {_schema_text()}",
         )
@@ -138,6 +258,7 @@ def _spacy_evidence_text(analysis: NLPAnalysis) -> str:
         "detected_measures", "detected_dimensions", "date_expressions", "ranking_limit",
         "candidate_entity_spans", "negations", "comparative_terms",
         "has_explicit_time_grouping", "time_grouping_granularity",
+        "quoted_entities", "contextual_identifiers", "recency_direction", "recency_limit",
     }
     return json.dumps(analysis.model_dump(include=fields), ensure_ascii=False, separators=(",", ":"))
 

@@ -67,6 +67,11 @@ _SQL_KEYWORDS = _ALIAS_STOP_WORDS | {
 _ALLOWED_FUNCTIONS = {
     "ADD_MONTHS", "AVG", "COUNT", "MAX", "MIN", "ROUND", "SUM", "TRUNC",
 }
+# Never added to _ALLOWED_FUNCTIONS: date boundaries are QueryPlan-derived and
+# must always reach SQL as named binds, never as a literal-conversion call.
+# Named here only so the rejection message can point the model at the
+# correct fix instead of a bare "unsupported function" list.
+_DATE_LITERAL_FUNCTIONS = {"TO_DATE", "TO_TIMESTAMP", "DATE"}
 
 
 @dataclass(frozen=True)
@@ -117,8 +122,12 @@ def _mask_string_literals(sql: str) -> str:
 
 
 def _column_pattern(reference: str) -> re.Pattern[str]:
+    # (?<!:) excludes a bind PARAMETER whose name happens to contain the
+    # column name, e.g. `:ITEM_NAME` -- the leading colon means this is a
+    # placeholder identifier, not a reference to the ITEM_NAME column. Same
+    # rationale as the `:limit` exclusion in _basic_safety.
     parts = [re.escape(part) for part in reference.split(".")]
-    return re.compile(r"\b" + r"\s*\.\s*".join(parts) + r"\b", re.IGNORECASE)
+    return re.compile(r"(?<!:)\b" + r"\s*\.\s*".join(parts) + r"\b", re.IGNORECASE)
 
 
 def _cte_names(masked_sql: str) -> set[str]:
@@ -179,7 +188,9 @@ def _basic_safety(sql: str) -> str:
     for keyword in _BLOCKED_KEYWORDS:
         if re.search(rf"\b{keyword}\b", masked, re.IGNORECASE):
             raise UnsafeGroundedSqlError(f"Blocked SQL keyword: {keyword}.")
-    if re.search(r"\bLIMIT\b", masked, re.IGNORECASE):
+    # (?<!:) excludes a bind PARAMETER named e.g. `:limit` -- the colon means
+    # this is a placeholder, not the unsupported MySQL/Postgres LIMIT clause.
+    if re.search(r"(?<!:)\bLIMIT\b", masked, re.IGNORECASE):
         raise OracleDialectGroundedSqlError(
             "Oracle SQL does not support LIMIT; use FETCH FIRST <N> ROWS ONLY."
         )
@@ -198,9 +209,14 @@ def _basic_safety(sql: str) -> str:
     }
     unsupported_functions = sorted(function_names - _ALLOWED_FUNCTIONS)
     if unsupported_functions:
-        raise UnsafeGroundedSqlError(
-            "Unsupported SQL function(s): " + ", ".join(unsupported_functions) + "."
-        )
+        message = "Unsupported SQL function(s): " + ", ".join(unsupported_functions) + "."
+        if _DATE_LITERAL_FUNCTIONS & set(unsupported_functions):
+            message += (
+                " Date boundaries must use named bind parameters on the grounded date "
+                "column (e.g. date_column BETWEEN :date_start AND :date_end), never a "
+                "date-literal function or string."
+            )
+        raise UnsafeGroundedSqlError(message)
     return masked
 
 
@@ -745,6 +761,23 @@ def _predicate_matches(
     return outermost(all_occurrences), outermost(approved)
 
 
+def _is_compound_condition_concept(grounding: GroundedSchemaPlan, concept: str) -> bool:
+    """True when a QueryPlan concept phrase resolved (during grounding) to a
+    bounded compound condition rather than a single bindable column.
+
+    Uses `entity_column_candidates`, which grounding already populates with
+    the literal plan phrase -> resolved column set for both ordinary and
+    compound concepts alike -- so this works regardless of which catalog
+    alias the plan happened to use, without needing to re-derive the
+    canonical concept name here.
+    """
+    candidates = grounding.entity_column_candidates.get(concept)
+    if not candidates:
+        return False
+    candidate_set = set(candidates)
+    return any(set(condition.columns) == candidate_set for condition in grounding.compound_conditions)
+
+
 def _validate_filter_operators(
     masked_sql: str,
     query_plan: QueryPlan,
@@ -759,6 +792,11 @@ def _validate_filter_operators(
     bind = rf":{_IDENTIFIER}"
     for entity in query_plan.entities:
         if entity.status is EntityStatus.NOT_REQUIRED:
+            continue
+        if _is_compound_condition_concept(grounding, entity.concept):
+            # A compound condition is verified in full by
+            # _validate_compound_conditions; it is never a single bindable
+            # column, so the ordinary equality-bind shape does not apply.
             continue
         occurrences, approved = _predicate_matches(
             where_part,
@@ -788,6 +826,8 @@ def _validate_filter_operators(
     }
     for item in query_plan.filters:
         if query_plan.date_range and _normalise_concept(item.concept) in {"date", "time", "period"}:
+            continue
+        if _is_compound_condition_concept(grounding, item.concept):
             continue
         occurrences, approved = _predicate_matches(
             where_part,
@@ -871,6 +911,16 @@ def _validate_entity_binds(
         count = relative[1]
         numeric_scan = re.sub(rf"-\s*{count}\b", "", numeric_scan)
         numeric_scan = re.sub(r"\+\s*1\b", "", numeric_scan)
+    unqualified_for_scan = _unqualified_column_map(grounding, references)
+    for condition in grounding.compound_conditions:
+        # A compound condition's comparison values are fixed, catalog-declared
+        # constants (e.g. flag = 1), not user-supplied values -- so unlike an
+        # arbitrary literal, these do not need a bind. Only the exact
+        # required columns' own comparisons are exempted here.
+        for full_column in condition.columns:
+            for variant in _reference_variants(full_column, references.aliases, unqualified_for_scan):
+                pattern = _column_pattern(variant).pattern
+                numeric_scan = re.sub(rf"{pattern}\s*=\s*\d+", "", numeric_scan, flags=re.IGNORECASE)
     if re.search(r"(?<![:A-Z0-9_$#])\d+(?:\.\d+)?(?![A-Z0-9_$#])", numeric_scan, re.IGNORECASE):
         raise GroundedSqlSemanticError("Filter literals must be represented by validated named binds.")
 
@@ -878,6 +928,12 @@ def _validate_entity_binds(
         return
     unqualified_columns = _unqualified_column_map(grounding, references)
     for concept, values in requirements:
+        if _is_compound_condition_concept(grounding, concept):
+            # Verified in full by _validate_compound_conditions; a compound
+            # condition's fixed constants are not user-supplied values, so
+            # there is nothing here for a bind or embedded-literal check to
+            # apply to.
+            continue
         candidates = grounding.entity_column_candidates.get(concept) or _columns_for_requirement(
             grounding, concept, "entity_filter"
         )
@@ -908,6 +964,58 @@ def _validate_entity_binds(
                 raise GroundedSqlSemanticError(f"Raw entity value is embedded in SQL: {concept}.")
 
 
+def _validate_compound_conditions(
+    masked_sql: str,
+    grounded_schema_plan: GroundedSchemaPlan,
+    references: _SqlReferences,
+) -> None:
+    """Bounded check: every grounded compound condition's exact columns must
+    appear in the SQL joined by exactly its catalog-declared combinator.
+
+    This never inspects a free-form expression string -- there isn't one.
+    The columns and the combinator both come from the verified catalog
+    (schema_grounding.py), so this only has to confirm the model reproduced
+    that fixed structure, not that it invented something plausible-looking.
+    Deliberately regex-based (not a full boolean-expression parser), matching
+    the rest of this module's style; it assumes the two columns of a given
+    condition are not independently reused elsewhere in the same WHERE
+    clause, which holds for the bounded MRS status conditions this supports.
+    """
+    if not grounded_schema_plan.compound_conditions:
+        return
+    unqualified_columns = _unqualified_column_map(grounded_schema_plan, references)
+    where_part = _clause(masked_sql, "WHERE", r"\bGROUP\s+BY\b|\bORDER\s+BY\b|\bFETCH\b|\bOFFSET\b")
+
+    for condition in grounded_schema_plan.compound_conditions:
+        positions: list[tuple[int, int]] = []
+        for full_column in condition.columns:
+            match = None
+            for variant in _reference_variants(full_column, references.aliases, unqualified_columns):
+                match = _column_pattern(variant).search(where_part)
+                if match:
+                    break
+            if not match:
+                raise GroundedSqlSemanticError(
+                    f"Compound condition '{condition.logical_concept}' is missing required column {full_column}."
+                )
+            positions.append((match.start(), match.end()))
+
+        positions.sort()
+        between_text = where_part[positions[0][1]:positions[-1][0]]
+        required = condition.combinator.upper()
+        other = "AND" if required == "OR" else "OR"
+        if not re.search(rf"\b{required}\b", between_text, re.IGNORECASE):
+            raise GroundedSqlSemanticError(
+                f"Compound condition '{condition.logical_concept}' requires its columns to be "
+                f"combined with {required}."
+            )
+        if re.search(rf"\b{other}\b", between_text, re.IGNORECASE):
+            raise GroundedSqlSemanticError(
+                f"Compound condition '{condition.logical_concept}' must not mix {other} into "
+                f"its required {required} combination."
+            )
+
+
 def validate_grounded_sql(sql: str, query_plan: QueryPlan, grounded_schema_plan: GroundedSchemaPlan) -> None:
     """Reject SQL that exceeds grounding or misses a required logical instruction."""
     if not grounded_schema_plan.is_grounded:
@@ -919,6 +1027,7 @@ def validate_grounded_sql(sql: str, query_plan: QueryPlan, grounded_schema_plan:
     _validate_measures_and_grouping(masked_sql, query_plan, grounded_schema_plan, references)
     _validate_sort_limit_and_date(masked_sql, query_plan, grounded_schema_plan, references)
     _validate_entity_binds(sql, masked_sql, query_plan, grounded_schema_plan, references)
+    _validate_compound_conditions(masked_sql, grounded_schema_plan, references)
 
 
 def collect_grounded_sql_violations(
@@ -957,6 +1066,7 @@ def collect_grounded_sql_violations(
         lambda: _validate_entity_binds(
             sql, masked_sql, query_plan, grounded_schema_plan, references
         ),
+        lambda: _validate_compound_conditions(masked_sql, grounded_schema_plan, references),
     )
     for check in checks:
         try:

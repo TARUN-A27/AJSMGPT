@@ -90,8 +90,19 @@ def correct_question_text(question: str) -> TextCorrectionResult:
         raise TextCorrectionError("Question cannot be empty.")
     corrections: list[TokenCorrection] = []
     corrected_chunks: list[str] = []
+    inside_quoted_span = False
     for chunk in re.split(r"(\s+)", question):
-        if not chunk or chunk.isspace() or _PROTECTED_CHUNK_PATTERN.search(chunk):
+        if not chunk or chunk.isspace():
+            corrected_chunks.append(chunk)
+            continue
+        # A chunk between an opening and closing `"` carries no quote char of
+        # its own, so _PROTECTED_CHUNK_PATTERN never sees it; track quote
+        # state across chunks so a multi-word quoted value ("dell system") is
+        # protected word-for-word, not just at its two boundary chunks.
+        protected = inside_quoted_span or bool(_PROTECTED_CHUNK_PATTERN.search(chunk))
+        if chunk.count('"') % 2 == 1:
+            inside_quoted_span = not inside_quoted_span
+        if protected:
             corrected_chunks.append(chunk)
             continue
         corrected_chunks.append(_WORD_PATTERN.sub(lambda match: _replacement_for(match.group(0), chunk, corrections), chunk))

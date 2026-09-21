@@ -21,9 +21,30 @@ DATE_SQL = (
     "WHERE PO.ORDERDATE BETWEEN :date_from AND :date_to"
 )
 UNKNOWN_SQL = "SELECT * FROM INVENTORY.PURCHASEORDER PO WHERE PO.APP_STATUS = :status"
+MRS_NUMBER_SQL = "SELECT * FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number"
+MRS_DUE_DATE_SQL = "SELECT * FROM INVENTORY.MRS_TEMP M WHERE M.DUEDATE BETWEEN :date_from AND :date_to"
+MRS_REJECTION_REASON_SQL = "SELECT M.REASONFORREJECTIONSTORES FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number"
 
 
 class OfflineDatatypeValidationTests(unittest.TestCase):
+    def test_mrs_number_numeric_bind_accepted(self) -> None:
+        dv.validate_sql_datatypes(MRS_NUMBER_SQL, {"mrs_number": 890330})
+
+    def test_mrs_number_text_bind_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            dv.validate_sql_datatypes(MRS_NUMBER_SQL, {"mrs_number": "890330-A"})
+
+    def test_mrs_due_date_bind_accepted(self) -> None:
+        dv.validate_sql_datatypes(
+            MRS_DUE_DATE_SQL, {"date_from": date(2026, 1, 1), "date_to": date(2026, 12, 31)}
+        )
+
+    def test_mrs_rejection_reason_is_text_not_a_status_filter(self) -> None:
+        # REASONFORREJECTIONSTORES is a plain text display column; it is only
+        # ever selected here, never compared/filtered, so no status semantics
+        # are being asserted or invented.
+        dv.validate_sql_datatypes(MRS_REJECTION_REASON_SQL, {"mrs_number": 890330})
+
     def test_valid_text_bind(self) -> None:
         dv.validate_sql_datatypes(PO_SQL, {"sup_code": "SUP001"})
 

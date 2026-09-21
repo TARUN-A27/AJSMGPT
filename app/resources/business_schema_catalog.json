@@ -97,6 +97,57 @@
       "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "MRSDATE", "roles": ["date_filter", "grouping"], "confidence": 0.8, "evidence": "metadata and mrs router"}]
     },
     {
+      "name": "mrs_number",
+      "aliases": ["mrs number", "mrs no", "mrs nos"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "MRSNO", "roles": ["entity_filter", "identifier"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata and mrs router"}]
+    },
+    {
+      "name": "mrs_due_date",
+      "aliases": ["mrs due", "due date", "due"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "DUEDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE", "confidence": 0.8, "evidence": "metadata and mrs router"}]
+    },
+    {
+      "name": "mrs_rejection_reason",
+      "aliases": ["rejection reason", "rejected reason"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "REASONFORREJECTIONSTORES", "roles": ["display", "grouping"], "datatype_category": "TEXT", "confidence": 0.7, "evidence": "metadata and purchase analytics router"}]
+    },
+    {
+      "name": "mrs_hold_flag",
+      "aliases": ["mrs hold", "hold", "on hold"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "HOLDINGSTATUS", "roles": ["entity_filter"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata and purchase analytics router MRS_STATUS derivation"}]
+    },
+    {
+      "name": "mrs_ready_for_approval",
+      "aliases": ["ready for approval", "store officer pending"],
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "READYFORAPPROVAL", "roles": ["entity_filter"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata and purchase analytics router MRS_STATUS derivation"}]
+    },
+    {
+      "name": "mrs_rejected",
+      "aliases": ["mrs rejected", "rejected"],
+      "confidence": 0.85,
+      "evidence": "purchase analytics router MRS_STATUS derivation (REJECTED case)",
+      "compound_condition": {
+        "combinator": "OR",
+        "columns": [
+          {"table": "INVENTORY.MRS_TEMP", "column": "REJECTIONSTATUS", "datatype_category": "NUMERIC"},
+          {"table": "INVENTORY.MRS_TEMP", "column": "STORESREJECTIONSTATUS", "datatype_category": "NUMERIC"}
+        ]
+      }
+    },
+    {
+      "name": "mrs_approved",
+      "aliases": ["mrs approved", "approved"],
+      "confidence": 0.85,
+      "evidence": "purchase analytics router MRS_STATUS derivation (APPROVED case)",
+      "compound_condition": {
+        "combinator": "AND",
+        "columns": [
+          {"table": "INVENTORY.MRS_TEMP", "column": "APPROVALSTATUS", "datatype_category": "NUMERIC"},
+          {"table": "INVENTORY.MRS_TEMP", "column": "READYFORAPPROVAL", "datatype_category": "NUMERIC"}
+        ]
+      }
+    },
+    {
       "name": "department",
       "aliases": ["department", "dept"],
       "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "DEPT_CODE", "roles": ["grouping", "entity_filter", "identifier"], "datatype_category": "NUMERIC", "confidence": 0.7, "evidence": "metadata; no MRS_TEMP-to-DEPT foreign key is catalogued"}]

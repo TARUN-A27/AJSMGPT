@@ -276,6 +276,214 @@ class QueryPlanExtractorTests(unittest.TestCase):
             extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
         self.assertEqual(len(call.calls), 2)
 
+    # -- deterministic post-parse overrides ----------------------------------
+
+    def test_explicit_recency_limit_overrides_hallucinated_date_range(self) -> None:
+        # The exact real-world bug: Qwen mis-parsed "Last 5" as a date range
+        # instead of a row limit.
+        question = 'Last 5 purchase qty of "BARCODE SCANNER"'
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            measures=[{"concept": "quantity", "aggregation": "none"}],
+            entities=[{"concept": "material", "original_value": "barcode scanner"}],
+            date_range={"kind": "relative", "original_text": "last 5"},
+            confidence=0.7,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.limit, 5)
+        self.assertIsNone(plan.date_range)
+
+    def test_recency_limit_does_not_clear_a_genuine_date_range(self) -> None:
+        question = "last 3 purchases in 2026"
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            date_range={"kind": "relative", "original_text": "in 2026"},
+            confidence=0.8,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.limit, 3)
+        self.assertIsNotNone(plan.date_range)
+        self.assertEqual(plan.date_range.start, "2026-01-01")
+        self.assertEqual(plan.date_range.end, "2026-12-31")
+
+    def test_explicit_year_sets_absolute_date_range(self) -> None:
+        question = "last purchase rate of barcode scanner in 2026"
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            measures=[{"concept": "rate", "aggregation": "none"}],
+            dimensions=[{"concept": "purchase date", "grouping": False}],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+            requested_output={"fields": ["purchase date"]},
+            confidence=0.8,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.date_range.kind.value, "absolute")
+        self.assertEqual(plan.date_range.start, "2026-01-01")
+        self.assertEqual(plan.date_range.end, "2026-12-31")
+
+    def test_explicit_yyyymmdd_sets_single_day_date_range(self) -> None:
+        question = "current attendance for empcode 165224 on 20260212"
+        response = plan_json(
+            original_question=question,
+            operation="lookup",
+            business_subject={"concept": "attendance"},
+            confidence=0.8,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.date_range.start, "2026-02-12")
+        self.assertEqual(plan.date_range.end, "2026-02-12")
+
+    def test_quoted_entity_text_is_corrected_to_exact_verbatim(self) -> None:
+        question = 'Last 5 purchase details of "dell system"'
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            entities=[{"concept": "material", "original_value": "Dell System"}],
+            dimensions=[{"concept": "purchase date", "grouping": False}],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+            requested_output={"fields": ["purchase date"]},
+            confidence=0.9,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.entities[0].original_value, "dell system")
+
+    def test_recency_direction_corrects_sort_direction(self) -> None:
+        question = "last supply of mouse"
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            entities=[{"concept": "material", "original_value": "mouse"}],
+            dimensions=[{"concept": "purchase date", "grouping": False}],
+            sorting=[{"field_concept": "purchase date", "direction": "asc", "priority": 0}],
+            requested_output={"fields": ["purchase date"]},
+            confidence=0.85,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.sorting[0].direction.value, "desc")
+
+    def test_first_supply_sets_ascending_sort_direction(self) -> None:
+        question = "first supply of mouse"
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            entities=[{"concept": "material", "original_value": "mouse"}],
+            dimensions=[{"concept": "purchase date", "grouping": False}],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+            requested_output={"fields": ["purchase date"]},
+            confidence=0.85,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.sorting[0].direction.value, "asc")
+
+    def test_superlative_ranking_without_limit_defaults_to_one(self) -> None:
+        question = "Which supplier is given lowest price?"
+        response = plan_json(
+            original_question=question,
+            operation="ranking",
+            business_subject={"concept": "supplier"},
+            measures=[{"concept": "rate", "aggregation": "minimum"}],
+            dimensions=[{"concept": "supplier", "grouping": True}],
+            sorting=[{"field_concept": "rate", "direction": "asc", "priority": 0}],
+            confidence=0.8,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.limit, 1)
+
+    def test_compound_ranking_direction_does_not_get_default_limit(self) -> None:
+        # "highest and lowest" is genuinely compound: no deterministic
+        # limit=1 default should be applied, so the plan is left to fail the
+        # existing "ranking requires a positive limit" rule instead of
+        # silently picking one direction.
+        question = "list who is given highest rate and who is given lowest rate?"
+        response = plan_json(
+            original_question=question,
+            operation="ranking",
+            business_subject={"concept": "supplier"},
+            measures=[
+                {"concept": "rate", "aggregation": "maximum"},
+                {"concept": "rate", "aggregation": "minimum"},
+            ],
+            dimensions=[{"concept": "supplier", "grouping": True}],
+            confidence=0.7,
+        )
+        call = Calls(response, response)
+        with self.assertRaises(QueryPlanValidationError):
+            extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+
+    # -- shape-preserving defaults --------------------------------------------
+
+    def test_entity_status_defaults_to_unresolved_when_omitted(self) -> None:
+        question = "last supply of mouse"
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            entities=[{"concept": "material", "original_value": "mouse", "confidence": 0.9}],
+            dimensions=[{"concept": "purchase date", "grouping": False}],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+            requested_output={"fields": ["purchase date"]},
+            confidence=0.85,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.entities[0].status.value, "unresolved")
+
+    def test_sort_priority_defaults_to_zero_when_omitted(self) -> None:
+        question = "last supply of mouse"
+        response = plan_json(
+            original_question=question,
+            operation="detail",
+            business_subject={"concept": "purchase"},
+            dimensions=[{"concept": "purchase date", "grouping": False}],
+            sorting=[{"field_concept": "purchase date", "direction": "desc"}],
+            requested_output={"fields": ["purchase date"]},
+            confidence=0.85,
+        )
+        plan = extract_query_plan(
+            question, model_call=Calls(response), nlp_analysis=analyze_question_with_spacy(question),
+        )
+        self.assertEqual(plan.sorting[0].priority, 0)
+
+    # -- correction-prompt enrichment ------------------------------------------
+
+    def test_correction_prompt_carries_field_path_for_pydantic_errors(self) -> None:
+        question = "Show top 10 suppliers by purchase value"
+        bad_response = plan_json(
+            original_question=question,
+            sorting=[{"field_concept": "value", "direction": "descending"}],
+        )
+        call = Calls(bad_response, plan_json(original_question=question))
+        extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        retry_prompt = call.calls[1][1]
+        self.assertIn("field: sorting.0.direction", retry_prompt)
+        self.assertNotIn("Traceback", retry_prompt)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

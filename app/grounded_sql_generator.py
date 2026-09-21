@@ -64,8 +64,17 @@ Use named bind placeholders for every user/entity value; never embed those value
 Honor every required measure, grouping dimension, output field, date filter, sort, and limit.
 Use every required grounded display/grouping column for user-visible entity output.
 Join identifier columns may be used only for verified joins and cannot replace required user-facing display columns.
-For a requested limit, use Oracle FETCH FIRST N ROWS ONLY; never use LIMIT.
+Every entity in query_plan.entities whose bind_required is true MUST appear in the WHERE
+clause as exactly one equality comparison against its grounded column, bound by exactly one
+named placeholder (<grounded column> = :<name>); never omit it, never test it with a
+different operator, and never leave it out because it seems implied by a join.
+For a requested limit, use Oracle FETCH FIRST N ROWS ONLY with N as the plan's own literal
+limit number written directly in the SQL; never a bind parameter for the row count, and
+never LIMIT. Only include FETCH FIRST at all when the plan actually specifies a limit.
 Never invent a status meaning, join, table, column, date conversion, or business rule.
+For each entry in grounding.compound_conditions, the WHERE clause must combine exactly
+those listed columns using exactly the given combinator (AND/OR); never use a different
+combinator, never omit one of the columns, and never substitute a different column.
 Do not use SELECT *, comments, semicolons, DML, DDL, or PL/SQL.
 For this preview endpoint, assumptions must always be an empty list.
 For a relative month-based date range, require BOTH predicates on the grounded date column:
@@ -74,6 +83,10 @@ with N taken from the QueryPlan; never use BETWEEN or approximate months as days
 For a relative day-based date range, require BOTH predicates on the grounded date column:
 date_column >= TRUNC(SYSDATE) - N AND date_column < TRUNC(SYSDATE) + 1,
 with N taken from the QueryPlan.
+For an absolute date range, use exactly two named bind placeholders on the grounded date
+column (date_column BETWEEN :date_start AND :date_end, or the plan's own inclusive/exclusive
+operators); never use TO_DATE, TO_TIMESTAMP, a literal date string, or any date-conversion
+function -- the start and end are always bind parameters, never literals.
 Return exactly one JSON object and no markdown or prose. The object must contain only:
 sql, selected_fields, applied_filters, assumptions, confidence."""
 
@@ -112,6 +125,13 @@ def _compact_context(query_plan: QueryPlan, grounding: GroundedSchemaPlan) -> di
                 "date_column >= TRUNC(SYSDATE) - N AND date_column < TRUNC(SYSDATE) + 1, "
                 "with N from QueryPlan."
             )
+    elif date_requirement is not None and date_requirement.kind.value == "absolute":
+        date_guidance = (
+            "Absolute date range requires two named bind placeholders on the grounded date "
+            "column: date_column BETWEEN :date_start AND :date_end (or the plan's own "
+            "inclusive/exclusive operators). Never TO_DATE, TO_TIMESTAMP, or a literal date "
+            "string -- the boundaries are always binds, never literals."
+        )
     return {
         "query_plan": {
             "intent": {"domain": query_plan.domain, "operation": query_plan.operation},
@@ -149,6 +169,9 @@ def _compact_context(query_plan: QueryPlan, grounding: GroundedSchemaPlan) -> di
                 item.model_dump(mode="json") for item in grounding.allowed_relationship_paths
             ],
             "entity_column_candidates": grounding.entity_column_candidates,
+            "compound_conditions": [
+                item.model_dump(mode="json") for item in grounding.compound_conditions
+            ],
         },
     }
 

@@ -14,6 +14,7 @@ from app.nlp_execution import (
     ExecutionRejectedError,
     ExecutionResultError,
     NLPExecutionDependencies,
+    ParameterBindingError,
     ReportType,
     UnsupportedResultValueError,
     _normalise_result,
@@ -28,7 +29,9 @@ from app.query_plan import (
     Dimension,
     EntityReference,
     EntityStatus,
+    FilterOperator,
     Measure,
+    QueryFilter,
     QueryPlan,
     RequestedOutput,
     SortDirection,
@@ -92,9 +95,21 @@ def preview(sql: str) -> GroundedSqlResult:
     )
 
 
-def dependencies(plan: QueryPlan, sql: str, runner: RecordingRunner) -> NLPExecutionDependencies:
+def dependencies(
+    plan: QueryPlan, sql: str, runner: RecordingRunner, *, resolve_entities=None,
+) -> NLPExecutionDependencies:
+    """Test fixture. `resolve_entities` defaults to a pass-through identity
+    stub, so existing tests that hand-author an already-RESOLVED entity keep
+    testing what they were designed to test (bind-mapping, SQL safety, ...)
+    in isolation from resolution mechanics -- resolution itself is covered
+    by scripts/test_entity_resolution.py and the resolver-integration tests
+    below. Production code never uses this helper: NLPExecutionDependencies'
+    own default (`_default_resolve_entities`) is the real, Oracle-backed
+    resolver, and is what actually enforces that the model cannot bypass it.
+    """
     return NLPExecutionDependencies(
         extract_plan=lambda *args, **kwargs: plan,
+        resolve_entities=resolve_entities or (lambda p: p),
         ground_plan=ground_query_plan,
         generate_sql=lambda *args, **kwargs: preview(sql),
         runner=runner,
@@ -290,6 +305,207 @@ class NLPExecutionTests(unittest.TestCase):
         executed_sql, binds = runner.calls[0]
         self.assertNotIn("ABC", executed_sql)
         self.assertEqual(binds, {"supplier_code": "ABC"})
+
+    # -- entity-resolution integration (Phase 5) -----------------------------
+    # These prove the *wiring*: execute_nlp_query trusts deps.resolve_entities'
+    # output, not whatever extract_plan produced. Resolution's own matching
+    # logic (exact/normalized/ambiguous/not-found) is proven separately and
+    # offline in scripts/test_entity_resolution.py.
+
+    def _one_entity_plan(self) -> QueryPlan:
+        return QueryPlan(
+            original_question="purchase quantity for supplier ABC",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase quantity")],
+            entities=[EntityReference(concept="supplier", original_value="ABC")],
+            requested_output=RequestedOutput(fields=["purchase quantity"]),
+            confidence=0.9,
+        )
+
+    def test_unresolved_entity_after_resolution_executes_zero_times(self) -> None:
+        plan = self._one_entity_plan()
+        runner = RecordingRunner()
+        resolve_entities = lambda p: p.model_copy(update={"entities": [
+            EntityReference(concept="supplier", original_value="ABC", status=EntityStatus.UNRESOLVED),
+        ]})
+        with self.assertRaises(ExecutionRejectedError):
+            execute_nlp_query(
+                plan.original_question,
+                dependencies=dependencies(plan, "SELECT 1 FROM DUAL", runner, resolve_entities=resolve_entities),
+            )
+        self.assertEqual(runner.calls, [])
+
+    def test_ambiguous_entity_after_resolution_executes_zero_times(self) -> None:
+        plan = self._one_entity_plan()
+        runner = RecordingRunner()
+        resolve_entities = lambda p: p.model_copy(update={"entities": [
+            EntityReference(
+                concept="supplier", original_value="ABC", status=EntityStatus.AMBIGUOUS,
+                candidates=["ABC Textiles", "ABC Trading Co"],
+            ),
+        ]})
+        with self.assertRaises(ExecutionRejectedError):
+            execute_nlp_query(
+                plan.original_question,
+                dependencies=dependencies(plan, "SELECT 1 FROM DUAL", runner, resolve_entities=resolve_entities),
+            )
+        self.assertEqual(runner.calls, [])
+
+    def test_resolver_output_overrides_a_model_claimed_resolved_entity(self) -> None:
+        # extract_plan hands back an entity the model itself already marked
+        # RESOLVED with a fabricated value; the resolver stub represents what
+        # the real resolver would do when that value doesn't verify. Proves
+        # execute_nlp_query gates on deps.resolve_entities' output, not on
+        # whatever status/selected_value extraction produced.
+        plan = QueryPlan(
+            original_question="purchase quantity for supplier Totally Fake Co",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase quantity")],
+            entities=[EntityReference(
+                concept="supplier", original_value="Totally Fake Co",
+                selected_value="Totally Fake Co", status=EntityStatus.RESOLVED, confidence=0.9,
+            )],
+            requested_output=RequestedOutput(fields=["purchase quantity"]),
+            confidence=0.9,
+        )
+        runner = RecordingRunner()
+        resolve_entities = lambda p: p.model_copy(update={"entities": [
+            EntityReference(concept="supplier", original_value="Totally Fake Co", status=EntityStatus.UNRESOLVED),
+        ]})
+        with self.assertRaises(ExecutionRejectedError):
+            execute_nlp_query(
+                plan.original_question,
+                dependencies=dependencies(plan, "SELECT 1 FROM DUAL", runner, resolve_entities=resolve_entities),
+            )
+        self.assertEqual(runner.calls, [])
+
+    def test_mixed_resolution_one_unresolved_blocks_execution(self) -> None:
+        plan = QueryPlan(
+            original_question="purchase quantity for keyboard from supplier ABC",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase quantity")],
+            entities=[
+                EntityReference(concept="material", original_value="keyboard"),
+                EntityReference(concept="supplier", original_value="ABC"),
+            ],
+            requested_output=RequestedOutput(fields=["purchase quantity"]),
+            confidence=0.9,
+        )
+        runner = RecordingRunner()
+        resolve_entities = lambda p: p.model_copy(update={"entities": [
+            EntityReference(concept="material", original_value="keyboard", selected_value="KEYBOARD", status=EntityStatus.RESOLVED),
+            EntityReference(concept="supplier", original_value="ABC", status=EntityStatus.UNRESOLVED),
+        ]})
+        with self.assertRaises(ExecutionRejectedError):
+            execute_nlp_query(
+                plan.original_question,
+                dependencies=dependencies(plan, "SELECT 1 FROM DUAL", runner, resolve_entities=resolve_entities),
+            )
+        self.assertEqual(runner.calls, [])
+
+    def test_successful_resolution_of_multiple_entities_still_executes_once(self) -> None:
+        plan = QueryPlan(
+            original_question="purchase quantity for keyboard from supplier ABC",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase quantity")],
+            entities=[
+                EntityReference(concept="material", original_value="keyboard"),
+                EntityReference(concept="supplier", original_value="ABC"),
+            ],
+            requested_output=RequestedOutput(fields=["purchase quantity"]),
+            confidence=0.9,
+        )
+        sql = (
+            "SELECT po.QTY AS purchase_quantity FROM INVENTORY.PURCHASEORDER po "
+            "JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE "
+            "WHERE items.ITEM_NAME = :material_name AND po.SUP_CODE = :supplier_code"
+        )
+        runner = RecordingRunner({"columns": ["PURCHASE_QUANTITY"], "rows": [[4]]})
+        resolve_entities = lambda p: p.model_copy(update={"entities": [
+            EntityReference(concept="material", original_value="keyboard", selected_value="KEYBOARD", status=EntityStatus.RESOLVED),
+            EntityReference(concept="supplier", original_value="ABC", selected_value="ABC Textiles", status=EntityStatus.RESOLVED),
+        ]})
+        execute_nlp_query(
+            plan.original_question,
+            dependencies=dependencies(plan, sql, runner, resolve_entities=resolve_entities),
+        )
+        self.assertEqual(len(runner.calls), 1)
+        executed_sql, binds = runner.calls[0]
+        self.assertEqual(binds, {"material_name": "KEYBOARD", "supplier_code": "ABC Textiles"})
+
+    # -- entity-resolution bypass via QueryFilter (Phase 10 Finding 1) ------
+    # resolve_plan_entities and the unresolved-entity gate above only ever
+    # look at plan.entities. A resolvable concept (supplier/material) placed
+    # in plan.filters instead of plan.entities would otherwise reach Oracle
+    # with its raw, never-verified value. build_bind_parameters must refuse
+    # this independently of how the plan was shaped.
+
+    def test_supplier_filter_bypassing_entity_resolution_is_rejected(self) -> None:
+        plan = QueryPlan(
+            original_question="show supplier Totally Fake Supplier Inc",
+            domain="supplier_lookup",
+            operation="lookup",
+            business_subject=BusinessSubject(concept="supplier"),
+            filters=[QueryFilter(
+                concept="supplier_name", operator=FilterOperator.EQUALS,
+                value="Totally Fake Supplier Inc", value_type="text",
+            )],
+            requested_output=RequestedOutput(fields=["supplier_name"]),
+            confidence=0.95,
+        )
+        sql = "SELECT pm.PARTYNAME AS supplier_name FROM SCM.PARTYMASTER pm WHERE pm.PARTYNAME = :party_name"
+        runner = RecordingRunner()
+        with self.assertRaises(ParameterBindingError):
+            execute_nlp_query(plan.original_question, dependencies=dependencies(plan, sql, runner))
+        self.assertEqual(runner.calls, [])
+
+    def test_material_filter_bypassing_entity_resolution_is_rejected(self) -> None:
+        plan = QueryPlan(
+            original_question="purchases of material Totally Fake Widget",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase quantity")],
+            filters=[QueryFilter(
+                concept="material", operator=FilterOperator.EQUALS,
+                value="Totally Fake Widget", value_type="text",
+            )],
+            requested_output=RequestedOutput(fields=["purchase quantity"]),
+            confidence=0.9,
+        )
+        sql = (
+            "SELECT po.QTY AS purchase_quantity FROM INVENTORY.PURCHASEORDER po "
+            "JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE "
+            "WHERE items.ITEM_NAME = :material_name"
+        )
+        runner = RecordingRunner()
+        with self.assertRaises(ParameterBindingError):
+            execute_nlp_query(plan.original_question, dependencies=dependencies(plan, sql, runner))
+        self.assertEqual(runner.calls, [])
+
+    def test_entity_free_question_never_touches_the_resolver_or_oracle(self) -> None:
+        # Uses the REAL production default (resolve_entities not stubbed) to
+        # prove an entity-free plan never reaches oracle_entity_lookup at
+        # all -- resolve_plan_entities short-circuits before any lookup.
+        plan = ranking_plan()
+        runner = RecordingRunner()
+        deps = NLPExecutionDependencies(
+            extract_plan=lambda *args, **kwargs: plan,
+            ground_plan=ground_query_plan,
+            generate_sql=lambda *args, **kwargs: preview(ranking_sql()),
+            runner=runner,
+        )
+        result = execute_nlp_query(plan.original_question, dependencies=deps)
+        self.assertEqual(len(runner.calls), 1)
+        self.assertTrue(result.success)
 
     def test_absolute_date_binds_follow_predicate_role_not_text_order(self) -> None:
         plan = QueryPlan(

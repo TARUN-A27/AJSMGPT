@@ -2,7 +2,9 @@
   "domains": {
     "purchase": ["purchase", "purchased", "procurement", "buying", "order"],
     "mrs": ["mrs", "material requisition", "requisition", "indent"],
-    "consumption": ["consumption", "consumed", "consume", "issued", "issue"]
+    "consumption": ["consumption", "consumed", "consume", "issued", "issue"],
+    "stock": ["stock", "inventory"],
+    "grn": ["grn", "goods receipt", "goods receipt note", "received", "receipt"]
   },
   "operations": {
     "detail": ["detail", "details", "show", "list", "display"],

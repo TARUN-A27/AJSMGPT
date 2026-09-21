@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import re
 
-from app.query_plan import Aggregation, QueryPlan
+from app.query_plan import Aggregation, Dimension, QueryPlan, SortDirection
 from app.spacy_nlp import NLPAnalysis
+from app.v1_capabilities import load_capability_catalog
 
 
 class QueryPlanSemanticValidationError(ValueError):
@@ -19,6 +20,45 @@ class QueryPlanSemanticValidationError(ValueError):
 _DATE_DIMENSIONS = {"date", "month", "year"}
 _DATE_GROUPING_WORDS = re.compile(r"\b(by\s+(?:date|month|year)|monthly|trend|over time)\b", re.IGNORECASE)
 _TIME_SERIES_WORDS = re.compile(r"\b(?:time[- ]series|timeseries|chronological)\b", re.IGNORECASE)
+_DUE_WORD = re.compile(r"\bdue\b", re.IGNORECASE)
+# Operations that may name a dimension purely as an output field, without
+# also marking it grouping=true: "detail" already had this exemption; a
+# lookup ("who supplies keyboard") is the same shape (one implied answer
+# field, not a grouped report) and was missing it.
+_OUTPUT_ONLY_OPERATIONS = {"detail", "lookup"}
+
+
+def _is_date_concept(concept: str) -> bool:
+    key = concept.strip().lower()
+    return key in _DATE_DIMENSIONS or "date" in key
+
+
+def _supported_domains() -> set[str]:
+    return {
+        domain.lower()
+        for family in load_capability_catalog().families
+        if family.status == "supported"
+        for domain in family.domains
+    }
+
+
+def has_conflicting_ranking_directions(plan: QueryPlan) -> bool:
+    """True when the plan asks for two opposite rankings of the same concept.
+
+    Shared by the extractor (to withhold a deterministic limit=1 default for
+    a genuinely compound question, e.g. "highest and lowest rate") and by
+    this module's own fail-closed check — kept in one place so the two never
+    drift apart.
+    """
+    aggregations_by_concept: dict[str, set[Aggregation]] = {}
+    for measure in plan.measures:
+        aggregations_by_concept.setdefault(measure.concept.lower(), set()).add(measure.aggregation)
+    if any({Aggregation.MAXIMUM, Aggregation.MINIMUM} <= aggs for aggs in aggregations_by_concept.values()):
+        return True
+    directions_by_field: dict[str, set[SortDirection]] = {}
+    for instruction in plan.sorting:
+        directions_by_field.setdefault(instruction.field_concept.lower(), set()).add(instruction.direction)
+    return any({SortDirection.ASC, SortDirection.DESC} <= dirs for dirs in directions_by_field.values())
 
 
 def normalize_temporal_dimensions(plan: QueryPlan, nlp_analysis: NLPAnalysis | None = None) -> QueryPlan:
@@ -43,9 +83,52 @@ def normalize_temporal_dimensions(plan: QueryPlan, nlp_analysis: NLPAnalysis | N
     return normalized
 
 
+def normalize_recency_sorting(plan: QueryPlan) -> QueryPlan:
+    """Let a detail/lookup plan sort by a date concept it never declared as a dimension.
+
+    "Last purchase details of mouse" naturally arrives as operation=detail
+    with a `sorting` entry on a date concept ("purchase date") that isn't
+    also listed in `dimensions`/`requested_output.fields` — today that trips
+    "Sorting field unavailable" or "Dimension does not affect grouping or
+    output". This only ADDS a non-grouped `Dimension` (and output field) for
+    a concept the plan's own `sorting` already names; it never invents a new
+    concept, and grouping is always left False, so it can never turn into a
+    GROUP BY. Scoped to date concepts only (matching `_DATE_DIMENSIONS`/a
+    "*date" name) — a blanket version for any sort field would silently
+    defeat the "sorting field is unavailable" check for every hallucinated
+    sort target, not just recency ones.
+    """
+    if plan.operation.lower() not in _OUTPUT_ONLY_OPERATIONS or not plan.sorting:
+        return plan
+    known_concepts = {dimension.concept.lower() for dimension in plan.dimensions}
+    known_concepts.update(measure.concept.lower() for measure in plan.measures)
+    missing_date_concepts = [
+        instruction.field_concept
+        for instruction in plan.sorting
+        if _is_date_concept(instruction.field_concept) and instruction.field_concept.lower() not in known_concepts
+    ]
+    if not missing_date_concepts:
+        return plan
+    normalized = plan.model_copy(deep=True)
+    existing_dimension_keys = {dimension.concept.lower() for dimension in normalized.dimensions}
+    existing_fields = {field.lower() for field in normalized.requested_output.fields}
+    added_fields = list(normalized.requested_output.fields)
+    for concept in missing_date_concepts:
+        key = concept.lower()
+        if key not in existing_dimension_keys:
+            normalized.dimensions.append(Dimension(concept=concept, grouping=False))
+            existing_dimension_keys.add(key)
+        if key not in existing_fields:
+            added_fields.append(concept)
+            existing_fields.add(key)
+    normalized.requested_output = normalized.requested_output.model_copy(update={"fields": added_fields})
+    return normalized
+
+
 def validate_query_plan_semantics(plan: QueryPlan, nlp_analysis: NLPAnalysis | None = None) -> QueryPlan:
     """Validate logical output relationships without relying on physical data sources."""
     plan = normalize_temporal_dimensions(plan, nlp_analysis)
+    plan = normalize_recency_sorting(plan)
     violations: list[str] = []
     dimensions = {dimension.concept.lower(): dimension for dimension in plan.dimensions}
     measures = {measure.concept.lower() for measure in plan.measures}
@@ -81,14 +164,19 @@ def validate_query_plan_semantics(plan: QueryPlan, nlp_analysis: NLPAnalysis | N
     )
     for name, dimension in dimensions.items():
         is_output = name in output_fields
-        if not dimension.grouping and not is_output:
+        # A lookup's dimension is its one implied answer field ("who
+        # supplies keyboard" -> dimension=supplier), so it does not need to
+        # also be grouping=true or separately listed in requested_output;
+        # "detail" is intentionally left unexempted here, unchanged from
+        # today, since this specific check never had a detail exemption.
+        if not dimension.grouping and not is_output and operation != "lookup":
             violations.append(f"Dimension '{name}' does not affect grouping or requested output.")
         if name in _DATE_DIMENSIONS and date_only_evidence and not date_grouping_requested:
             violations.append(f"Date dimension '{name}' is not justified by a date range alone.")
 
-    detail_request = operation == "detail"
+    output_field_exempt = operation in _OUTPUT_ONLY_OPERATIONS
     for field in output_fields:
-        if field not in measures and field not in grouping and not detail_request:
+        if field not in measures and field not in grouping and not output_field_exempt:
             violations.append(f"Requested output field '{field}' is not an available measure or grouping dimension.")
 
     available_sort_fields = measures | set(dimensions)
@@ -98,8 +186,29 @@ def validate_query_plan_semantics(plan: QueryPlan, nlp_analysis: NLPAnalysis | N
 
     if plan.domain.lower() == "unknown" and plan.confidence >= 0.65:
         violations.append("Unknown domain cannot have high confidence.")
+    if operation == "unknown" and plan.domain.lower() in _supported_domains():
+        violations.append(
+            f"Operation 'unknown' is not usable for the supported domain '{plan.domain}'; "
+            "choose detail, aggregate, ranking, comparison, trend, or lookup."
+        )
     if any(ambiguity.blocking for ambiguity in plan.ambiguities) and not plan.requires_clarification:
         violations.append("Blocking ambiguity must require clarification.")
+
+    if plan.date_range is not None and _DUE_WORD.search(plan.original_question):
+        nameable = any("due" in name for name in dimensions) or any(
+            "due" in filter_item.concept.lower() for filter_item in plan.filters
+        )
+        if not nameable:
+            violations.append(
+                "The question mentions a due date but the plan does not name which date concept "
+                "'due' refers to; ask for clarification instead of assuming the general date filter."
+            )
+
+    if operation == "ranking" and has_conflicting_ranking_directions(plan):
+        violations.append(
+            "The plan requests two conflicting ranking directions (e.g. highest and lowest) for the "
+            "same concept; ask which single ranking is wanted."
+        )
 
     if violations:
         raise QueryPlanSemanticValidationError(violations)

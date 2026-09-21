@@ -51,35 +51,43 @@ def _load_offline_column_categories() -> dict[tuple[str, str, str], str]:
     catalog = json.loads(CATALOG_PATH.read_text())
     categories: dict[tuple[str, str, str], str] = {}
 
+    def _record(col: dict, roles: set[str]) -> None:
+        owner, table = col["table"].split(".", 1)
+        key = (_normalize(owner), _normalize(table), _normalize(col["column"]))
+
+        explicit = col.get("datatype_category")
+        if explicit is not None:
+            if explicit not in _VALID_CATEGORIES:
+                raise ValueError(
+                    f"Unknown datatype_category {explicit!r} for {key}; "
+                    f"expected one of {sorted(_VALID_CATEGORIES)}."
+                )
+            category = explicit
+        else:
+            category = None
+            for role, mapped_category in _ROLE_CATEGORY_PRIORITY:
+                if role in roles:
+                    category = mapped_category
+                    break
+
+        if category is None:
+            return
+
+        existing = categories.get(key)
+        if existing is not None and existing != category:
+            categories[key] = "AMBIGUOUS"
+        else:
+            categories[key] = category
+
     for concept in catalog.get("concepts", []):
         for col in concept.get("columns", []):
-            owner, table = col["table"].split(".", 1)
-            key = (_normalize(owner), _normalize(table), _normalize(col["column"]))
-            roles = set(col.get("roles", []))
-
-            explicit = col.get("datatype_category")
-            if explicit is not None:
-                if explicit not in _VALID_CATEGORIES:
-                    raise ValueError(
-                        f"Unknown datatype_category {explicit!r} for {key}; "
-                        f"expected one of {sorted(_VALID_CATEGORIES)}."
-                    )
-                category = explicit
-            else:
-                category = None
-                for role, mapped_category in _ROLE_CATEGORY_PRIORITY:
-                    if role in roles:
-                        category = mapped_category
-                        break
-
-            if category is None:
-                continue
-
-            existing = categories.get(key)
-            if existing is not None and existing != category:
-                categories[key] = "AMBIGUOUS"
-            else:
-                categories[key] = category
+            _record(col, set(col.get("roles", [])))
+        compound = concept.get("compound_condition")
+        if compound:
+            # Compound-condition columns have no per-column roles; a category
+            # must be given explicitly, same as every other explicit case.
+            for col in compound.get("columns", []):
+                _record(col, roles=set())
 
     return categories
 

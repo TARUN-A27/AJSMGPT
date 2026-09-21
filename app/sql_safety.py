@@ -28,7 +28,7 @@ BLOCKED_KEYWORDS = [
 ]
 
 
-ORACLE_SCHEMAS = os.getenv("ORACLE_SCHEMAS", "INVENTORY")
+ORACLE_SCHEMAS = os.getenv("ORACLE_SCHEMAS", "INVENTORY,SCM")
 ALLOWED_SCHEMAS = {
     schema.strip().upper()
     for schema in ORACLE_SCHEMAS.split(",")
@@ -107,11 +107,6 @@ def add_oracle_row_limit(sql: str, max_rows: int = 100) -> str:
     """
 
     safe_sql = validate_select_only(sql)
-
-    upper_sql = safe_sql.upper()
-
-    if " FETCH FIRST " in upper_sql or " ROWNUM " in upper_sql:
-        return safe_sql
 
     return f"""
 SELECT *

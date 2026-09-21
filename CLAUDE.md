@@ -60,15 +60,17 @@ Legacy — NOT V1, do not build on it, do not remove without an explicit task:
 app/sql_generator_v2.py      app/schema_search.py
 ```
 Unwired — not in the V1 chain: `app/query_planner.py`, `app/entity_resolver.py`, `app/full_value_resolver.py`.
-Wired — `app/entity_resolution.py` IS in the V1 chain: `nlp_execution.py` calls `resolve_plan_entities(plan, oracle_entity_lookup)` before the execution gate (deterministic, fail-closed, Oracle-backed lookup; uncommitted).
+Post-V1, unwired — `app/plugins.py`: deterministic post-execution plugins over `NLPExecuteResponse` (CLI `python -m app.plugins`, tests `scripts/test_plugins.py`). Never wire into SQL generation or execution; wiring into the response is a Step 9+ decision.
+Wired — `app/entity_resolution.py` IS in the V1 chain: `nlp_execution.py` calls `resolve_plan_entities(plan, oracle_entity_lookup)` before the execution gate (deterministic, fail-closed, Oracle-backed lookup; commit `ab77443`).
 
 ## 5. Current active work
 Branch: `feature/v1-query-execution`. Live status: `progress.md`.
 Order of work — do not skip ahead:
 ```text
-1. Recover the 20 raw Qwen3:8b QueryPlan outputs
-2. Classify every failure (model / prompt / contract / ontology)
-3. Fix only the proven bottleneck
+1. Recover the 20 raw Qwen3:8b QueryPlan outputs        ✅
+2. Classify every failure (model / prompt / contract / ontology)  ✅ fix.md #6
+3. Fix only the proven bottleneck                       ✅ (fix.md #7 follow-up open)
+   3b. Close fix.md #7 (aggregate without GROUP BY)      ← next
 4. Controlled Qwen3:8b vs Qwen3:14b comparison
 5. Re-run acceptance
 6. Connect company Oracle server, validate real results
@@ -80,15 +82,15 @@ Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture red
 Detail and fix plan per item: `fix.md`.
 47-question real evaluation (`scripts/v1_real_question_eval_results.json`):
 ```text
-QUERY_PLAN_FAILURE           20   ← raw model outputs were not saved; root cause unknown
-UNSUPPORTED_EXPECTED         13   ← by design
-ENTITY_RESOLUTION_REJECTION   9
-CAPABILITY_FAILURE            3
-GROUNDING_FAILURE             2
+PASS_PIPELINE                 3   ← first end-to-end passes 2026-09-22 (stub runner); 2 of 3 SQLs need fix.md #7
+UNSUPPORTED_EXPECTED         24   ← by design
+ENTITY_RESOLUTION_REJECTION   8   ← 7 offline-fixture gaps, 1 model error
+CAPABILITY_FAILURE            6   ← mrs lookup/unknown operation
+QUERY_PLAN_FAILURE            3   ← all model behaviour (fix.md #6)
+GROUNDING_FAILURE             3   ← cost / rate / order-pending not catalogued
 SQL_GENERATION / SQL_VALIDATION / ENVIRONMENT  0
-PASS_PIPELINE                 0
 ```
-Do not treat the 20 QueryPlan failures as proof Qwen3:8b is inadequate until raw outputs are recovered.
+The 20 → 3 QueryPlan drop came from fixing our own semantic validator, not the model. The 3 that remain are model behaviour and are the real input to Step 4.
 
 ## 7. Test commands
 Tests are `unittest` scripts. Run the one for the component you changed:
@@ -96,7 +98,7 @@ Tests are `unittest` scripts. Run the one for the component you changed:
 python scripts/test_<component>.py
 ```
 Core V1 suites: `test_text_correction`, `test_spacy_nlp`, `test_query_plan_extractor`, `test_query_plan_semantic_validator`, `test_schema_grounding`, `test_grounded_sql_generator`, `test_grounded_sql_validator`, `test_sql_datatype_validator`, `test_nlp_execution`, `test_v1_acceptance_matrix`.
-Baseline: targeted V1 suites 105/105, authoritative suite 293/293.
+Baseline: 11 core suites 263/263 (2026-09-22).
 
 ## 8. Evaluation commands
 ```bash

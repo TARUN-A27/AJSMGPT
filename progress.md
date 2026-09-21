@@ -12,16 +12,16 @@ Current phase: **V1** (grounded, validated, read-only pipeline). Branch: `featur
 |---|---|---|---|---|
 | 1 | Typo correction | `text_correction.py` | ✅ done | 18 |
 | 2 | spaCy NLP signals | `spacy_nlp.py` | ✅ done | 26 |
-| 3 | Qwen QueryPlan extraction | `query_plan_extractor.py`, `query_plan.py` | ✅ built · ⚠️ 20/47 real questions fail contract | 39 |
-| 4 | Semantic validation | `query_plan_semantic_validator.py` | ✅ done | 23 |
+| 3 | Qwen QueryPlan extraction | `query_plan_extractor.py`, `query_plan.py` | ✅ built · 3/47 real questions still fail here (all model behaviour) | 50 |
+| 4 | Semantic validation | `query_plan_semantic_validator.py` | ✅ done · self-conflict + entity-dimension normalizer fixed 2026-09-22 | 30 |
 | 5 | Deterministic schema grounding | `schema_grounding.py` | ✅ done · 2/47 grounding gaps | 22 |
-| 6 | Qwen grounded SQL generation | `grounded_sql_generator.py` | ✅ built · untested by real questions (nothing reaches it) | 15 |
-| 7 | Static SQL validation | `grounded_sql_validator.py`, `sql_safety.py`, `sql_datatype_validator.py` | ✅ done | 49 + 17 |
+| 6 | Qwen grounded SQL generation | `grounded_sql_generator.py` | ✅ built · 3 real questions reach it and pass validation | 15 |
+| 7 | Static SQL validation | `grounded_sql_validator.py`, `sql_safety.py`, `sql_datatype_validator.py` | ✅ done · ⚠️ gap: aggregate without GROUP BY accepted (fix.md #7) | 49 + 17 |
 | 8 | Read-only Oracle execution | `nlp_execution.py`, `oracle_client.py` | ✅ built · never run against company server | 22 |
 | 9 | Business report | `answer_formatter.py` | ✅ built · unverified on real results | — |
 | — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ | 2 (supported accept / unsupported reject) |
 
-Targeted V1 suites: 105/105 (last recorded run).
+Core V1 suites (11): 263/263 (2026-09-22).
 
 ### API endpoints (`app/nlp_router.py`)
 | Endpoint | Status |
@@ -47,22 +47,22 @@ Catalog: 5 domains · 24 concepts · 3 relationships.
 
 ### Real-question evaluation (47 questions)
 ```text
-PASS_PIPELINE                 0   ← nothing has gone end-to-end yet
-QUERY_PLAN_FAILURE           20
-UNSUPPORTED_EXPECTED         13   (by design)
-ENTITY_RESOLUTION_REJECTION   9
-CAPABILITY_FAILURE            3
-GROUNDING_FAILURE             2
+PASS_PIPELINE                 3   ← first end-to-end passes (2026-09-22); stub runner, 0 Oracle
+UNSUPPORTED_EXPECTED         24   (by design; now routed before semantic checks)
+ENTITY_RESOLUTION_REJECTION   8   (7 = value not in offline fixture; 1 model error)
+CAPABILITY_FAILURE            6   (mrs lookup/unknown operation)
+QUERY_PLAN_FAILURE            3   (was 20; all remaining are model behaviour)
+GROUNDING_FAILURE             3   (cost, rate, order-pending — catalog gaps)
 ```
-Honest read: **every deterministic layer is built and unit-tested; the LLM layer has not yet produced a single end-to-end pass on real questions.** The blocker is diagnostic — raw Qwen outputs for the 20 failures were never saved (fix.md #1).
+Honest read: **3 real questions now run end to end** (grounded join, entity bind, FETCH FIRST). 20 → 3 QueryPlan failures came from fixing our own validator, not the model. But 2 of the 3 passing SQLs would fail in Oracle (aggregate without GROUP BY — fix.md #7): the static validator has a gap only real input could show.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~95%   built, tested, catalog-backed
-LLM layers (3, 6)                          ~50%   built, unproven on real questions
+Deterministic layers (2, 4, 5, 7)         ~92%   built, tested; one known validator gap (fix.md #7)
+LLM layers (3, 6)                          ~65%   QueryPlan stage now passes real questions; SQL gen reached
 Execution + report (8, 9)                  ~60%   built, never run on company Oracle
-Real-question pass rate                     0%
-Overall V1                                 ~55%
+Real-question pass rate                   3/47   (6%; 24 are by-design unsupported → 3/23 of in-scope)
+Overall V1                                 ~60%
 ```
 
 ---
@@ -78,8 +78,11 @@ Overall V1                                 ~55%
 | 0ee16fd | Grounded NLP pipeline |
 | 1495b00 | Validated grounded SQL preview |
 | f7db1c2 | Guarded V1 query execution |
+| ab77443 | Entity resolution wired, QueryFilter bypass gate, validator false-positive fixes, MRS compound conditions |
+| 2448e75 | Evaluation harness (offline resolver, stage classification, raw model output), tracking docs, harness policy |
+| (Step 3) | Semantic-validator self-conflict, entity-dimension normalizer, capability-first gate ordering, correction round, entity-concept prompt — first 3 end-to-end passes |
 
-## In progress (uncommitted on this branch)
+## Committed 2026-09-21 as `ab77443` (V1 hardening) + `2448e75` (evaluator, docs)
 - Entity resolution `app/entity_resolution.py` — **wired into V1**: `nlp_execution.py` calls `resolve_plan_entities(plan, oracle_entity_lookup)` before the execution gate; deterministic exact-match against `SCM.PARTYMASTER` / `INVENTORY.INVITEMS`, fail-closed (0 rows → UNRESOLVED, >1 → AMBIGUOUS). Tests: `test_entity_resolution.py`, resolver-integration tests in `test_nlp_execution.py`.
 - Older resolvers `app/entity_resolver.py`, `app/full_value_resolver.py` + `data/entity_index.sqlite3`, `data/full_value_index.sqlite3` — built, **not wired** (post-V1 candidate source, see B below).
 - Security fix: `build_bind_parameters` in `nlp_execution.py` now rejects a `QueryFilter` whose concept is in `resolvable_concepts()` — closes the path where a supplier/material value could reach Oracle as a raw filter bind without entity verification. Tests: `test_supplier_filter_bypassing_entity_resolution_is_rejected`, `test_material_filter_bypassing_entity_resolution_is_rejected`.
@@ -92,20 +95,22 @@ Overall V1                                 ~55%
 
 ## V1 — remaining work, in order
 
-### Step 1 — Recover raw QueryPlan outputs
-- [ ] Change `scripts/evaluate_v1_real_questions.py` / `app/query_plan_extractor.py` to store the raw Qwen response and the corrected JSON in the result record *before* contract validation rejects it.
-- [ ] Re-run the 47-question eval (Ollama, explicit approval).
-- [ ] Exit: all 20 `QUERY_PLAN_FAILURE` records have `raw_model_calls` populated.
+### Step 1 — Recover raw QueryPlan outputs ✅ 2026-09-21
+- [x] Evaluator now stores `raw_model_calls` for every record + `cause` (`exc.__cause__`). Evaluator-only change.
+- [x] Re-ran only the 20 `QUERY_PLAN_FAILURE` (Ollama, approved; Oracle calls = 0). Ollama dropped mid-run once; 12 retried.
+- [x] Exit met: 20/20 have `raw_model_calls`. 1 flipped to `UNSUPPORTED_EXPECTED` → 19 remain.
 
-### Step 2 — Classify the 20 QueryPlan failures
-- [ ] Bucket each into: bad prompt · bad contract field · missing ontology term · model can't do it · question genuinely unsupported.
-- [ ] Record counts per bucket in `fix.md` #1.
-- [ ] Exit: every failure has a bucket and a one-line reason.
+### Step 2 — Classify the 19 QueryPlan failures ✅ 2026-09-21
+- [x] Buckets recorded in `fix.md` #6: 6a validator self-conflict (6) · 6b entity duplicated as dimension (5) · 6c unknown-domain/high-confidence (3) · 6d MRS due-date clarification (2) · 6e contract: entity-only plan (2) · 6f conflicting ranking (1).
+- [x] Only 2/19 are contract failures; 17/19 are our semantic validator rejecting schema-valid JSON. 9/19 are unsupported-domain questions that never reached the capability gate.
+- [x] Correction round is a no-op (19/20 identical retries) — retry drops `SYSTEM_PROMPT`.
 
-### Step 3 — Fix the proven bottleneck only
-- [ ] Apply fixes for the largest bucket(s) — prompt wording, contract loosening only where deterministic validation still holds, ontology additions from `nlp_ontology.json`.
-- [ ] Add a unit test per fixed pattern in `test_query_plan_extractor.py`.
-- [ ] Exit: targeted suites green; QueryPlan failures reduced; no validator loosened.
+### Step 3 — Fix the proven bottleneck only ✅ 2026-09-22
+- [x] 6a normalizer/rule agreement · entity-dimension normalizer · gate ordering (capability decision, after review) · correction round keeps `SYSTEM_PROMPT` · prompt: canonical entity concepts (pinned to `resolvable_concepts()`), always `business_subject`, entity ≠ dimension.
+- [x] Independent review (fresh Opus 5 session): BLOCKER on first gate-ordering predicate fixed; reviewer's probe shapes are tests.
+- [x] 11 new tests; core suites 263/263. No validator rule loosened.
+- [x] Exit met: QUERY_PLAN_FAILURE 20 → 3; PASS_PIPELINE 0 → 3.
+- [ ] Follow-up found by the first passes: fix.md #7 (aggregate without GROUP BY) — do before Step 5.
 
 ### Step 4 — Entity resolution (9 rejections)
 The deterministic resolver is already wired (`app/entity_resolution.py`, fail-closed, no LLM resolution). The 9 rejections split two ways:
@@ -157,7 +162,8 @@ The deterministic resolver is already wired (`app/entity_resolution.py`, fail-cl
 
 ### C. Report layer
 - `answer_formatter.py` → structured report: title, filters applied, table, totals, row count, SQL shown on request.
-- Export: CSV/XLSX download from `/v1/nlp/execute` result.
+- Export: CSV/XLSX download from `/v1/nlp/execute` result. ⏳ CSV exists unwired: `app/plugins.py` `export` (2026-09-22).
+- Post-execution plugins (`app/plugins.py`, unwired, 2026-09-22): `export`, `share`, `anomaly`, `trend`, `compare`, `explain` — deterministic processors over `NLPExecuteResponse`; CLI `python -m app.plugins`; tests `scripts/test_plugins.py` 15/15. Wiring (one optional request field, no new endpoint) waits for Step 9.
 - Business templates (`business_template_engine.py`, `data/business_query_templates.json`) for recurring reports — deterministic, no LLM.
 - Charts only after tabular output is trusted.
 
@@ -200,4 +206,6 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
 
 ## Log
 - 2026-09-21 — CLAUDE.md rewritten; harness policy saved to `docs/`; progress.md / fix.md / fixlog.md created.
+- 2026-09-22 — Step 3 done: QueryPlan failures 20 → 3, first 3 PASS_PIPELINE; fix.md #7 opened (aggregate/GROUP BY validator gap).
+- 2026-09-22 — `app/plugins.py` added (6 post-execution plugins, unwired, tests 15/15); recorded under Post-V1 C.
 - 2026-09-21 — progress.md expanded: per-stage V1 status, endpoint/coverage tables, ~55% completion estimate, 9-step remaining plan, post-V1 needs A–I.

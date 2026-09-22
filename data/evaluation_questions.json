@@ -1,0 +1,917 @@
+[
+  {
+    "question": "pending PO for yarn",
+    "expected_intent": "pending_po_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "ITEM_NAME",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show stock for yarn",
+    "expected_intent": "stock_by_item_name",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "S.ITEMCODE = INV.ITEM_CODE",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show supplier GST for dutch blue",
+    "expected_intent": "supplier_by_name",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "PARTYNAME",
+      "GSTINID",
+      "LIKE '%DUTCH BLUE%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show employees in stores department",
+    "expected_intent": "employee_by_department",
+    "must_contain": [
+      "HRDNEW.STAFF",
+      "HRDNEW.DEPARTMENT",
+      "S.DEPTCODE = D.DEPTCODE",
+      "LIKE '%STORES%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "employee details for production",
+    "expected_intent": "employee_by_department",
+    "must_contain": [
+      "HRDNEW.STAFF",
+      "HRDNEW.DEPARTMENT",
+      "HRDNEW.DESIGNATION",
+      "LIKE '%PRODUCTION%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock of item A12001392",
+    "expected_intent": "stock_by_item_code",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "S.ITEMCODE = INV.ITEM_CODE",
+      "UPPER(S.ITEMCODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock for item code A12001392",
+    "expected_intent": "stock_by_item_code",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "S.ITEMCODE = INV.ITEM_CODE",
+      "UPPER(S.ITEMCODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "pending PO for item code C02000094",
+    "expected_intent": "pending_po_by_item_code",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "PO.ITEM_CODE = INV.ITEM_CODE",
+      "UPPER(PO.ITEM_CODE) = 'C02000094'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "purchase order for item code C02000094",
+    "expected_intent": "pending_po_by_item_code",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "PO.ITEM_CODE = INV.ITEM_CODE",
+      "UPPER(PO.ITEM_CODE) = 'C02000094'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "keyboard last purchase date",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "PO.ORDERDATE",
+      "ROWNUM = 1",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "last purchase date for keyboard",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "PO.ORDERDATE",
+      "ROWNUM = 1",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "when was keyboard last purchased",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "PO.ORDERDATE",
+      "ROWNUM = 1",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "last PO date for keyboard",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "PO.ORDERDATE",
+      "ROWNUM = 1",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "keyboard last order date",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "PO.ORDERDATE",
+      "ROWNUM = 1",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "last purchase of keyboard by company name",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER",
+      "P.PARTYNAME",
+      "LIKE '%KEYBOARD%",
+      "ORDER BY PO.ORDERDATE DESC",
+      "ROWNUM = 1"
+    ],
+    "must_not_contain": [
+      "SUP_CODE) = 'NAME'",
+      "SUP_CODE = 'NAME'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "last purchase of keyboard with supplier name",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER",
+      "P.PARTYNAME",
+      "LIKE '%KEYBOARD%",
+      "ORDER BY PO.ORDERDATE DESC",
+      "ROWNUM = 1"
+    ],
+    "must_not_contain": [
+      "SUP_CODE) = 'NAME'",
+      "SUP_CODE = 'NAME'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "which company supplied keyboard last",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER",
+      "P.PARTYNAME",
+      "LIKE '%KEYBOARD%",
+      "ORDER BY PO.ORDERDATE DESC",
+      "ROWNUM = 1"
+    ],
+    "must_not_contain": [
+      "SUP_CODE) = 'NAME'",
+      "SUP_CODE = 'NAME'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "from which company keyboard was last purchased",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER",
+      "P.PARTYNAME",
+      "LIKE '%KEYBOARD%",
+      "ORDER BY PO.ORDERDATE DESC",
+      "ROWNUM = 1"
+    ],
+    "must_not_contain": [
+      "SUP_CODE) = 'NAME'",
+      "SUP_CODE = 'NAME'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "keyboard latest purchase company name",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER",
+      "P.PARTYNAME",
+      "LIKE '%KEYBOARD%",
+      "ORDER BY PO.ORDERDATE DESC",
+      "ROWNUM = 1"
+    ],
+    "must_not_contain": [
+      "SUP_CODE) = 'NAME'",
+      "SUP_CODE = 'NAME'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "keyboard latest purchase supplier name",
+    "expected_intent": "last_purchase_date_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "SCM.PARTYMASTER",
+      "P.PARTYNAME",
+      "LIKE '%KEYBOARD%",
+      "ORDER BY PO.ORDERDATE DESC",
+      "ROWNUM = 1"
+    ],
+    "must_not_contain": [
+      "SUP_CODE) = 'NAME'",
+      "SUP_CODE = 'NAME'"
+    ],
+    "execute": false
+  },
+  {
+    "question": "supplier details for party code ODUT001",
+    "expected_intent": "supplier_by_party_code",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "UPPER(PARTYCODE) = 'ODUT001'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "vendor details for party code ODUT001",
+    "expected_intent": "supplier_by_party_code",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "UPPER(PARTYCODE) = 'ODUT001'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "employee details for empcode 165224",
+    "expected_intent": "employee_by_empcode",
+    "must_contain": [
+      "HRDNEW.STAFF",
+      "HRDNEW.DEPARTMENT",
+      "HRDNEW.DESIGNATION",
+      "UPPER(S.EMPCODE) = '165224'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "staff details for empcode 165224",
+    "expected_intent": "employee_by_empcode",
+    "must_contain": [
+      "HRDNEW.STAFF",
+      "HRDNEW.DEPARTMENT",
+      "HRDNEW.DESIGNATION",
+      "UPPER(S.EMPCODE) = '165224'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "pending MRS for yarn",
+    "expected_intent": "pending_mrs_by_item_name",
+    "must_contain": [
+      "INVENTORY.MRS_TEMP",
+      "INVENTORY.INVITEMS",
+      "M.ITEM_CODE = INV.ITEM_CODE",
+      "M.MRSFLAG = 1",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "pending MRS for item code A14700167",
+    "expected_intent": "pending_mrs_by_item_code",
+    "must_contain": [
+      "INVENTORY.MRS_TEMP",
+      "INVENTORY.INVITEMS",
+      "M.ITEM_CODE = INV.ITEM_CODE",
+      "UPPER(M.ITEM_CODE) = 'A14700167'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "grn for item code C02000094",
+    "expected_intent": "grn_by_item_code",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "G.CODE = INV.ITEM_CODE",
+      "UPPER(G.CODE) = 'C02000094'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "grn for supplier code 800967",
+    "expected_intent": "grn_by_supplier_code",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "SCM.PARTYMASTER",
+      "G.SUP_CODE = P.PARTYCODE",
+      "UPPER(G.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "grn for order number 800151",
+    "expected_intent": "grn_by_order_no",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "G.ORDERNO = 800151"
+    ],
+    "execute": true
+  },
+  {
+    "question": "grn for yarn",
+    "expected_intent": "grn_by_item_name",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "INVENTORY.INVITEMS",
+      "INV.ITEM_NAME",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "issue for item code A12001392",
+    "expected_intent": "issue_by_item_code",
+    "must_contain": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "I.CODE = INV.ITEM_CODE",
+      "UPPER(I.CODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "issue for yarn",
+    "expected_intent": "issue_by_item_name",
+    "must_contain": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "INV.ITEM_NAME",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "issue for issue number 737",
+    "expected_intent": "issue_by_issue_no",
+    "must_contain": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "I.ISSUENO = 737"
+    ],
+    "execute": true
+  },
+  {
+    "question": "issue for indent number 0",
+    "expected_intent": "issue_by_indent_no",
+    "must_contain": [
+      "INVENTORY.ISSUE",
+      "INVENTORY.INVITEMS",
+      "I.INDENTNO = 0"
+    ],
+    "execute": true
+  },
+  {
+    "question": "indent for item code A12001392",
+    "expected_intent": "indent_by_item_code",
+    "must_contain": [
+      "INVENTORY.INDENT",
+      "INVENTORY.INVITEMS",
+      "I.CODE = INV.ITEM_CODE",
+      "UPPER(I.CODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "indent for yarn",
+    "expected_intent": "indent_by_item_name",
+    "must_contain": [
+      "INVENTORY.INDENT",
+      "INVENTORY.INVITEMS",
+      "INV.ITEM_NAME",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "indent for indent number 5241",
+    "expected_intent": "indent_by_indent_no",
+    "must_contain": [
+      "INVENTORY.INDENT",
+      "INVENTORY.INVITEMS",
+      "I.INDENTNO = 5241"
+    ],
+    "execute": true
+  },
+  {
+    "question": "indent for department electrical",
+    "expected_intent": "indent_by_department",
+    "must_contain": [
+      "INVENTORY.INDENT",
+      "INVENTORY.DEPT",
+      "I.DEPTCODE = D.DEPT_CODE",
+      "LIKE '%ELECTRICAL%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "item master for item code A12001392",
+    "expected_intent": "item_master_by_item_code",
+    "must_contain": [
+      "INVENTORY.INVITEMS",
+      "ITEM_CODE",
+      "ITEM_NAME",
+      "UPPER(ITEM_CODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "item details for yarn",
+    "expected_intent": "item_master_by_item_name",
+    "must_contain": [
+      "INVENTORY.INVITEMS",
+      "ITEM_NAME",
+      "HSNCODE",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock for department electrical",
+    "expected_intent": "stock_by_department",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.DEPT",
+      "S.ITEMCODE = INV.ITEM_CODE",
+      "INV.DEPTCODE = D.DEPT_CODE",
+      "LIKE '%ELECTRICAL%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock for unit A-Unit",
+    "expected_intent": "stock_by_unit",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "S.ITEMCODE = INV.ITEM_CODE",
+      "INV.UOMCODE = U.UNIT_CODE",
+      "LIKE '%A-UNIT%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock summary for department electrical",
+    "expected_intent": "stock_summary_by_department",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.DEPT",
+      "SUM(NVL(S.STOCK, 0))",
+      "GROUP BY D.DEPT_NAME",
+      "LIKE '%ELECTRICAL%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock summary for unit A-Unit",
+    "expected_intent": "stock_summary_by_unit",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "INVENTORY.INVITEMS",
+      "INVENTORY.UNIT",
+      "SUM(NVL(S.STOCK, 0))",
+      "GROUP BY U.UNIT_NAME",
+      "LIKE '%A-UNIT%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "po summary for supplier code 800967",
+    "expected_intent": "po_summary_by_supplier_code",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "SCM.PARTYMASTER",
+      "PO.SUP_CODE = P.PARTYCODE",
+      "COUNT(DISTINCT PO.ORDERNO)",
+      "SUM(NVL(PO.NET, 0))",
+      "UPPER(PO.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "grn summary for supplier code 800967",
+    "expected_intent": "grn_summary_by_supplier_code",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "SCM.PARTYMASTER",
+      "G.SUP_CODE = P.PARTYCODE",
+      "COUNT(DISTINCT G.GRNNO)",
+      "SUM(NVL(G.QTY, 0))",
+      "UPPER(G.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock availability for keyboard",
+    "expected_intent": "stock_availability_by_item_name",
+    "must_contain": [
+      "INVENTORY.INVITEMS",
+      "INVENTORY.STOCK",
+      "LEFT JOIN INVENTORY.STOCK",
+      "NVL(S.STOCK, 0)",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "keyboard stock",
+    "expected_intent": "stock_availability_by_item_name",
+    "must_contain": [
+      "INVENTORY.INVITEMS",
+      "INVENTORY.STOCK",
+      "LEFT JOIN INVENTORY.STOCK",
+      "NVL(S.STOCK, 0)",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "purchase order for yarn",
+    "expected_intent": "pending_po_by_item_name",
+    "must_contain": [
+      "INVENTORY.PURCHASEORDER",
+      "INVENTORY.INVITEMS",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "purchase order for yarn?",
+    "expected_intent": "pending_po_by_item_name",
+    "must_contain": [
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "purchase orders for yarn",
+    "expected_intent": "pending_po_by_item_name",
+    "must_contain": [
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "how much yarn did we order",
+    "expected_intent": "po_summary_by_item_name",
+    "must_contain": [
+      "PURCHASEORDER",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "purchase order for yarn and cotton",
+    "expected_intent": "pending_po_by_item_name",
+    "must_contain": [
+      "PURCHASEORDER",
+      "LIKE '%YARN%'",
+      "LIKE '%COTTON%"
+    ],
+    "execute": true
+  },
+  {
+    "question": "grn for supplier 800967",
+    "expected_intent": "grn_by_supplier_code",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "UPPER(G.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "goods receipt note for supplier code 800967",
+    "expected_intent": "grn_by_supplier_code",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "UPPER(G.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "goods receipt for supplier 800967",
+    "expected_intent": "grn_by_supplier_code",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "UPPER(G.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "supplier by party code ODUT001",
+    "expected_intent": "supplier_by_party_code",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "UPPER(PARTYCODE) = 'ODUT001'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "supplier details for ODUT001",
+    "expected_intent": "supplier_by_party_code",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "UPPER(PARTYCODE) = 'ODUT001'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "who is dutch blue",
+    "expected_intent": "supplier_by_name",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "LIKE '%DUTCH BLUE%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show supplier dutch blue gst",
+    "expected_intent": "supplier_by_name",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "LIKE '%DUTCH BLUE%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "who is dutch blue gst",
+    "expected_intent": "supplier_by_name",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "LIKE '%DUTCH BLUE%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "supplier by gst dutch blue",
+    "expected_intent": "supplier_by_name",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "LIKE '%DUTCH BLUE%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "who is dutch blue?",
+    "expected_intent": "supplier_by_name",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "LIKE '%DUTCH BLUE%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show employee 165224",
+    "expected_intent": "employee_by_empcode",
+    "must_contain": [
+      "HRDNEW.STAFF",
+      "UPPER(S.EMPCODE) = '165224'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show staff 165224",
+    "expected_intent": "employee_by_empcode",
+    "must_contain": [
+      "HRDNEW.STAFF",
+      "UPPER(S.EMPCODE) = '165224'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "who is empcode 165224",
+    "expected_intent": "employee_by_empcode",
+    "must_contain": [
+      "HRDNEW.STAFF",
+      "UPPER(S.EMPCODE) = '165224'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "pending mrs for keyboard",
+    "expected_intent": "pending_mrs_by_item_name",
+    "must_contain": [
+      "INVENTORY.MRS_TEMP",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "pending MRS for keyboards",
+    "expected_intent": "pending_mrs_by_item_name",
+    "must_contain": [
+      "INVENTORY.MRS_TEMP",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "pending MRS for keyboards in stores",
+    "expected_intent": "pending_mrs_by_item_name",
+    "must_contain": [
+      "INVENTORY.MRS_TEMP",
+      "LIKE '%KEYBOARD%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "what was issued for A12001392",
+    "expected_intent": "issue_by_item_code",
+    "must_contain": [
+      "INVENTORY.ISSUE",
+      "UPPER(I.CODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "what were the issues for yarn",
+    "expected_intent": "issue_by_item_name",
+    "must_contain": [
+      "INVENTORY.ISSUE",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "what was issued for yarn",
+    "expected_intent": "issue_by_item_name",
+    "must_contain": [
+      "INVENTORY.ISSUE",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show indent 5241",
+    "expected_intent": "indent_by_indent_no",
+    "must_contain": [
+      "INVENTORY.INDENT",
+      "I.INDENTNO = 5241"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show indent for department stores",
+    "expected_intent": "indent_by_department",
+    "must_contain": [
+      "INVENTORY.INDENT",
+      "LIKE '%STORES%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "do we have yarn in stock",
+    "expected_intent": "stock_by_item_name",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show stock of yarn in stores",
+    "expected_intent": "stock_by_item_name",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "how much yarn is in stock",
+    "expected_intent": "stock_summary_by_item_name",
+    "must_contain": [
+      "SUM(NVL(S.STOCK, 0))",
+      "LIKE '%YARN%'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "stock balance for A12001392",
+    "expected_intent": "stock_by_item_code",
+    "must_contain": [
+      "INVENTORY.STOCK",
+      "UPPER(S.ITEMCODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "show purchase order for item code A12001392",
+    "expected_intent": "pending_po_by_item_code",
+    "must_contain": [
+      "PURCHASEORDER",
+      "UPPER(PO.ITEM_CODE) = 'A12001392'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "open purchase orders for supplier 800967",
+    "expected_intent": "pending_po_by_supplier_code",
+    "must_contain": [
+      "PURCHASEORDER",
+      "UPPER(PO.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "po summary for supplier 800967",
+    "expected_intent": "po_summary_by_supplier_code",
+    "must_contain": [
+      "COUNT(DISTINCT PO.ORDERNO)",
+      "UPPER(PO.SUP_CODE) = '800967'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "goods receipt note for order number 800151",
+    "expected_intent": "grn_by_order_no",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "G.ORDERNO = 800151"
+    ],
+    "execute": true
+  },
+  {
+    "question": "grn for order 800151",
+    "expected_intent": "grn_by_order_no",
+    "must_contain": [
+      "INVENTORY.GRN",
+      "G.ORDERNO = 800151"
+    ],
+    "execute": true
+  },
+  {
+    "question": "supplier details for party ODUT001",
+    "expected_intent": "supplier_by_party_code",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "UPPER(PARTYCODE) = 'ODUT001'"
+    ],
+    "execute": true
+  },
+  {
+    "question": "who is party ODUT001",
+    "expected_intent": "supplier_by_party_code",
+    "must_contain": [
+      "SCM.PARTYMASTER",
+      "UPPER(PARTYCODE) = 'ODUT001'"
+    ],
+    "execute": true
+  }
+]

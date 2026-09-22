@@ -1,0 +1,947 @@
+[
+  {
+    "from_schema": "ADMIN",
+    "from_table": "TRN_VEHICLEMOVEMENT",
+    "from_column": "MATERIALTRANSCONFIG_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_MATERIALTRANSCONFIG",
+    "to_column": "ID",
+    "constraint_name": "TRN_VEHICLEMOVEMENT_FK"
+  },
+  {
+    "from_schema": "ADMIN",
+    "from_table": "TRN_VEHICLEMOVEMENT_AUTH",
+    "from_column": "MATERIALTRANSAPPUSER_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_MATERIALTRANSCAMERAIP",
+    "to_column": "ID",
+    "constraint_name": "TRN_VEHICLEMOVEMENT_AUTH_F1"
+  },
+  {
+    "from_schema": "ADMIN",
+    "from_table": "TRN_VEHICLEMOVEMENT_AUTH",
+    "from_column": "TRANSID",
+    "to_schema": "ADMIN",
+    "to_table": "TRN_VEHICLEMOVEMENT",
+    "to_column": "ID",
+    "constraint_name": "TRN_VEHICLEMOVEMENT_AUTH_FK"
+  },
+  {
+    "from_schema": "ADMIN",
+    "from_table": "TRN_VEHICLEMOVEMENT_DETAILS",
+    "from_column": "TRANSID",
+    "to_schema": "ADMIN",
+    "to_table": "TRN_VEHICLEMOVEMENT",
+    "to_column": "ID",
+    "constraint_name": "TRN_VEHICLEMOVEMENT_DETAILS_F1"
+  },
+  {
+    "from_schema": "ADMIN",
+    "from_table": "TRN_VEHICLEMOVEMENT_DETAILS",
+    "from_column": "MATERIALTRANSCAMERAIP_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_MATERIALTRANSCAMERAIP",
+    "to_column": "ID",
+    "constraint_name": "TRN_VEHICLEMOVEMENT_DETAILS_FK"
+  },
+  {
+    "from_schema": "ADMIN",
+    "from_table": "TRN_VEHICLEMOVEMENT_TIMEEXTREQ",
+    "from_column": "TRANSID",
+    "to_schema": "ADMIN",
+    "to_table": "TRN_VEHICLEMOVEMENT",
+    "to_column": "ID",
+    "constraint_name": "TRN_VEHICLEMOVEMENT_TEXTREQ_FK"
+  },
+  {
+    "from_schema": "HRDNEW",
+    "from_table": "OVERTIME",
+    "from_column": "DEPTCODE",
+    "to_schema": "HRDNEW",
+    "to_table": "DEPARTMENT",
+    "to_column": "DEPTCODE",
+    "constraint_name": "FK_OT_DC"
+  },
+  {
+    "from_schema": "HRDNEW",
+    "from_table": "STAFF",
+    "from_column": "DEPTCODE",
+    "to_schema": "HRDNEW",
+    "to_table": "DEPARTMENT",
+    "to_column": "DEPTCODE",
+    "constraint_name": "FK_STA_DEP"
+  },
+  {
+    "from_schema": "HRDNEW",
+    "from_table": "STAFF",
+    "from_column": "DESIGNATIONCODE",
+    "to_schema": "HRDNEW",
+    "to_table": "DESIGNATION",
+    "to_column": "DESIGNATIONCODE",
+    "constraint_name": "FK_STA_DES"
+  },
+  {
+    "from_schema": "INSUR",
+    "from_table": "POLICYACKNOWLEDGEMENT",
+    "from_column": "INTIMATIONNO",
+    "to_schema": "INSUR",
+    "to_table": "LOGBOOK",
+    "to_column": "INTIMATIONNO",
+    "constraint_name": "POLICYACKNOWLEDGEMENT_FK"
+  },
+  {
+    "from_schema": "INSUR",
+    "from_table": "TRN_MBD_CLAIM_STATUS",
+    "from_column": "INTIMATIONNO",
+    "to_schema": "INSUR",
+    "to_table": "LOGBOOK",
+    "to_column": "INTIMATIONNO",
+    "constraint_name": "TRN_MBD_CLAIM_STATUS_FK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ADVREQUEST",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_ADVREQ"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ADVREQUEST",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_ADVREQ_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "COMPARSIONENQUIRY",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_COMPARSION"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DELETEDADVREQUEST",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_DELADVREQ"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DELETEDGRN",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_DELGRN"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DELETEDINDENT",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_DELINDENT"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DELETEDISSUE",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_DELISSUE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DELETEDMATDESC",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_DELMATDESC"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DELETEDMRS",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_DELMRS"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DELETEDORDER",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_DELORDER"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DEPTITEMCONFIG",
+    "from_column": "DEPT_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "DEPT",
+    "to_column": "DEPT_CODE",
+    "constraint_name": "DEPTITEMCONFIG_DEPTFK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DEPTITEMCONFIG",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "DEPTITEMCONFIG_FK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "DYEINGINVITEMS",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "DY_ITEMCODE_INVITEMS-ITEMCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ENQUIRY",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_ENQUIRY_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ENQUIRY",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_ENQ_INVITEMS"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ENQUIRYSTATUSANDMAIL",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_ENQSTA_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ENQUIRYSTATUSANDMAIL",
+    "from_column": "STATUSCODE",
+    "to_schema": "INVENTORY",
+    "to_table": "ENQUIRYSTATUSMASTER",
+    "to_column": "STATUSCODE",
+    "constraint_name": "SYS_C0021384"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "EPCGEXPENSECALPERCENTS",
+    "from_column": "ORDERTYPECODE",
+    "to_schema": "INVENTORY",
+    "to_table": "EPCGORDERTYPE",
+    "to_column": "ORDERTYPECODE",
+    "constraint_name": "SYS_C0021386"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "EPCGGROUPEXPENSEDETAILS",
+    "from_column": "ORDERTYPECODE",
+    "to_schema": "INVENTORY",
+    "to_table": "EPCGORDERTYPE",
+    "to_column": "ORDERTYPECODE",
+    "constraint_name": "SYS_C0021387"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "EPCGORDERGROUP",
+    "from_column": "ORDERTYPECODE",
+    "to_schema": "INVENTORY",
+    "to_table": "EPCGORDERTYPE",
+    "to_column": "ORDERTYPECODE",
+    "constraint_name": "SYS_C0021388"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "EPCGORDERGROUP",
+    "from_column": "CURRENCYTYPECODE",
+    "to_schema": "INVENTORY",
+    "to_table": "EPCGCURRENCYTYPE",
+    "to_column": "CURRENCYTYPECODE",
+    "constraint_name": "SYS_C0021389"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "EPCGREQUESTORDER",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_EPCGREQ"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "EPCGREQUESTORDER",
+    "from_column": "CURRENCYTYPECODE",
+    "to_schema": "INVENTORY",
+    "to_table": "EPCGCURRENCYTYPE",
+    "to_column": "CURRENCYTYPECODE",
+    "constraint_name": "SYS_C0021391"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "GATEINWARDRDC",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_GIRDC_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "GRN",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_GRN"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "GRN",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_GRN_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "INDENT",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_INDENT"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "INDENT_REQUEST",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "INDENT_REQUEST_FK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "INVITEMS_MASTER_DATA",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_ITEMCODE_INVITEMS_ITEMCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "INVITEMS_MASTER_DATA",
+    "from_column": "TABLECODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS_MASTERTABLES_TABLE",
+    "to_column": "ID",
+    "constraint_name": "FK_ITEM_MASTER_TABLE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "INVOICEGRN",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_INVOICEGRN_ITEMCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "INVOICEGRN",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_INVOICEGRN_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ISSUE",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_ISSUE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ITEMSTOCK",
+    "from_column": "ITEMCODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_ITEMSTOCK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "ITEM_MACHINE_MODEL",
+    "from_column": "DEPT_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "DEPT",
+    "to_column": "DEPT_CODE",
+    "constraint_name": "FK_MODEL_DEPT"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "KAMADHENUINVITEMS",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_KAMINVITEMS"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MELANGEINVITEMS",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_MELITEMS"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MONTHLYPLANNINGITEM",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_MONPLANITEM"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MRS",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_MRS"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MRS",
+    "from_column": "UNIT_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "UNIT",
+    "to_column": "UNIT_CODE",
+    "constraint_name": "SYS_C0022745"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MRS",
+    "from_column": "DEPT_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "DEPT",
+    "to_column": "DEPT_CODE",
+    "constraint_name": "SYS_C0022746"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MRSITEMS",
+    "from_column": "MATCHING_ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_MRSITEMS"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MS_APPROVAL_WORKFLOW",
+    "from_column": "SCREEN_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_SCREEN_MASTER",
+    "to_column": "SCREEN_ID",
+    "constraint_name": "SYS_C009334435"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MS_APPROVAL_WORKFLOW",
+    "from_column": "USERCODE",
+    "to_schema": "SCM",
+    "to_table": "RAWUSER",
+    "to_column": "USERCODE",
+    "constraint_name": "SYS_C009334436"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MS_MATERIALTRANSAPPUSER",
+    "from_column": "TRANSID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_MATERIALTRANSCONFIG",
+    "to_column": "ID",
+    "constraint_name": "MS_MATERIALTRANSAPPUSERFK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MS_MATERIALTRANSCAMERAIP",
+    "from_column": "TRANSID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_MATERIALTRANSCONFIG",
+    "to_column": "ID",
+    "constraint_name": "MS_MATERIALTRANSCAMERAIPFK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "MS_PAYMENT_TERM_DTL",
+    "from_column": "TERM_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_PAYMENT_TERMS",
+    "to_column": "TERM_ID",
+    "constraint_name": "FK_MS_PAYMENT_TERM_DTL"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "NONRETURNITEMSCHECKING",
+    "from_column": "RETURNDETAILSID",
+    "to_schema": "INVENTORY",
+    "to_table": "MATERIALINDENTRETURNDETAILS",
+    "to_column": "ID",
+    "constraint_name": "SYS_C006541666"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "NONSTOCKISSUE",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_NONSTOCKISSUE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PARTY_MASTER_DATA",
+    "from_column": "PARTY_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_PARTYCODE_PARTY_PARTYCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PARTY_MASTER_DATA",
+    "from_column": "TABLECODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS_MASTERTABLES_TABLE",
+    "to_column": "ID",
+    "constraint_name": "FK_PARTY_MASTER_TABLE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PARTY_MSME_DETAILS",
+    "from_column": "PARTYCODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "PARTY_MSME_FK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PARTY_MSME_DETAILS",
+    "from_column": "TYPE",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_MSME_TYPE",
+    "to_column": "CODE",
+    "constraint_name": "PARTY_MSME_TYPE_FK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "POOL",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_POOL"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PURCHASEORDER",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "ITEMCODE_INVITEMS-ITEMCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PURCHASEORDER",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "SUPCODE_PARTYMASTER-PARTYCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PYGRN",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_PYGRN"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PYISSUE",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_PYISSUE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PYMATDESC",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_PYMATDESC"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "PYORDER",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_PYORDER"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "RDC",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_RDC_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "RDC",
+    "from_column": "REQUEST_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "TRN_USER_REQUEST",
+    "to_column": "ID",
+    "constraint_name": "SYS_C009417091"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "RDCMEMO",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_RDCMEMO_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "REGPLAN",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_REGPLAN"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "REGPLANTEMP",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_REGPLANTEMP"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "REGPOOL",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_REGPOOL"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "REGPOOLTEMP",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_REGPOOLTEMP"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "STOCKTRANSFER",
+    "from_column": "CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_STKTRANSFER"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "STOCK_ADJUST_DETAILS",
+    "from_column": "TRANSID",
+    "to_schema": "INVENTORY",
+    "to_table": "STOCK_ADJUST",
+    "to_column": "TRANSID",
+    "constraint_name": "STOCK_ADJUST_DETAILS_FK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TEMPREGPOOL",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_TEMPREGPOOL"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRANSFERSTOCK",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_TRANSFERSTOCK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRN_APPROVAL_DETAILS",
+    "from_column": "SCREEN_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_SCREEN_MASTER",
+    "to_column": "SCREEN_ID",
+    "constraint_name": "SYS_C009335163"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRN_APPROVAL_DETAILS",
+    "from_column": "USERCODE",
+    "to_schema": "SCM",
+    "to_table": "RAWUSER",
+    "to_column": "USERCODE",
+    "constraint_name": "SYS_C009335164"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRN_GIREJECTIONDETAILS",
+    "from_column": "TRN_GIREJECTION_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "TRN_GIREJECTION",
+    "to_column": "ID",
+    "constraint_name": "TRN_GIREJECTIONDLS_FK"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRN_GIREJECTION_ATTACHMENT",
+    "from_column": "GIREJECTIONID",
+    "to_schema": "INVENTORY",
+    "to_table": "TRN_GIREJECTION",
+    "to_column": "ID",
+    "constraint_name": "SYS_C006819601"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRN_USER_REQUEST",
+    "from_column": "SCREEN_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "MS_SCREEN_MASTER",
+    "to_column": "SCREEN_ID",
+    "constraint_name": "SYS_C009345507"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRN_USER_REQUEST",
+    "from_column": "REQUEST_BY",
+    "to_schema": "SCM",
+    "to_table": "RAWUSER",
+    "to_column": "USERCODE",
+    "constraint_name": "SYS_C009345508"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "TRN_USER_REQUEST_DLS",
+    "from_column": "REQUEST_ID",
+    "to_schema": "INVENTORY",
+    "to_table": "TRN_USER_REQUEST",
+    "to_column": "ID",
+    "constraint_name": "SYS_C009357373"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "WORKGRN",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_WGRN_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "WORKORDER",
+    "from_column": "SUP_CODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "FK_WO_SUPCODE"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "YEARLYBUDGET",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_YEARLYBUDGET"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "YEARLYPLANNING",
+    "from_column": "ITEMCODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_YEARLYPLANNING"
+  },
+  {
+    "from_schema": "INVENTORY",
+    "from_table": "YEARLYPLANNINGITEM",
+    "from_column": "ITEM_CODE",
+    "to_schema": "INVENTORY",
+    "to_table": "INVITEMS",
+    "to_column": "ITEM_CODE",
+    "constraint_name": "FK_YEARLYPLANNINGITEM"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "AGN",
+    "from_column": "ACCODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "SYS_C0021460"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "COTTONGI",
+    "from_column": "ACCODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "SYS_C0021468"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "FIBRE",
+    "from_column": "DYEDPARTYCODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "SYS_C004886516"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "GIFIBREDETAILS",
+    "from_column": "GINO",
+    "to_schema": "SCM",
+    "to_table": "AGN",
+    "to_column": "GINO",
+    "constraint_name": "FK_AGN_GINO"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "PARTYMASTER",
+    "from_column": "CITYCODE",
+    "to_schema": "SCM",
+    "to_table": "PLACE",
+    "to_column": "PLACECODE",
+    "constraint_name": "FOREIGN_KEY_PARTY_CITY"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "PARTYMASTER",
+    "from_column": "COUNTRYCODE",
+    "to_schema": "SCM",
+    "to_table": "COUNTRY",
+    "to_column": "COUNTRYCODE",
+    "constraint_name": "FOREIGN_KEY_PARTY_COUNTRY"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "PARTYMASTER",
+    "from_column": "STATECODE",
+    "to_schema": "SCM",
+    "to_table": "STATE",
+    "to_column": "STATECODE",
+    "constraint_name": "FOREIGN_KEY_PARTY_STATE"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "PURCHASE",
+    "from_column": "ACCODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "SYS_C0021510"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "PURCHASEAGN",
+    "from_column": "GINO",
+    "to_schema": "SCM",
+    "to_table": "PURCHASE",
+    "to_column": "GINO",
+    "constraint_name": "FOREIGN_KEY_PURAGN"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "RAWUSER",
+    "from_column": "PARTYCODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "SYS_C008790972"
+  },
+  {
+    "from_schema": "SCM",
+    "from_table": "SAMPLESDC",
+    "from_column": "PARTYCODE",
+    "to_schema": "SCM",
+    "to_table": "PARTYMASTER",
+    "to_column": "PARTYCODE",
+    "constraint_name": "SYS_C009171693"
+  }
+]

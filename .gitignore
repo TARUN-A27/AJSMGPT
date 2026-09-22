@@ -2,7 +2,14 @@ venv/
 __pycache__/
 *.pyc
 .env
-data/
+# data/ is ignored except the verified schema metadata V1 grounding needs at runtime
+data/*
+!data/multi_schema_metadata.json
+!data/schema_relationships.json
+!data/oracle_schema_profile_2026-09-22.json
+!data/business_query_templates.json
+!data/evaluation_questions.json
+!data/user_purchase_mrs_questions.txt
 logs/
 .vscode/
 .idea/
@@ -12,3 +19,9 @@ logs/
 qdrant_dumps/
 templates/*.bak
 reports/
+
+# Local database value memory - do not commit sensitive ERP values
+data/entity_index.sqlite3
+data/full_value_index.sqlite3
+data/full_value_index.sqlite3-*
+AutomateQuery/reports/full_value_index_build_report.json

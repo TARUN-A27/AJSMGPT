@@ -1,0 +1,24 @@
+What is the price of mouse?
+mouse last purchased supplier name?
+material mouse last purchased date?
+material mouse last purchased rate?
+Who is given lowest price in last one year?
+list who is given highest rate and who is given lowest rate?
+how many materials placed in last month?
+how much cost consumed last month?
+which material cost is high in last month?
+mouse is placed in last month MRS?
+Mrs rejected reason?
+last month placed material MRS Nos?
+What is status of last month placed MRS?
+is material mouse received?
+when was received?
+how many qty received?
+how many qty in receipt pending?
+list out order pending material names?
+list out material hold  at Store officer?
+list out material approval pending at Store officer?
+Which supplier is taken highest orders?
+Which supplier is given lowest price?
+how many qty received in last one year?
+Today received material names and qty?

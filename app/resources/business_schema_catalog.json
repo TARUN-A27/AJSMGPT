@@ -45,9 +45,14 @@
       "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "NET", "roles": ["measure"], "confidence": 0.85, "evidence": "metadata and purchase analytics router"}]
     },
     {
+      "name": "purchase_rate",
+      "aliases": ["purchase rate", "rate", "price", "unit rate", "unit price", "purchase price", "last purchase rate"],
+      "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "RATE", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(14,4); live profile 2026-09-22: never null on 178,707 PO lines; ERP report views (TEMP1POORDER*, X3339991) expose RATE per line; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1"}]
+    },
+    {
       "name": "purchase_date",
       "aliases": ["purchase date", "order date", "date"],
-      "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "ORDERDATE", "roles": ["date_filter", "grouping"], "confidence": 0.8, "evidence": "metadata and purchase analytics router"}]
+      "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "ORDERDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE_TEXT", "confidence": 0.8, "evidence": "purchase analytics router; metadata VARCHAR2(8); live profile 2026-09-22: 100% YYYYMMDD strings"}]
     },
     {
       "name": "supplier",
@@ -94,7 +99,7 @@
     {
       "name": "mrs_date",
       "aliases": ["mrs date", "request date", "date"],
-      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "MRSDATE", "roles": ["date_filter", "grouping"], "confidence": 0.8, "evidence": "metadata and mrs router"}]
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "MRSDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE_TEXT", "confidence": 0.8, "evidence": "mrs router; metadata VARCHAR2(8); live profile 2026-09-22: 100% YYYYMMDD strings"}]
     },
     {
       "name": "mrs_number",
@@ -104,7 +109,7 @@
     {
       "name": "mrs_due_date",
       "aliases": ["mrs due", "due date", "due"],
-      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "DUEDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE", "confidence": 0.8, "evidence": "metadata and mrs router"}]
+      "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "DUEDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE_TEXT", "confidence": 0.8, "evidence": "mrs router; metadata VARCHAR2(8); live profile 2026-09-22: mixed formats (99.9% YYYYMMDD, some D/M/YYYY) -- non-conforming rows misfile under string compare"}]
     },
     {
       "name": "mrs_rejection_reason",
@@ -164,13 +169,18 @@
     },
     {
       "name": "consumption_value",
-      "aliases": ["consumption value", "issue value", "issued value"],
-      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEVALUE", "roles": ["measure"], "confidence": 0.8, "evidence": "metadata"}]
+      "aliases": ["consumption value", "issue value", "issued value", "cost consumed", "consumption cost", "consumed cost"],
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEVALUE", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata NUMBER(12,2); live profile 2026-09-22: ISSUE.ISSUEVALUE with ISSRATE per issue line; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2"}]
+    },
+    {
+      "name": "consumption_rate",
+      "aliases": ["issue rate", "consumption rate", "issued rate"],
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSRATE", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata NUMBER(12,4); live profile 2026-09-22; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2"}]
     },
     {
       "name": "consumption_date",
       "aliases": ["consumption date", "issue date", "issued date", "date"],
-      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEDATE", "roles": ["date_filter", "grouping"], "confidence": 0.8, "evidence": "metadata"}]
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE_TEXT", "confidence": 0.8, "evidence": "metadata VARCHAR2(8); live profile 2026-09-22: 100% YYYYMMDD strings"}]
     },
     {
       "name": "consumption_status",

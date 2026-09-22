@@ -7,7 +7,7 @@
       "status": "supported",
       "domains": ["purchase"],
       "operations": ["detail", "aggregate", "ranking"],
-      "verified_concepts": ["purchase quantity", "purchase value", "purchase date", "supplier", "supplier name", "supplier code", "material", "item code"],
+      "verified_concepts": ["purchase quantity", "purchase value", "purchase rate", "purchase date", "supplier", "supplier name", "supplier code", "material", "item code"],
       "limitations": ["No status-code meanings are defined.", "No financial-year rules are defined."]
     },
     {
@@ -57,7 +57,7 @@
       "status": "supported",
       "domains": ["consumption", "issue", "issued"],
       "operations": ["detail", "aggregate", "ranking"],
-      "verified_concepts": ["consumption quantity", "consumption value", "consumption date", "material", "item code"],
+      "verified_concepts": ["consumption quantity", "consumption value", "consumption rate", "consumption date", "material", "item code"],
       "limitations": ["Issue status meanings are unsupported because status values are not catalogued."]
     }
   ]

@@ -250,6 +250,31 @@ class SchemaGroundingTests(unittest.TestCase):
             {"INVENTORY.MRS_TEMP.APPROVALSTATUS", "INVENTORY.MRS_TEMP.READYFORAPPROVAL"},
         )
 
+    # -- P3: verified measure columns from the 2026-09-22 schema study --------
+
+    def test_purchase_rate_grounds_as_measure(self):
+        # "last purchase rate of barcode scanner in 2026" failed grounding on
+        # `measure:rate`; PURCHASEORDER.RATE is NUMBER(14,4), never null.
+        result = ground_query_plan(plan(
+            "purchase", "purchase", operation="detail",
+            measures=[Measure(concept="rate")],
+            entities=[EntityReference(concept="material", original_value="barcode scanner")],
+        ))
+        self.assert_grounded(result)
+        self.assertIn(("INVENTORY.PURCHASEORDER", "RATE", "measure"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
+    def test_cost_consumed_grounds_to_issue_value(self):
+        # "how much cost consumed last month?" -> ISSUE.ISSUEVALUE.
+        result = ground_query_plan(plan(
+            "consumption", "consumption", operation="aggregate",
+            measures=[Measure(concept="cost consumed", aggregation=Aggregation.SUM)],
+            date_range=DateRange(kind=DateRangeKind.RELATIVE, original_text="last month"),
+        ))
+        self.assert_grounded(result)
+        self.assertIn(("INVENTORY.ISSUE", "ISSUEVALUE", "measure"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
     def test_compound_condition_columns_are_catalog_verified(self):
         # _catalog_is_verified() already runs on every ground_query_plan()
         # call and raises RuntimeError if any column (including compound
@@ -257,6 +282,32 @@ class SchemaGroundingTests(unittest.TestCase):
         # at all is itself proof every compound column passed that check.
         result = ground_query_plan(self._entity_plan("mrs rejected"))
         self.assertTrue(result.is_grounded)
+
+
+class CatalogDatatypeCategoryTests(unittest.TestCase):
+    def test_catalog_datatype_categories_agree_with_metadata(self) -> None:
+        # DATE_TEXT is only valid on a VARCHAR2 column and every date_filter
+        # column must say which it is: the company DB stores business dates
+        # as 'YYYYMMDD' text (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §5).
+        import json
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1]
+        catalog = json.loads((root / "app" / "resources" / "business_schema_catalog.json").read_text())
+        metadata = {
+            (entry["full_table_name"], col["column_name"]): col["data_type"]
+            for entry in json.loads((root / "data" / "multi_schema_metadata.json").read_text())
+            for col in entry["columns"]
+        }
+        for concept in catalog["concepts"]:
+            for col in concept.get("columns", []):
+                key = (col["table"], col["column"])
+                category = col.get("datatype_category")
+                if "date_filter" in col["roles"]:
+                    self.assertEqual(category, "DATE_TEXT", key)
+                if category == "DATE_TEXT":
+                    self.assertEqual(metadata[key], "VARCHAR2", key)
+                if category == "DATE":
+                    self.assertIn(metadata[key], ("DATE", "TIMESTAMP(6)"), key)
 
 
 if __name__ == "__main__":

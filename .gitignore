@@ -10,6 +10,7 @@ data/*
 !data/business_query_templates.json
 !data/evaluation_questions.json
 !data/user_purchase_mrs_questions.txt
+!data/question_bank_v1.json
 logs/
 .vscode/
 .idea/

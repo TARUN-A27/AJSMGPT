@@ -1,0 +1,1765 @@
+{
+ "version": "1.0",
+ "total": 197,
+ "note": "proposed_family is a review proposal, not a verdict",
+ "questions": [
+  {
+   "question": "how much cost consumed last month?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "latest issue for yarn in 2024",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "issue for item code A12001392",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "issue for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "issue for issue number 737",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "what was issued for A12001392",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "what were the issues for yarn",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "what was issued for yarn",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "how many qty received in last one year?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "how many qty received?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "is material mouse received?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "Today received material names and qty?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "when was received?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "GRN for supplier 800967 in 2025",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "grn for item code C02000094",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "grn for supplier code 800967",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "grn for order number 800151",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "grn for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "grn summary for supplier code 800967",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "grn for supplier 800967",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "grn for order 800151",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "item master for item code A12001392",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "material_lookup"
+  },
+  {
+   "question": "item details for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "material_lookup"
+  },
+  {
+   "question": "list out material approval pending at Store officer?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "list out material hold  at Store officer?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "last month placed material MRS Nos?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "mouse is placed in last month MRS?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "Mrs rejected reason?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "What is status of last month placed MRS?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "pending MRS for keyboard in 2026",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 5,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "approved MRS for keyboard",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "Item name scanner what is the lattest MRS no",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "MRS details for MRS number 890330",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "MRS due for keyboard in 2026",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "MRS due in 2026",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "MRS for department EDP",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "MRS for unit B-Unit",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "MRS linked with order number 800151",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "rejected MRS for keyboard",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "pending MRS for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "pending MRS for item code A14700167",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "issue for indent number 0",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "indent for item code A12001392",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "indent for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "indent for indent number 5241",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "indent for department electrical",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "pending mrs for keyboard",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "pending MRS for keyboards",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "pending MRS for keyboards in stores",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "show indent 5241",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "show indent for department stores",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "show camera ip details",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "out_of_scope_admin"
+  },
+  {
+   "question": "vehicle movement details for supplier 800967",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "out_of_scope_admin"
+  },
+  {
+   "question": "current attendance for empcode 165224 on 20260212",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "show current attendance for empcode 165224",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "show department authentication for empcode 165224",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "arunkumar what is his today shift in time",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "show employees in stores department",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "employee details for production",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "employee details for empcode 165224",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "staff details for empcode 165224",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "show employee 165224",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "show staff 165224",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "who is empcode 165224",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "out_of_scope_hr"
+  },
+  {
+   "question": "Last 3 purchase qty purchase of the item Keyboard",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 62,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last supply of mouse",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 44,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Last purchase qty purchase of the item Keyboard",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 38,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Last 3 purchase details of \"dell system\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 33,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "first supply from supplier Prime compu systems",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 30,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Last 3 purchase details of \"MONITOR\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 17,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Last 5 purchase qty of \"BARCODE SCANNER\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 17,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "material mouse last purchased rate?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 10,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "pending order  list",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 10,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"dell\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 9,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"hp system\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 9,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last supply from supplier Prime compu systems",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 9,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "material mouse last purchased date?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 8,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "What is the price of mouse?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 8,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "mouse last purchased supplier name?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 8,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "THE GALAXY last supply",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 8,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "how many qty in receipt pending?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "list out order pending material names?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "list who is given highest rate and who is given lowest rate?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "which material cost is high in last month?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Who is given lowest price in last one year?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "PRIME COMPU system what they have supplied",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Which supplier is given lowest price?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Which supplier is taken highest orders?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"dell system\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 5,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"barcode scanner\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"computer\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"hp laser\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"monitor\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"PRINTER\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"scanner\" latest purchase order no?",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "Last 5 purchase details of \"dell system\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase rate of barcode scanner in 2026",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "latest purchase rate of printer toner in 2026",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "pending order for the  user arunkumar",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "latest purchase order for supplier 800967 in 2026",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last one year purchase rate of key board",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase rate of the  computer monitor",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase rate of the  computer monitor and keyboard",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase rate of the  monitor",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last year purchase of keyboard",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "list all purchase rate of monitor",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "pending PO for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "pending PO for item code C02000094",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "purchase order for item code C02000094",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "keyboard last purchase date",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase date for keyboard",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "when was keyboard last purchased",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last PO date for keyboard",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "keyboard last order date",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase of keyboard by company name",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase of keyboard with supplier name",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "which company supplied keyboard last",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "from which company keyboard was last purchased",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "keyboard latest purchase company name",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "keyboard latest purchase supplier name",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "po summary for supplier code 800967",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "purchase order for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "purchase order for yarn?",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "purchase orders for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "how much yarn did we order",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "purchase order for yarn and cotton",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"THE GALAXY\" last supply",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "barcode chromo label last purchase",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "show purchase order for item code A12001392",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "open purchase orders for supplier 800967",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "po summary for supplier 800967",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "goods receipt note for order number 800151",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "material mouse last purchased rate",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "supplier \"THE GALAXY\" last supply",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "supplier name \"THE GALAXY\"  its last supply",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "supplier \"THE GALAXY\"  its last supply",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "supplier \"THE GALAXY\"'s  its last supply",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "\"THE GALAXY\"   its last supply",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "what did Prime compu systems supply last",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase from THE GALAXY",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "latest purchase from supplier THE GALAXY",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "describe the partymaster table",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "schema_metadata"
+  },
+  {
+   "question": "keyboard stock",
+   "sources": [
+    "question_bank",
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 5,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "\"dell  system\" stock",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "\"dell  systen\" stock",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "dell stock",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "dell system show stock",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show item stock of \"hp printer\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show item stock of \"hp printer\"show item stock of \"hp laser\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show item stock of \"hp printer\"show item stock of \"hp scanner\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show item stock of \"hp printer\"show item stock of \"scanner\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show item stock of \"HP\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show item stock of \"printer\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show item stock of \"scanner\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show stock for yarn",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock of item A12001392",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock for item code A12001392",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock for department electrical",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock for unit A-Unit",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock summary for department electrical",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock summary for unit A-Unit",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock availability for keyboard",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "do we have yarn in stock",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "show stock of yarn in stores",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "how much yarn is in stock",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "stock balance for A12001392",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"barcode label\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 44,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"BARCODE CHROMO LABEL\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 18,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"BARCODE LABLES\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 8,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "cashbank voucher details for party ODUT001",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "document details for party 911378",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "document details for party 911378 in 2012",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "document details for party ODUT001",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "supplier",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"BARCODE CHROMO\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"BARCODE%LAB\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"dell 300\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"dell comp\"",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item dell",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "last supplier of keyboard",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "show supplier GST for dutch blue",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "supplier details for party code ODUT001",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "vendor details for party code ODUT001",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "goods receipt note for supplier code 800967",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "goods receipt for supplier 800967",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "supplier by party code ODUT001",
+   "sources": [
+    "evaluation_questions",
+    "ask_log"
+   ],
+   "occurrences": 2,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "supplier details for ODUT001",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "who is dutch blue",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "show supplier dutch blue gst",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "who is dutch blue gst",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "supplier by gst dutch blue",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "who is dutch blue?",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "supplier details for party ODUT001",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "who is party ODUT001",
+   "sources": [
+    "evaluation_questions"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "WHO are the suppliers for the item \"BARCODE%LABLES\"",
+   "sources": [
+    "ask_log"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "how many materials placed in last month?",
+   "sources": [
+    "question_bank",
+    "user_collected",
+    "ask_log"
+   ],
+   "occurrences": 6,
+   "proposed_family": "unclassified"
+  },
+  {
+   "question": "what is this",
+   "sources": [
+    "question_bank",
+    "ask_log"
+   ],
+   "occurrences": 3,
+   "proposed_family": "unclassified"
+  }
+ ]
+}

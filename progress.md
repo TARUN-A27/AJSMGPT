@@ -70,11 +70,11 @@ what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~92%   built, tested; one known validator gap (fix.md #7)
-LLM layers (3, 6)                          ~65%   QueryPlan stage now passes real questions; SQL gen reached
-Execution + report (8, 9)                  ~60%   built, never run on company Oracle
-Real-question pass rate                   3/47   (6%; 24 are by-design unsupported → 3/23 of in-scope)
-Overall V1                                 ~60%
+Deterministic layers (2, 4, 5, 7)         ~95%   both #7 gaps closed + 6 review findings; fix.md #10 open
+LLM layers (3, 6)                          ~65%   unchanged: the remaining failures are model behaviour (Step 4)
+Execution + report (8, 9)                  ~70%   SQL is now valid for Oracle 11.2; still never run on it
+Real-question pass rate                   2/47   (24 by-design unsupported → 2/23 of in-scope, both executable)
+Overall V1                                 ~70%   remaining: Step 4 (8b vs 14b), Step 5, Step 6 (server), freeze
 ```
 
 ---

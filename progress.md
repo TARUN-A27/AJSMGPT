@@ -16,12 +16,12 @@ Current phase: **V1** (grounded, validated, read-only pipeline). Branch: `featur
 | 4 | Semantic validation | `query_plan_semantic_validator.py` | ✅ done · self-conflict + entity-dimension normalizer fixed 2026-09-22 | 30 |
 | 5 | Deterministic schema grounding | `schema_grounding.py` | ✅ done · 2/47 grounding gaps | 22 |
 | 6 | Qwen grounded SQL generation | `grounded_sql_generator.py` | ✅ built · 3 real questions reach it and pass validation | 15 |
-| 7 | Static SQL validation | `grounded_sql_validator.py`, `sql_safety.py`, `sql_datatype_validator.py` | ✅ done · ⚠️ gap: aggregate without GROUP BY accepted (fix.md #7) | 49 + 17 |
-| 8 | Read-only Oracle execution | `nlp_execution.py`, `oracle_client.py` | ✅ built · never run against company server | 22 |
+| 7 | Static SQL validation | `grounded_sql_validator.py`, `sql_safety.py`, `sql_datatype_validator.py` | ✅ done · GROUP BY both ways, half-open date binds, no model-written row limit (fix.md #7, #8, #9) | 46 + 20 |
+| 8 | Read-only Oracle execution | `nlp_execution.py`, `oracle_client.py` | ✅ built · 11g `ROWNUM` wrapper + `'YYYYMMDD'` date binds; never run against company server | 33 |
 | 9 | Business report | `answer_formatter.py` | ✅ built · unverified on real results | — |
 | — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ | 2 (supported accept / unsupported reject) |
 
-Core V1 suites (11): 263/263 (2026-09-22).
+Core V1 suites (11): 278/278 (2026-09-22, after the Oracle-executability fixes and the independent review).
 
 ### API endpoints (`app/nlp_router.py`)
 | Endpoint | Status |
@@ -35,26 +35,38 @@ Core V1 suites (11): 263/263 (2026-09-22).
 ### Verified business coverage (`app/resources/v1_query_capabilities.json`)
 | Family | Domains | Operations | Concepts | Status |
 |---|---|---|---|---|
-| purchase_orders | purchase | detail, aggregate, ranking | 8 | ✅ supported |
+| purchase_orders | purchase | detail, aggregate, ranking | 9 | ✅ supported |
 | mrs | mrs | detail, aggregate, ranking | 4 | ✅ supported (no `lookup`) |
-| consumption | consumption / issue | detail, aggregate, ranking | 5 | ✅ supported |
+| consumption | consumption / issue | detail, aggregate, ranking | 6 | ✅ supported |
 | supplier_lookup | purchase, supplier_lookup | lookup | 3 | ✅ supported |
 | material_lookup | purchase, material_lookup | lookup | 3 | ✅ supported |
 | stock | stock, inventory | — | 0 | ❌ unsupported |
 | grn | goods receipt | — | 0 | ❌ unsupported |
 
-Catalog: 5 domains · 24 concepts · 3 relationships.
+Catalog: 5 domains · 26 concepts · 3 relationships (`purchase_rate`, `consumption_rate` added 2026-09-22 from the schema study).
 
 ### Real-question evaluation (47 questions)
 ```text
-PASS_PIPELINE                 3   ← first end-to-end passes (2026-09-22); stub runner, 0 Oracle
-UNSUPPORTED_EXPECTED         24   (by design; now routed before semantic checks)
-ENTITY_RESOLUTION_REJECTION   8   (7 = value not in offline fixture; 1 model error)
-CAPABILITY_FAILURE            6   (mrs lookup/unknown operation)
-QUERY_PLAN_FAILURE            3   (was 20; all remaining are model behaviour)
-GROUNDING_FAILURE             3   (cost, rate, order-pending — catalog gaps)
+                              2026-09-22 (a)   2026-09-22 (b)
+PASS_PIPELINE                        3               2
+UNSUPPORTED_EXPECTED                24              23
+ENTITY_RESOLUTION_REJECTION          8              10
+CAPABILITY_FAILURE                   6               5
+QUERY_PLAN_FAILURE                   3               4
+GROUNDING_FAILURE                    3               2
+SQL_VALIDATION_FAILURE               0               1
+SQL_GENERATION / ENVIRONMENT         0               0
 ```
-Honest read: **3 real questions now run end to end** (grounded join, entity bind, FETCH FIRST). 20 → 3 QueryPlan failures came from fixing our own validator, not the model. But 2 of the 3 passing SQLs would fail in Oracle (aggregate without GROUP BY — fix.md #7): the static validator has a gap only real input could show.
+(a) = after Step 3; (b) = after the Oracle-executability fixes (3b, P1–P4). Both offline, stub runner, 0 Oracle calls.
+
+Honest read: the count went 3 → 2 and the quality went up. In (a), 2 of the 3 passing SQLs used `SUM(QTY)` beside
+`ORDERDATE` with no `GROUP BY` (ORA-00937) and all 3 used `FETCH FIRST` with DATE binds — none of them would have
+returned a row on the company database. In (b) both passes are executable as written: `ROWNUM` wrapper applied by
+code, `'YYYYMMDD'` string binds, entity bound as one equality. The lost pass is `Last purchase qty ... Keyboard`,
+where the model dropped the material filter entirely — the validator caught it, which is the correct outcome.
+`rate` no longer fails at grounding (P3); the remaining grounding failures are order-pending (P6) and a
+cross-domain date-alias collision (fix.md #10). Model behaviour is now the dominant failure mode, which is exactly
+what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text

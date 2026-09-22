@@ -69,11 +69,16 @@ Order of work — do not skip ahead:
 ```text
 1. Recover the 20 raw Qwen3:8b QueryPlan outputs        ✅
 2. Classify every failure (model / prompt / contract / ontology)  ✅ fix.md #6
-3. Fix only the proven bottleneck                       ✅ (fix.md #7 follow-up open)
-   3b. Close fix.md #7 (aggregate without GROUP BY)      ← next
-4. Controlled Qwen3:8b vs Qwen3:14b comparison
+3. Fix only the proven bottleneck                       ✅
+   3b. Close fix.md #7 (aggregate without GROUP BY)      ✅ commit 088b908
+   P1. Row limits: 11g ROWNUM wrapper, model writes none ✅ commit 088b908
+   P2. Dates: deterministic 'YYYYMMDD' half-open binds   ✅ commit 088b908
+   P3. Catalog: purchase/consumption rate, cost aliases  ✅ commit 0a11c17
+   P4. Entity resolution on real master data             ✅ commit 7816149
+4. Controlled Qwen3:8b vs Qwen3:14b comparison           ← next
 5. Re-run acceptance
 6. Connect company Oracle server, validate real results
+   (needs: branch pushed to origin + DBA SELECT-only account — docs/ORACLE_READONLY_ACCOUNT.md)
 7. Freeze V1
 ```
 Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign.
@@ -82,15 +87,19 @@ Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture red
 Detail and fix plan per item: `fix.md`.
 47-question real evaluation (`scripts/v1_real_question_eval_results.json`):
 ```text
-PASS_PIPELINE                 3   ← first end-to-end passes 2026-09-22 (stub runner); 2 of 3 SQLs need fix.md #7
-UNSUPPORTED_EXPECTED         24   ← by design
-ENTITY_RESOLUTION_REJECTION   8   ← 7 offline-fixture gaps, 1 model error
-CAPABILITY_FAILURE            6   ← mrs lookup/unknown operation
-QUERY_PLAN_FAILURE            3   ← all model behaviour (fix.md #6)
-GROUNDING_FAILURE             3   ← cost / rate / order-pending not catalogued
-SQL_GENERATION / SQL_VALIDATION / ENVIRONMENT  0
+UNSUPPORTED_EXPECTED         23   ← by design
+ENTITY_RESOLUTION_REJECTION  10   ← values absent from the offline fixture (recheck on real master data)
+CAPABILITY_FAILURE            5   ← mrs lookup/unknown operation
+QUERY_PLAN_FAILURE            4   ← all model behaviour (low confidence, undeclared sort field)
+PASS_PIPELINE                 2   ← both now executable on Oracle 11.2 (ROWNUM wrapper, 'YYYYMMDD' binds)
+GROUNDING_FAILURE             2   ← order-pending (P6), cross-domain date alias collision (fix.md #10)
+SQL_VALIDATION_FAILURE        1   ← model omitted the entity filter; correct rejection
+SQL_GENERATION / ENVIRONMENT  0
 ```
-The 20 → 3 QueryPlan drop came from fixing our own semantic validator, not the model. The 3 that remain are model behaviour and are the real input to Step 4.
+Re-run 2026-09-22 after the Oracle-executability fixes (offline, stub runner, 0 Oracle calls). Count moved 3 → 2 but
+quality went up: before, 2 of the 3 passing SQLs would have raised ORA-00937 and all 3 would have failed on
+`FETCH FIRST` and DATE binds. Both current passes are executable as written. The QueryPlan failures are model
+behaviour and are the real input to Step 4.
 
 ## 7. Test commands
 Tests are `unittest` scripts. Run the one for the component you changed:
@@ -98,7 +107,7 @@ Tests are `unittest` scripts. Run the one for the component you changed:
 python scripts/test_<component>.py
 ```
 Core V1 suites: `test_text_correction`, `test_spacy_nlp`, `test_query_plan_extractor`, `test_query_plan_semantic_validator`, `test_schema_grounding`, `test_grounded_sql_generator`, `test_grounded_sql_validator`, `test_sql_datatype_validator`, `test_nlp_execution`, `test_v1_acceptance_matrix`.
-Baseline: 11 core suites 263/263 (2026-09-22).
+Baseline: 11 core suites 278/278 (2026-09-22).
 
 ## 8. Evaluation commands
 ```bash

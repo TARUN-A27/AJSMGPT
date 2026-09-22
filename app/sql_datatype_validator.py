@@ -202,7 +202,7 @@ def validate_sql_datatypes(sql: str, binds: Mapping[str, Any] | None = None) -> 
         if not category:
             continue
 
-        if category in (NUMERIC, DATE_CAT, TIMESTAMP_CAT):
+        if category in (NUMERIC, DATE_CAT, DATE_TEXT_CAT, TIMESTAMP_CAT):
             raise ValueError(
                 f"Invalid LIKE comparison: {owner}.{table}.{column} is {category}. "
                 f"LIKE can be used only on text columns."
@@ -267,7 +267,12 @@ def _validate_bind_datatypes(sql: str, alias_map: dict, binds: Mapping[str, Any]
     literal value that a best-effort skip could safely fall back on.
     """
     seen: set[tuple[str, str]] = set()
-    column_pattern = re.compile(r"\b([A-Z][A-Z0-9_]*)\.([A-Z][A-Z0-9_]*)\b", re.IGNORECASE)
+    # The optional leading qualifier keeps a fully qualified reference
+    # (INVENTORY.PURCHASEORDER.ORDERDATE) from being consumed as
+    # schema.table, which would skip the column's bind check entirely.
+    column_pattern = re.compile(
+        r"\b([A-Z][A-Z0-9_]*(?:\.[A-Z][A-Z0-9_]*)?)\.([A-Z][A-Z0-9_]*)\b", re.IGNORECASE
+    )
     for match in column_pattern.finditer(sql):
         alias = _normalize(match.group(1))
         column = _normalize(match.group(2))

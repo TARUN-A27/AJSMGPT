@@ -412,10 +412,16 @@ _RELATIVE_UNITS = r"(months?|days?|years?)"
 
 
 def relative_date_spec(text: str) -> tuple[str, int] | None:
-    """Parse 'last 6 months' / 'past 30 days' / 'last year' -> (unit, count)."""
+    """Parse 'last 6 months' / 'past 30 days' / 'last year' -> (unit, count).
+
+    Without the last/past/previous anchor the quantity is only accepted when it
+    is the WHOLE text ('6 months'). A bare search would read '6 months' out of
+    'the 6 months ending March 2025' or '3 days before Diwali' and answer a
+    different question than the one asked; returning None instead fails the
+    query closed, which is this layer's job."""
     match = re.search(
         rf"\b(?:last|past|previous)\s+(\d+|{'|'.join(_NUMBER_WORDS)})\s+{_RELATIVE_UNITS}\b", text, re.IGNORECASE
-    ) or re.search(rf"\b(\d+|{'|'.join(_NUMBER_WORDS)})\s+{_RELATIVE_UNITS}\b", text, re.IGNORECASE)
+    ) or re.fullmatch(rf"\s*(\d+|{'|'.join(_NUMBER_WORDS)})\s+{_RELATIVE_UNITS}\s*", text, re.IGNORECASE)
     if match:
         number = match.group(1).lower()
         count = int(number) if number.isdigit() else _NUMBER_WORDS[number]

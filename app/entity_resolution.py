@@ -199,7 +199,11 @@ def oracle_entity_lookup(source: VerifiedEntitySource, normalized_value: str) ->
     from app.oracle_client import run_safe_select  # local import: no Oracle dependency for offline tests
 
     identifier_column = "PARTYCODE" if source.table == "SCM.PARTYMASTER" else "ITEM_CODE"
-    select_list = f"{identifier_column}, {source.column}" + (f", {source.detail_column}" if source.detail_column else "")
+    # The display column IS the identifier for a code-shaped source; projecting
+    # the same name twice makes the inline view run_safe_select wraps this in
+    # (SELECT * FROM (...) WHERE ROWNUM <= n) ambiguous -- ORA-00918.
+    display_column = source.column if source.column != identifier_column else f"{source.column} AS DISPLAY_VALUE"
+    select_list = f"{identifier_column}, {display_column}" + (f", {source.detail_column}" if source.detail_column else "")
     sql = (
         f"SELECT {select_list} FROM {source.table} "
         f"WHERE UPPER(TRIM(REGEXP_REPLACE({source.column}, '[[:space:]]+', ' '))) = :normalized_value"

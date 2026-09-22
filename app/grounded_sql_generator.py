@@ -70,6 +70,8 @@ named placeholder (<grounded column> = :<name>); never omit it, never test it wi
 different operator, and never leave it out because it seems implied by a join.
 Never write a row limit of any kind (no FETCH FIRST, OFFSET, ROWNUM, or LIMIT): the system applies the
 plan's limit after validation. Express "last N" purely as ORDER BY on the date column.
+When the SELECT list aggregates, GROUP BY must list exactly the non-aggregated selected
+expressions -- no column that is not selected, and none of the selected ones left out.
 Never invent a status meaning, join, table, column, date conversion, or business rule.
 For each entry in grounding.compound_conditions, the WHERE clause must combine exactly
 those listed columns using exactly the given combinator (AND/OR); never use a different

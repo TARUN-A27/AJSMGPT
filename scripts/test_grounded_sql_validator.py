@@ -329,6 +329,36 @@ GROUP BY items.ITEM_NAME"""
             "GROUP BY pm.PARTYNAME", ""
         ), GroundedSqlSemanticError)
 
+    def test_rejects_aggregate_hidden_inside_an_allowed_function(self) -> None:
+        # ROUND(SUM(...)) aggregates exactly as SUM(...) does. Detecting only
+        # an outermost aggregate switched the whole ORA-00937 rule off for the
+        # one wrapper a model is most likely to write (review, 2026-09-22).
+        plan = purchase_ranking_plan()
+        grounding = ground_query_plan(plan)
+        rounded = PURCHASE_RANKING_SQL.replace(
+            "SELECT pm.PARTYNAME AS supplier, SUM(po.NET) AS total_purchase_value",
+            "SELECT pm.PARTYNAME AS supplier, po.ORDERDATE, ROUND(SUM(po.NET), 2) AS total_purchase_value",
+        )
+        with self.assertRaisesRegex(GroundedSqlSemanticError, "GROUP BY"):
+            validate_grounded_sql(rounded, plan, grounding)
+        # ... and the same wrapper with a matching GROUP BY stays valid.
+        validate_grounded_sql(
+            PURCHASE_RANKING_SQL.replace("SUM(po.NET) AS total_purchase_value",
+                                         "ROUND(SUM(po.NET), 2) AS total_purchase_value"),
+            plan, grounding,
+        )
+
+    def test_rejects_group_by_column_the_select_list_does_not_return(self) -> None:
+        # Valid Oracle, silently wrong answer: GROUP BY supplier, ORDERDATE
+        # returns one row per supplier per DAY, which the report then presents
+        # as the top suppliers (review, 2026-09-22).
+        plan = purchase_ranking_plan()
+        with self.assertRaisesRegex(GroundedSqlSemanticError, "grain"):
+            validate_grounded_sql(
+                PURCHASE_RANKING_SQL.replace("GROUP BY pm.PARTYNAME", "GROUP BY pm.PARTYNAME, po.ORDERDATE"),
+                plan, ground_query_plan(plan),
+            )
+
     def test_rejects_aggregate_beside_ungrouped_column(self) -> None:
         # fix.md #7: the first real end-to-end pass produced
         # `SELECT ORDERDATE, SUM(QTY) ... ORDER BY ORDERDATE` with no GROUP BY --

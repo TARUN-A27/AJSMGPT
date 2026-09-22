@@ -62,6 +62,27 @@ class OfflineDatatypeValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "DATE_TEXT"):
             dv.validate_sql_datatypes(DATE_SQL, {"date_from": "2026-01-01", "date_to": "2026-12-31"})
 
+    def test_fully_qualified_date_column_still_rejects_a_python_date_bind(self) -> None:
+        # The bind scan used to consume INVENTORY.PURCHASEORDER as schema.table
+        # and never see .ORDERDATE, so the guard silently did not run on the
+        # fully qualified spelling the SQL validator explicitly supports.
+        sql = (
+            "SELECT INVENTORY.PURCHASEORDER.NET FROM INVENTORY.PURCHASEORDER "
+            "WHERE INVENTORY.PURCHASEORDER.ORDERDATE >= :date_from "
+            "AND INVENTORY.PURCHASEORDER.ORDERDATE < :date_to"
+        )
+        with self.assertRaisesRegex(ValueError, "DATE_TEXT"):
+            dv.validate_sql_datatypes(sql, {"date_from": date(2026, 1, 1), "date_to": date(2026, 12, 31)})
+        dv.validate_sql_datatypes(sql, {"date_from": "20260101", "date_to": "20261231"})
+
+    def test_like_on_a_date_text_column_is_rejected(self) -> None:
+        # A YYYYMMDD column is text, so LIKE '2026%' is legal SQL -- and an
+        # unbounded date filter the half-open bind rule never sees.
+        with self.assertRaisesRegex(ValueError, "LIKE"):
+            dv.validate_sql_datatypes(
+                "SELECT po.NET FROM INVENTORY.PURCHASEORDER po WHERE po.ORDERDATE LIKE '2026%'"
+            )
+
     def test_invalid_text_to_numeric_bind(self) -> None:
         with self.assertRaises(ValueError):
             dv.validate_sql_datatypes(QTY_SQL, {"qty": "not-a-number"})

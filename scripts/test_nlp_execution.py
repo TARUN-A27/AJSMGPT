@@ -19,8 +19,10 @@ from app.nlp_execution import (
     ReportType,
     UnsupportedResultValueError,
     _normalise_result,
+    build_bind_parameters,
     date_bounds,
     execute_nlp_query,
+    relative_date_spec,
 )
 from app.query_plan import (
     Aggregation,
@@ -604,9 +606,28 @@ WHERE po.ORDERDATE >= :start_date AND po.ORDERDATE < :end_date"""
         self.assertEqual(date_bounds(exclusive), ("20250102", "20260101"))
 
     def test_date_binds_are_yyyymmdd_strings_never_python_dates(self) -> None:
-        for value in date_bounds(DateRange(kind=DateRangeKind.ABSOLUTE, start="2025-01-01", end="2025-12-31")):
+        # Asserted on what the runner would actually receive, not on
+        # date_bounds' own return: a Python date here is ORA-01861 on the
+        # company database (business dates are VARCHAR2(8) text).
+        plan = ranking_plan("last 6 months")
+        sql = ranking_sql("last 6 months")
+        binds = build_bind_parameters(sql, plan, ground_query_plan(plan), today=date(2026, 9, 22))
+        date_binds = {name: value for name, value in binds.items() if name.startswith("date_")}
+        self.assertEqual(set(date_binds), {"date_start", "date_end"})
+        for value in date_binds.values():
             self.assertIsInstance(value, str)
             self.assertRegex(value, r"^\d{8}$")
+
+    def test_quantity_inside_a_longer_phrase_is_not_a_relative_range(self) -> None:
+        # "the 6 months ending March 2025" is not "the last 6 months": an
+        # unanchored search would answer a different question than the one
+        # asked. Fail closed instead (review finding, 2026-09-22).
+        for text in ("the 6 months ending March 2025", "in the first 3 months of 2025", "3 days before diwali"):
+            self.assertIsNone(relative_date_spec(text), text)
+            with self.assertRaises(ParameterBindingError):
+                date_bounds(DateRange(kind=DateRangeKind.RELATIVE, original_text=text), today=date(2026, 9, 22))
+        self.assertEqual(relative_date_spec("last 6 months"), ("months", 6))
+        self.assertEqual(relative_date_spec("6 months"), ("months", 6))
 
     def test_unparsed_relative_range_executes_zero_times(self) -> None:
         plan = ranking_plan("recently")

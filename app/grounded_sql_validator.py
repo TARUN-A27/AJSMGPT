@@ -480,26 +480,49 @@ def _validate_measures_and_grouping(
         raise GroundedSqlSemanticError("; ".join(violations))
 
 
-_AGGREGATE_CALL_RE = re.compile(r"^\s*(?:SUM|COUNT|AVG|MIN|MAX)\s*\(", re.IGNORECASE)
-_TRAILING_ALIAS_RE = re.compile(r"\s+(?:AS\s+)?[A-Z_][A-Z0-9_$#]*\s*$", re.IGNORECASE)
+# Matches an aggregate call ANYWHERE in a select item, not only as its
+# outermost call: ROUND(SUM(po.NET), 2) aggregates just as SUM(po.NET) does,
+# and anchoring here would switch the whole ORA-00937 rule off for it.
+_AGGREGATE_CALL_RE = re.compile(r"\b(?:SUM|COUNT|AVG|MIN|MAX)\s*\(", re.IGNORECASE)
+# The trailing token is an alias only when it does not belong to a qualified
+# reference: "PM . PARTYNAME" (the spaced form _column_pattern accepts) ends in
+# a column name, not an alias.
+_TRAILING_ALIAS_RE = re.compile(r"(?<!\.)\s+(?:AS\s+)?[A-Z_][A-Z0-9_$#]*\s*$", re.IGNORECASE)
+
+
+def _squash(fragment: str) -> str:
+    return re.sub(r"\s+", "", fragment).upper()
 
 
 def _aggregate_grouping_violations(select_part: str, group_part: str) -> list[str]:
     """Oracle rule (ORA-00937): once the SELECT list aggregates, every other
     selected expression must be in GROUP BY. Checked on the SQL text itself,
     independent of the plan, so a plan/prompt mistake cannot smuggle an
-    unexecutable statement past validation."""
+    unexecutable statement past validation.
+
+    The reverse direction is checked too, and is not an Oracle rule but a
+    correctness one: GROUP BY a column the SELECT list does not return is valid
+    SQL that silently changes the grain of the answer (one row per supplier per
+    ORDER DATE presented as one row per supplier), so it fails closed here."""
     items = _split_sql_list(select_part)
-    if not any(_AGGREGATE_CALL_RE.match(item) for item in items):
+    if not any(_AGGREGATE_CALL_RE.search(item) for item in items):
         return []
-    grouped = {re.sub(r"\s+", "", item).upper() for item in _split_sql_list(group_part)}
+    grouped = {_squash(item): item.strip() for item in _split_sql_list(group_part)}
     violations = []
+    selected_plain: set[str] = set()
     for item in items:
-        if _AGGREGATE_CALL_RE.match(item):
+        if _AGGREGATE_CALL_RE.search(item):
             continue
         expression = _TRAILING_ALIAS_RE.sub("", item).strip()
-        if re.sub(r"\s+", "", expression).upper() not in grouped:
+        selected_plain.add(_squash(expression))
+        if _squash(expression) not in grouped:
             violations.append(f"Aggregate SELECT requires every non-aggregated column in GROUP BY: {expression}.")
+    for key, original in grouped.items():
+        if key not in selected_plain:
+            violations.append(
+                f"GROUP BY must not add a column the SELECT list does not return, "
+                f"it changes the grain of the answer: {original}."
+            )
     return violations
 
 

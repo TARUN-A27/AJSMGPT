@@ -164,6 +164,27 @@ class EntityResolutionTests(unittest.TestCase):
             self.assertEqual(source.scope, "")
             self.assertEqual(source.detail_column, "OBSOLETE")
 
+    def test_code_lookup_never_projects_one_column_name_twice(self) -> None:
+        # For a code-shaped source the identifier IS the display column.
+        # run_safe_select wraps every statement in SELECT * FROM (...) WHERE
+        # ROWNUM <= n, and an inline view with two columns of the same name is
+        # ORA-00918 -- every code lookup would fail on the live database.
+        from unittest.mock import patch
+        from app.entity_resolution import _VERIFIED_SOURCES, oracle_entity_lookup
+        captured = {}
+
+        def fake_run_safe_select(sql, binds):
+            captured["sql"] = sql
+            return {"rows": [("100001", "100001", "0")]}
+
+        for concept in ("item_identifier", "supplier_identifier"):
+            with patch("app.oracle_client.run_safe_select", fake_run_safe_select):
+                rows = oracle_entity_lookup(_VERIFIED_SOURCES[concept][0], "100001")
+            select_list = captured["sql"].split(" FROM ")[0][len("SELECT "):]
+            names = [item.strip().split()[-1] for item in select_list.split(",")]
+            self.assertEqual(len(names), len(set(names)), captured["sql"])
+            self.assertEqual(rows[0][0], "100001")
+
     def test_duplicate_item_name_with_two_codes_is_ambiguous(self) -> None:
         # 407 ITEM_NAMEs are shared by more than one ITEM_CODE in the live
         # master: same name, two materials -> the name cannot pick one.

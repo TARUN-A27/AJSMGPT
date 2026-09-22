@@ -368,12 +368,14 @@ class NLPExecutionTests(unittest.TestCase):
                 candidates=["ABC Textiles", "ABC Trading Co"],
             ),
         ]})
-        with self.assertRaises(ExecutionRejectedError):
+        with self.assertRaises(ExecutionRejectedError) as ctx:
             execute_nlp_query(
                 plan.original_question,
                 dependencies=dependencies(plan, "SELECT 1 FROM DUAL", runner, resolve_entities=resolve_entities),
             )
         self.assertEqual(runner.calls, [])
+        # P4: the clarification names the verified candidates so the user can pick.
+        self.assertIn("Candidates: ABC Textiles; ABC Trading Co.", "; ".join(ctx.exception.response.ambiguities))
 
     def test_resolver_output_overrides_a_model_claimed_resolved_entity(self) -> None:
         # extract_plan hands back an entity the model itself already marked

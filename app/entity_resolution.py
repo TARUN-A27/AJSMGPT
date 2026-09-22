@@ -52,6 +52,14 @@ class VerifiedEntitySource:
     table: str
     column: str
     value_shape: str  # "text" or "code" -- see _select_source
+    # Fixed, catalog-derived SQL predicate narrowing the master rows this
+    # concept may match (never user or model text). Suppliers are the parties
+    # the ERP's own INVENTORY.SUPPLIER view selects: GOODSTYPECODE = 2
+    # (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1).
+    scope: str = ""
+    # Optional flag column returned with each row so an AMBIGUOUS candidate
+    # can say "(obsolete)"; INVITEMS.OBSOLETE = 1 on 29% of items.
+    detail_column: str | None = None
 
 
 # The ONLY tables/columns entity resolution may ever query, taken directly
@@ -61,15 +69,16 @@ class VerifiedEntitySource:
 # INVENTORY.INVITEMS). Qwen only ever supplies a `concept` string chosen
 # from the catalog's own alias vocabulary -- it is looked up here, never
 # interpreted as SQL, a table name, or a column name.
+_SUPPLIER_SCOPE = "GOODSTYPECODE = 2"
 _VERIFIED_SOURCES: dict[str, tuple[VerifiedEntitySource, ...]] = {
     "supplier": (
-        VerifiedEntitySource("SCM.PARTYMASTER", "PARTYCODE", "code"),
-        VerifiedEntitySource("SCM.PARTYMASTER", "PARTYNAME", "text"),
+        VerifiedEntitySource("SCM.PARTYMASTER", "PARTYCODE", "code", _SUPPLIER_SCOPE),
+        VerifiedEntitySource("SCM.PARTYMASTER", "PARTYNAME", "text", _SUPPLIER_SCOPE),
     ),
-    "supplier_name": (VerifiedEntitySource("SCM.PARTYMASTER", "PARTYNAME", "text"),),
-    "supplier_identifier": (VerifiedEntitySource("SCM.PARTYMASTER", "PARTYCODE", "code"),),
-    "material": (VerifiedEntitySource("INVENTORY.INVITEMS", "ITEM_NAME", "text"),),
-    "item_identifier": (VerifiedEntitySource("INVENTORY.INVITEMS", "ITEM_CODE", "code"),),
+    "supplier_name": (VerifiedEntitySource("SCM.PARTYMASTER", "PARTYNAME", "text", _SUPPLIER_SCOPE),),
+    "supplier_identifier": (VerifiedEntitySource("SCM.PARTYMASTER", "PARTYCODE", "code", _SUPPLIER_SCOPE),),
+    "material": (VerifiedEntitySource("INVENTORY.INVITEMS", "ITEM_NAME", "text", "", "OBSOLETE"),),
+    "item_identifier": (VerifiedEntitySource("INVENTORY.INVITEMS", "ITEM_CODE", "code", "", "OBSOLETE"),),
 }
 
 _CODE_SHAPE = re.compile(r"^\d+$")
@@ -106,7 +115,7 @@ def _select_source(concept: str, value: str) -> VerifiedEntitySource | None:
     return sources[-1]
 
 
-EntityLookup = Callable[[VerifiedEntitySource, str], Sequence[tuple[str, str]]]
+EntityLookup = Callable[[VerifiedEntitySource, str], Sequence[tuple]]
 """(source, normalized_value) -> matching (code, display_value) rows.
 
 Contract: return every verified row whose `source.column` value, once
@@ -140,20 +149,31 @@ def resolve_entity(entity: EntityReference, lookup: EntityLookup) -> EntityRefer
     except Exception as exc:
         raise EntityLookupError(f"Verified lookup failed for concept '{entity.concept}'.") from exc
 
-    distinct_values = list(dict.fromkeys(display for _code, display in rows))
-    if not distinct_values:
+    # One verified row per CODE: two items sharing one name are two
+    # materials (407 duplicated ITEM_NAMEs in the live master), so the name
+    # alone cannot pick one of them.
+    by_code: dict[str, tuple[str, object]] = {}
+    for row in rows:
+        code, display = str(row[0]), str(row[1])
+        detail = row[2] if len(row) > 2 else None
+        by_code.setdefault(code, (display, detail))
+    if not by_code:
         return entity.model_copy(update={"status": EntityStatus.UNRESOLVED, "selected_value": None, "candidates": []})
-    if len(distinct_values) == 1:
+    if len(by_code) == 1:
+        (display, _detail), = by_code.values()
         return entity.model_copy(update={
             "status": EntityStatus.RESOLVED,
-            "selected_value": distinct_values[0],
+            "selected_value": display,
             "normalized_value": normalized,
             "candidates": [],
         })
     return entity.model_copy(update={
         "status": EntityStatus.AMBIGUOUS,
         "selected_value": None,
-        "candidates": distinct_values,
+        "candidates": [
+            f"{display} [{code}]" + (" (obsolete)" if str(detail) == "1" else "")
+            for code, (display, detail) in by_code.items()
+        ],
     })
 
 
@@ -179,9 +199,11 @@ def oracle_entity_lookup(source: VerifiedEntitySource, normalized_value: str) ->
     from app.oracle_client import run_safe_select  # local import: no Oracle dependency for offline tests
 
     identifier_column = "PARTYCODE" if source.table == "SCM.PARTYMASTER" else "ITEM_CODE"
+    select_list = f"{identifier_column}, {source.column}" + (f", {source.detail_column}" if source.detail_column else "")
     sql = (
-        f"SELECT {identifier_column}, {source.column} FROM {source.table} "
+        f"SELECT {select_list} FROM {source.table} "
         f"WHERE UPPER(TRIM(REGEXP_REPLACE({source.column}, '[[:space:]]+', ' '))) = :normalized_value"
+        + (f" AND {source.scope}" if source.scope else "")
     )
     result = run_safe_select(sql, {"normalized_value": normalized_value})
-    return [(str(row[0]), str(row[1])) for row in result["rows"]]
+    return [tuple(str(value) if value is not None else None for value in row) for row in result["rows"]]

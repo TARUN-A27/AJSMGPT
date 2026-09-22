@@ -735,6 +735,7 @@ def execute_nlp_query(
     ambiguities = [item.reason for item in plan.ambiguities if item.blocking]
     unresolved = [
         f"Entity '{item.concept}' requires verified resolution before execution."
+        + (f" Candidates: {'; '.join(item.candidates)}." if item.status is EntityStatus.AMBIGUOUS and item.candidates else "")
         for item in plan.entities
         if item.status in {EntityStatus.UNRESOLVED, EntityStatus.AMBIGUOUS}
     ]

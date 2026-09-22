@@ -33,9 +33,9 @@ def fake_lookup(table_rows: dict[tuple[str, str], list[tuple[str, str]]]):
 
     def lookup(source: VerifiedEntitySource, normalized_value: str):
         rows = table_rows.get((source.table, source.column), [])
-        if source.value_shape == "code":
-            return [(code, name) for code, name in rows if _normalize(code) == normalized_value]
-        return [(code, name) for code, name in rows if _normalize(name) == normalized_value]
+        # rows are (code, name) or (code, name, detail) -- returned as-is
+        index = 0 if source.value_shape == "code" else 1
+        return [row for row in rows if _normalize(row[index]) == normalized_value]
 
     return lookup
 
@@ -141,6 +141,42 @@ class EntityResolutionTests(unittest.TestCase):
         resolved = resolve_entity(entity("material", "MONITOR"), fake_lookup(rows))
         self.assertEqual(resolved.status, EntityStatus.AMBIGUOUS)
         self.assertEqual(len(resolved.candidates), 2)
+
+    # -- live master-data facts (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md) -----
+
+    def test_supplier_lookup_is_scoped_to_goodstypecode_2(self) -> None:
+        # The ERP's own INVENTORY.SUPPLIER view is PARTYMASTER WHERE
+        # GOODSTYPECODE = 2; PARTYMASTER also holds ~11.5k customers/others.
+        from unittest.mock import patch
+        from app.entity_resolution import _VERIFIED_SOURCES, oracle_entity_lookup
+        captured = {}
+
+        def fake_run_safe_select(sql, binds):
+            captured["sql"], captured["binds"] = sql, binds
+            return {"rows": [("800967", "Prime Compu Systems")]}
+
+        with patch("app.oracle_client.run_safe_select", fake_run_safe_select):
+            rows = oracle_entity_lookup(_VERIFIED_SOURCES["supplier_name"][0], "PRIME COMPU SYSTEMS")
+        self.assertEqual(rows, [("800967", "Prime Compu Systems")])
+        self.assertIn("AND GOODSTYPECODE = 2", captured["sql"])
+        self.assertEqual(captured["binds"], {"normalized_value": "PRIME COMPU SYSTEMS"})
+        for source in _VERIFIED_SOURCES["material"] + _VERIFIED_SOURCES["item_identifier"]:
+            self.assertEqual(source.scope, "")
+            self.assertEqual(source.detail_column, "OBSOLETE")
+
+    def test_duplicate_item_name_with_two_codes_is_ambiguous(self) -> None:
+        # 407 ITEM_NAMEs are shared by more than one ITEM_CODE in the live
+        # master: same name, two materials -> the name cannot pick one.
+        rows = {("INVENTORY.INVITEMS", "ITEM_NAME"): [("IT-020", "KEYBOARD", "0"), ("IT-021", "KEYBOARD", "1")]}
+        resolved = resolve_entity(entity("material", "keyboard"), fake_lookup(rows))
+        self.assertIs(resolved.status, EntityStatus.AMBIGUOUS)
+        self.assertEqual(resolved.candidates, ["KEYBOARD [IT-020]", "KEYBOARD [IT-021] (obsolete)"])
+
+    def test_same_code_returned_twice_is_still_one_match(self) -> None:
+        rows = {("INVENTORY.INVITEMS", "ITEM_NAME"): [("IT-020", "KEYBOARD", "0"), ("IT-020", "KEYBOARD", "0")]}
+        resolved = resolve_entity(entity("material", "keyboard"), fake_lookup(rows))
+        self.assertIs(resolved.status, EntityStatus.RESOLVED)
+        self.assertEqual(resolved.selected_value, "KEYBOARD")
 
     # -- safety -------------------------------------------------------------
 

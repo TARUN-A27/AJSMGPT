@@ -13,9 +13,12 @@ CATALOG_PATH = PROJECT_ROOT / "app" / "resources" / "business_schema_catalog.jso
 NUMERIC = "NUMERIC"
 TEXT = "TEXT"
 DATE_CAT = "DATE"
-
+# A date stored as VARCHAR2(8) 'YYYYMMDD' text (how the company ERP stores
+# ORDERDATE, MRSDATE, ISSUEDATE, ...). Only an 8-digit string may be bound to
+# it: a Python date would be sent as a DATE and fail (ORA-01861) or compare wrongly.
+DATE_TEXT_CAT = "DATE_TEXT"
 TIMESTAMP_CAT = "TIMESTAMP"
-_VALID_CATEGORIES = {TEXT, NUMERIC, DATE_CAT, TIMESTAMP_CAT}
+_VALID_CATEGORIES = {TEXT, NUMERIC, DATE_CAT, DATE_TEXT_CAT, TIMESTAMP_CAT}
 
 # Verified-catalog role -> datatype category, used only as a fallback when a
 # column has no explicit `datatype_category`. Order matters (first match wins).
@@ -175,7 +178,7 @@ def validate_sql_datatypes(sql: str, binds: Mapping[str, Any] | None = None) -> 
                     f"Invalid datatype comparison: {owner}.{table}.{column} is {category} "
                     f"but compared with text {value}."
                 )
-        elif category == DATE_CAT:
+        elif category in (DATE_CAT, DATE_TEXT_CAT):
             if not _is_quoted_text(value) or not _is_date_literal(value):
                 raise ValueError(
                     f"Invalid datatype comparison: {owner}.{table}.{column} is {category} "
@@ -246,6 +249,8 @@ def _value_matches_category(category: str, value: Any) -> bool:
         if isinstance(value, str):
             return _is_date_literal(value)
         return False
+    if category == DATE_TEXT_CAT:
+        return isinstance(value, str) and re.fullmatch(r"\d{8}", value) is not None
     if category == TIMESTAMP_CAT:
         return isinstance(value, datetime)
     if category == TEXT:

@@ -65,7 +65,7 @@ _SQL_KEYWORDS = _ALIAS_STOP_WORDS | {
     "WITH", "RECURSIVE", "SYSDATE", "CURRENT_DATE", "CURRENT_TIMESTAMP", "ROWNUM", "LIMIT",
 }
 _ALLOWED_FUNCTIONS = {
-    "ADD_MONTHS", "AVG", "COUNT", "MAX", "MIN", "ROUND", "SUM", "TRUNC",
+    "AVG", "COUNT", "MAX", "MIN", "ROUND", "SUM",
 }
 # Never added to _ALLOWED_FUNCTIONS: date boundaries are QueryPlan-derived and
 # must always reach SQL as named binds, never as a literal-conversion call.
@@ -83,37 +83,6 @@ class _SqlReferences:
 
 def _normalise_concept(value: str) -> str:
     return " ".join(value.lower().replace("_", " ").replace("-", " ").split())
-
-
-def _relative_date_requirement(query_plan: QueryPlan) -> tuple[str, int] | None:
-    """Return the unit and count encoded by a relative date-range description."""
-    date_range = query_plan.date_range
-    if date_range is None or date_range.kind is not DateRangeKind.RELATIVE:
-        return None
-    text = date_range.original_text or f"{date_range.start or ''} {date_range.end or ''}"
-    match = re.search(
-        r"\b(?:last|past|previous)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|"
-        r"eleven|twelve)\s+(months?|days?)\b",
-        text,
-        re.IGNORECASE,
-    )
-    if not match:
-        match = re.search(
-            r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(months?|days?)\b",
-            text, re.IGNORECASE,
-        )
-    if not match:
-        implicit = re.search(r"\b(?:last|past|previous)\s+(months?|days?)\b", text, re.IGNORECASE)
-        if implicit:
-            return ("months" if implicit.group(1).lower().startswith("month") else "days", 1)
-    if not match:
-        return None
-    number = match.group(1).lower()
-    count = int(number) if number.isdigit() else {
-        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-        "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
-    }[number]
-    return ("months" if match.group(2).lower().startswith("month") else "days", count)
 
 
 def _mask_string_literals(sql: str) -> str:
@@ -192,7 +161,7 @@ def _basic_safety(sql: str) -> str:
     # this is a placeholder, not the unsupported MySQL/Postgres LIMIT clause.
     if re.search(r"(?<!:)\bLIMIT\b", masked, re.IGNORECASE):
         raise OracleDialectGroundedSqlError(
-            "Oracle SQL does not support LIMIT; use FETCH FIRST <N> ROWS ONLY."
+            "Oracle SQL does not support LIMIT; do not write a row limit, the system applies it."
         )
     if re.search(r"\bFOR\s+UPDATE\b", masked, re.IGNORECASE):
         raise UnsafeGroundedSqlError("SELECT FOR UPDATE is not allowed.")
@@ -506,8 +475,32 @@ def _validate_measures_and_grouping(
             for column in columns
         ):
             violations.append(f"Requested output field is missing: {field}.")
+    violations.extend(_aggregate_grouping_violations(select_part, group_part))
     if violations:
         raise GroundedSqlSemanticError("; ".join(violations))
+
+
+_AGGREGATE_CALL_RE = re.compile(r"^\s*(?:SUM|COUNT|AVG|MIN|MAX)\s*\(", re.IGNORECASE)
+_TRAILING_ALIAS_RE = re.compile(r"\s+(?:AS\s+)?[A-Z_][A-Z0-9_$#]*\s*$", re.IGNORECASE)
+
+
+def _aggregate_grouping_violations(select_part: str, group_part: str) -> list[str]:
+    """Oracle rule (ORA-00937): once the SELECT list aggregates, every other
+    selected expression must be in GROUP BY. Checked on the SQL text itself,
+    independent of the plan, so a plan/prompt mistake cannot smuggle an
+    unexecutable statement past validation."""
+    items = _split_sql_list(select_part)
+    if not any(_AGGREGATE_CALL_RE.match(item) for item in items):
+        return []
+    grouped = {re.sub(r"\s+", "", item).upper() for item in _split_sql_list(group_part)}
+    violations = []
+    for item in items:
+        if _AGGREGATE_CALL_RE.match(item):
+            continue
+        expression = _TRAILING_ALIAS_RE.sub("", item).strip()
+        if re.sub(r"\s+", "", expression).upper() not in grouped:
+            violations.append(f"Aggregate SELECT requires every non-aggregated column in GROUP BY: {expression}.")
+    return violations
 
 
 def _validate_sort_limit_and_date(
@@ -589,14 +582,16 @@ def _validate_sort_limit_and_date(
                 f"Required sort field is missing from ORDER BY: {instruction.field_concept}."
             )
 
-    if query_plan.limit is not None:
-        limit = query_plan.limit
-        fetch = re.search(rf"\bFETCH\s+(?:FIRST|NEXT)\s+{limit}\s+ROWS?\s+ONLY\b", masked_sql, re.IGNORECASE)
-        rownum = re.search(rf"\bROWNUM\s*<=?\s*{limit}\b", masked_sql, re.IGNORECASE)
-        if not fetch and not rownum:
-            violations.append(
-                f"Required row limit is missing: use FETCH FIRST {limit} ROWS ONLY."
-            )
+    # The row limit is never the model's to write. Oracle 11.2 (the company
+    # database) has no FETCH FIRST, and ROWNUM only limits correctly around an
+    # ordered subquery, which the one-SELECT rule forbids here. After this
+    # validation passes, deterministic code wraps the statement
+    # (sql_safety.add_oracle_row_limit) using the plan's limit or the service
+    # maximum -- see nlp_execution.add_execution_probe_limit.
+    if re.search(r"\bFETCH\b|\bOFFSET\b|\bROWNUM\b", masked_sql, re.IGNORECASE):
+        violations.append(
+            "Do not write a row limit (FETCH FIRST / OFFSET / ROWNUM); the system applies the requested limit."
+        )
 
     if query_plan.date_range and query_plan.date_range.kind is not DateRangeKind.UNSPECIFIED:
         where_part = _clause(masked_sql, "WHERE", r"\bGROUP\s+BY\b|\bORDER\s+BY\b|\bFETCH\b|\bOFFSET\b")
@@ -610,94 +605,27 @@ def _validate_sort_limit_and_date(
             for column in date_columns
         ):
             violations.append("Required date filter is missing.")
-        if query_plan.date_range.kind is DateRangeKind.RELATIVE:
-            relative_requirement = _relative_date_requirement(query_plan)
-            if relative_requirement and relative_requirement[0] == "months":
-                count = relative_requirement[1]
-                month_filter_valid = False
-                for date_column in date_columns:
-                    for variant in _reference_variants(date_column, references.aliases, unqualified_columns):
-                        column_ref = _column_pattern(variant).pattern
-                        lower = re.search(
-                            rf"{column_ref}\s*>=\s*ADD_MONTHS\s*\(\s*TRUNC\s*\(\s*SYSDATE\s*\)\s*,\s*-\s*{count}\s*\)",
-                            where_part, re.IGNORECASE,
-                        )
-                        upper = re.search(
-                            rf"{column_ref}\s*<\s*TRUNC\s*\(\s*SYSDATE\s*\)\s*\+\s*1\b",
-                            where_part, re.IGNORECASE,
-                        )
-                        if lower and upper:
-                            month_filter_valid = True
-                            break
-                    if month_filter_valid:
-                        break
-                if not month_filter_valid:
-                    violations.append(
-                        f"Month-based relative date filter requires both predicates: "
-                        f"date_column >= ADD_MONTHS(TRUNC(SYSDATE), -{count}) and "
-                        "date_column < TRUNC(SYSDATE) + 1; day approximations, single-month "
-                        "BETWEEN ranges, and incomplete bounds are not allowed."
-                    )
-            elif relative_requirement and relative_requirement[0] == "days":
-                count = relative_requirement[1]
-                day_filter_valid = False
-                for date_column in date_columns:
-                    for variant in _reference_variants(date_column, references.aliases, unqualified_columns):
-                        column_ref = _column_pattern(variant).pattern
-                        lower = re.search(
-                            rf"{column_ref}\s*>=\s*TRUNC\s*\(\s*SYSDATE\s*\)\s*-\s*{count}\b",
-                            where_part, re.IGNORECASE,
-                        )
-                        upper = re.search(
-                            rf"{column_ref}\s*<\s*TRUNC\s*\(\s*SYSDATE\s*\)\s*\+\s*1\b",
-                            where_part, re.IGNORECASE,
-                        )
-                        if lower and upper:
-                            day_filter_valid = True
-                            break
-                    if day_filter_valid:
-                        break
-                if not day_filter_valid:
-                    violations.append(
-                        f"Day-based relative date filter requires both predicates: "
-                        f"date_column >= TRUNC(SYSDATE) - {count} and "
-                        "date_column < TRUNC(SYSDATE) + 1."
-                    )
-            elif not re.search(
-                r"\b(?:SYSDATE|CURRENT_DATE|CURRENT_TIMESTAMP|ADD_MONTHS|TRUNC)\b", where_part, re.IGNORECASE
-            ):
-                violations.append("Relative date filter must use Oracle current-date semantics.")
-        elif query_plan.date_range.kind is DateRangeKind.ABSOLUTE:
-            absolute_filter_valid = False
-            lower_operator = r">=" if query_plan.date_range.inclusive_start else r">(?!\s*=)"
-            upper_operator = r"<=" if query_plan.date_range.inclusive_end else r"<(?!\s*=)"
-            for date_column in date_columns:
-                for variant in _reference_variants(date_column, references.aliases, unqualified_columns):
-                    column_ref = _column_pattern(variant).pattern
-                    between = re.search(
-                        rf"{column_ref}\s+BETWEEN\s+:{_IDENTIFIER}\s+AND\s+:{_IDENTIFIER}",
-                        where_part,
-                        re.IGNORECASE,
-                    ) if query_plan.date_range.inclusive_start and query_plan.date_range.inclusive_end else None
-                    lower = re.search(
-                        rf"{column_ref}\s*{lower_operator}\s*:{_IDENTIFIER}",
-                        where_part,
-                        re.IGNORECASE,
-                    )
-                    upper = re.search(
-                        rf"{column_ref}\s*{upper_operator}\s*:{_IDENTIFIER}",
-                        where_part,
-                        re.IGNORECASE,
-                    )
-                    if between or (lower and upper):
-                        absolute_filter_valid = True
-                        break
-                if absolute_filter_valid:
-                    break
-            if not absolute_filter_valid:
-                violations.append(
-                    "Absolute date filters require named start and end binds on the grounded date column."
-                )
+        # Every date range -- relative or absolute -- is two half-open binds
+        # computed by nlp_execution.date_bounds; the model writes no date
+        # arithmetic. The company database stores these columns as
+        # VARCHAR2(8) 'YYYYMMDD', so SYSDATE math would not even be valid.
+        if re.search(r"\b(?:SYSDATE|CURRENT_DATE|CURRENT_TIMESTAMP|SYSTIMESTAMP)\b", masked_sql, re.IGNORECASE):
+            violations.append("Date filters never use SYSDATE arithmetic; use the two named date binds.")
+        bounded = False
+        for date_column in date_columns:
+            for variant in _reference_variants(date_column, references.aliases, unqualified_columns):
+                column_ref = _column_pattern(variant).pattern
+                if re.search(rf"{column_ref}\s+BETWEEN\b", where_part, re.IGNORECASE):
+                    violations.append("Date filters use >= :date_start AND < :date_end, never BETWEEN.")
+                lower = re.search(rf"{column_ref}\s*>=\s*:({_IDENTIFIER})", where_part, re.IGNORECASE)
+                upper = re.search(rf"{column_ref}\s*<(?!\s*=)\s*:({_IDENTIFIER})", where_part, re.IGNORECASE)
+                if lower and upper and lower.group(1).upper() != upper.group(1).upper():
+                    bounded = True
+        if date_columns and not bounded:
+            violations.append(
+                "Date filter requires exactly date_column >= :date_start AND date_column < :date_end "
+                "with two distinct named binds."
+            )
     if violations:
         raise GroundedSqlSemanticError("; ".join(violations))
 
@@ -906,11 +834,6 @@ def _validate_entity_binds(
             )
 
     numeric_scan = where_part
-    relative = _relative_date_requirement(query_plan)
-    if relative:
-        count = relative[1]
-        numeric_scan = re.sub(rf"-\s*{count}\b", "", numeric_scan)
-        numeric_scan = re.sub(r"\+\s*1\b", "", numeric_scan)
     unqualified_for_scan = _unqualified_column_map(grounding, references)
     for condition in grounding.compound_conditions:
         # A compound condition's comparison values are fixed, catalog-declared

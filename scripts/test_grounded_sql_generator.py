@@ -59,7 +59,7 @@ class GroundedSqlGeneratorTests(unittest.TestCase):
         self.assertIn("SCM.PARTYMASTER", prompt)
         self.assertIn("required_output_display_columns", prompt)
         self.assertIn("join_identifier_columns_not_output_substitutes", prompt)
-        self.assertIn("FETCH FIRST N ROWS ONLY", calls[0][0])
+        self.assertIn("Never write a row limit", calls[0][0])
         self.assertIn("assumptions must always be an empty list", calls[0][0])
         self.assertNotIn("multi_schema_metadata", prompt)
         self.assertNotIn("evaluation", prompt.lower())
@@ -90,7 +90,8 @@ class GroundedSqlGeneratorTests(unittest.TestCase):
     def test_correction_receives_all_violations_and_fixes_them(self) -> None:
         invalid_sql = """SELECT po.SUP_CODE AS supplier, SUM(po.NET) AS value
 FROM INVENTORY.PURCHASEORDER po
-WHERE po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -6)
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
 GROUP BY po.SUP_CODE
 ORDER BY value DESC
 LIMIT 10"""
@@ -111,11 +112,14 @@ LIMIT 10"""
         self.assertIn("Assumptions must be empty", correction)
         self.assertIn("Oracle SQL does not support LIMIT", correction)
         self.assertIn("PARTYNAME", correction)
-        self.assertIn("FETCH FIRST 10 ROWS ONLY", correction)
+        self.assertIn("do not write a row limit", correction)
 
-    def test_month_date_correction_prompt_requires_calendar_month_logic(self) -> None:
+    def test_date_correction_prompt_requires_bind_bounds(self) -> None:
+        # Model wrote SYSDATE arithmetic (invalid: the company DB stores dates
+        # as 'YYYYMMDD' text); the correction must point at the bind shape.
         invalid_sql = PURCHASE_RANKING_SQL.replace(
-            "ADD_MONTHS(TRUNC(SYSDATE), -6)", "TRUNC(SYSDATE - 182.5)"
+            "po.ORDERDATE >= :date_start\nAND po.ORDERDATE < :date_end",
+            "po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -6)\nAND po.ORDERDATE < TRUNC(SYSDATE) + 1",
         )
         replies = iter((response(invalid_sql), response(PURCHASE_RANKING_SQL)))
         prompts: list[str] = []
@@ -127,22 +131,8 @@ LIMIT 10"""
         result = generate_grounded_sql(self.plan, self.grounding, model_call=model_call)
         self.assertEqual(result.sql, PURCHASE_RANKING_SQL)
         self.assertEqual(len(prompts), 2)
-        self.assertIn("ADD_MONTHS(TRUNC(SYSDATE), -6)", prompts[1])
-        self.assertIn("TRUNC(SYSDATE) + 1", prompts[1])
-
-    def test_day_date_correction_prompt_requires_two_predicates(self) -> None:
-        plan = self.plan.model_copy(update={"date_range": self.plan.date_range.model_copy(update={"original_text": "last 30 days"})})
-        grounding = ground_query_plan(plan)
-        invalid_sql = PURCHASE_RANKING_SQL.replace("ADD_MONTHS(TRUNC(SYSDATE), -6)", "TRUNC(SYSDATE) - 30").replace("AND po.ORDERDATE < TRUNC(SYSDATE) + 1", "")
-        corrected_sql = PURCHASE_RANKING_SQL.replace("ADD_MONTHS(TRUNC(SYSDATE), -6)", "TRUNC(SYSDATE) - 30")
-        replies = iter((response(invalid_sql), response(corrected_sql)))
-        prompts: list[str] = []
-        def model_call(_system: str, user: str) -> str:
-            prompts.append(user)
-            return next(replies)
-        generate_grounded_sql(plan, grounding, model_call=model_call)
-        self.assertIn("TRUNC(SYSDATE) - N", prompts[1])
-        self.assertIn("TRUNC(SYSDATE) + 1", prompts[1])
+        self.assertRegex(prompts[1], "SYSDATE|Unsupported SQL function")
+        self.assertIn(":date_start", prompts[1])
 
     def test_two_invalid_responses_fail_safely(self) -> None:
         model_call = Mock(return_value=response("SELECT * FROM INVENTORY.PURCHASEORDER"))
@@ -270,14 +260,14 @@ class Phase9bSqlGenerationRegressionTests(unittest.TestCase):
             "SELECT INVENTORY.PURCHASEORDER.ORDERDATE, INVENTORY.INVITEMS.ITEM_NAME "
             "FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS "
             "ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE "
-            "ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC FETCH FIRST 1 ROWS ONLY"
+            "ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC"
         )
         good_sql = (
             "SELECT INVENTORY.PURCHASEORDER.ORDERDATE, INVENTORY.INVITEMS.ITEM_NAME "
             "FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS "
             "ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE "
             "WHERE INVENTORY.INVITEMS.ITEM_NAME = :material "
-            "ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC FETCH FIRST 1 ROWS ONLY"
+            "ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC"
         )
         plan = material_last_purchase_supplier_name_plan()
         grounding = ground_query_plan(plan)
@@ -304,7 +294,8 @@ class Phase9bSqlGenerationRegressionTests(unittest.TestCase):
         good_sql = (
             "SELECT INVENTORY.PURCHASEORDER.ORDERDATE FROM INVENTORY.PURCHASEORDER "
             "WHERE INVENTORY.PURCHASEORDER.SUP_CODE = :supplier "
-            "AND INVENTORY.PURCHASEORDER.ORDERDATE BETWEEN :date_start AND :date_end "
+            "AND INVENTORY.PURCHASEORDER.ORDERDATE >= :date_start "
+            "AND INVENTORY.PURCHASEORDER.ORDERDATE < :date_end "
             "ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC"
         )
         plan = supplier_absolute_date_plan()
@@ -327,14 +318,13 @@ class Phase9bSqlGenerationRegressionTests(unittest.TestCase):
             "SELECT INVENTORY.PURCHASEORDER.ITEM_CODE, INVENTORY.PURCHASEORDER.QTY "
             "FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS "
             "ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE "
-            "ORDER BY INVENTORY.PURCHASEORDER.ITEM_CODE FETCH FIRST 5 ROWS ONLY"
+            "ORDER BY INVENTORY.PURCHASEORDER.ITEM_CODE"
         )
         good_sql = (
             "SELECT INVENTORY.PURCHASEORDER.ITEM_CODE, INVENTORY.PURCHASEORDER.QTY "
             "FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS "
             "ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE "
-            "WHERE INVENTORY.INVITEMS.ITEM_NAME = :material "
-            "FETCH FIRST 5 ROWS ONLY"
+            "WHERE INVENTORY.INVITEMS.ITEM_NAME = :material"
         )
         plan = material_qty_limit_plan()
         grounding = ground_query_plan(plan)
@@ -360,8 +350,9 @@ class Phase9bSqlGenerationRegressionTests(unittest.TestCase):
         generate_grounded_sql(purchase_ranking_plan(), ground_query_plan(purchase_ranking_plan()), model_call=model_call)
         system_prompt = calls[0][0]
         self.assertIn("exactly one equality comparison", system_prompt)
-        self.assertIn("never a bind parameter for the row count", system_prompt)
-        self.assertIn("never use TO_DATE", system_prompt)
+        self.assertIn("Never write a row limit of any kind", system_prompt)
+        self.assertIn("TO_DATE", system_prompt)
+        self.assertIn(":date_start AND date_column < :date_end", system_prompt)
 
     def test_absolute_date_guidance_reaches_the_prompt(self) -> None:
         plan = supplier_absolute_date_plan()
@@ -373,14 +364,15 @@ class Phase9bSqlGenerationRegressionTests(unittest.TestCase):
             return response(
                 "SELECT INVENTORY.PURCHASEORDER.ORDERDATE FROM INVENTORY.PURCHASEORDER "
                 "WHERE INVENTORY.PURCHASEORDER.SUP_CODE = :supplier "
-                "AND INVENTORY.PURCHASEORDER.ORDERDATE BETWEEN :date_start AND :date_end "
+                "AND INVENTORY.PURCHASEORDER.ORDERDATE >= :date_start "
+            "AND INVENTORY.PURCHASEORDER.ORDERDATE < :date_end "
                 "ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC"
             )
 
         generate_grounded_sql(plan, grounding, model_call=model_call)
         prompt = calls[0][1]
-        self.assertIn("Absolute date range requires two named bind placeholders", prompt)
-        self.assertIn("Never TO_DATE", prompt)
+        self.assertIn("date_column >= :date_start AND date_column < :date_end", prompt)
+        self.assertIn("TO_DATE", prompt)
 
 
 if __name__ == "__main__":

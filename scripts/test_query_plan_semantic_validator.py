@@ -132,6 +132,22 @@ class QueryPlanSemanticValidatorTests(unittest.TestCase):
         with self.assertRaisesRegex(QueryPlanSemanticValidationError, "requires a grouping dimension"):
             validate_query_plan_semantics(aggregate)
 
+    def test_detail_operation_rejects_aggregated_measure(self) -> None:
+        # fix.md #7: "Last 5 purchase qty of X" came back as operation=detail
+        # with aggregation=sum, which the SQL generator faithfully turned into
+        # SUM(QTY) without a GROUP BY.
+        detail = plan(
+            original_question="Last 5 purchase qty of barcode scanner",
+            operation="detail",
+            measures=[{"concept": "quantity", "aggregation": "sum"}],
+            dimensions=[],
+            sorting=[{"field_concept": "purchase date", "direction": "desc", "priority": 0}],
+            limit=5,
+            requested_output={"fields": ["quantity"]},
+        )
+        with self.assertRaisesRegex(QueryPlanSemanticValidationError, "aggregation none"):
+            validate_query_plan_semantics(detail)
+
     def test_valid_detail_plan_is_allowed(self) -> None:
         detail = plan(
             original_question="Show purchase details",

@@ -33,11 +33,10 @@ PURCHASE_RANKING_SQL = """
 SELECT pm.PARTYNAME AS supplier, SUM(po.NET) AS total_purchase_value
 FROM INVENTORY.PURCHASEORDER po
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
-WHERE po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -6)
-AND po.ORDERDATE < TRUNC(SYSDATE) + 1
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
 GROUP BY pm.PARTYNAME
 ORDER BY total_purchase_value DESC
-FETCH FIRST 10 ROWS ONLY
 """.strip()
 
 FULLY_QUALIFIED_PURCHASE_RANKING_SQL = """
@@ -46,10 +45,10 @@ SUM(INVENTORY.PURCHASEORDER.NET) AS value
 FROM INVENTORY.PURCHASEORDER
 JOIN SCM.PARTYMASTER
 ON INVENTORY.PURCHASEORDER.SUP_CODE = SCM.PARTYMASTER.PARTYCODE
-WHERE INVENTORY.PURCHASEORDER.ORDERDATE BETWEEN :start_date AND :end_date
+WHERE INVENTORY.PURCHASEORDER.ORDERDATE >= :date_start
+AND INVENTORY.PURCHASEORDER.ORDERDATE < :date_end
 GROUP BY SCM.PARTYMASTER.PARTYNAME
 ORDER BY value DESC
-FETCH FIRST 10 ROWS ONLY
 """.strip()
 
 
@@ -89,80 +88,48 @@ class GroundedSqlValidatorTests(unittest.TestCase):
     def test_valid_purchase_ranking_sql(self) -> None:
         validate_grounded_sql(PURCHASE_RANKING_SQL, self.plan, self.grounding)
 
-    def test_last_six_months_accepts_calendar_month_boundary(self) -> None:
-        validate_grounded_sql(PURCHASE_RANKING_SQL, self.plan, self.grounding)
+    # -- date ranges: two half-open binds, values computed by nlp_execution.date_bounds --
+    # The company Oracle stores business dates as VARCHAR2(8) 'YYYYMMDD'
+    # (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §5); SYSDATE arithmetic against
+    # them raises ORA-01861, so the model must never write it.
 
-    def test_last_six_months_rejects_single_month_between(self) -> None:
-        sql = PURCHASE_RANKING_SQL.replace(
+    def test_relative_date_requires_half_open_bind_bounds(self) -> None:
+        for period in ("last six months", "last 1 month", "last month", "last 30 days"):
+            plan = self.plan.model_copy(update={
+                "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text=period)
+            })
+            grounding = ground_query_plan(plan)
+            validate_grounded_sql(PURCHASE_RANKING_SQL, plan, grounding)
+        for broken in (
+            "po.ORDERDATE >= :date_start",                                  # upper bound missing
+            "po.ORDERDATE >= :date_start\nAND po.ORDERDATE <= :date_end",   # inclusive upper bound
+            "po.ORDERDATE >= :date_start\nAND po.ORDERDATE < :date_start",  # same bind twice
+        ):
+            sql = PURCHASE_RANKING_SQL.replace("po.ORDERDATE >= :date_start\nAND po.ORDERDATE < :date_end", broken)
+            with self.assertRaisesRegex(GroundedSqlSemanticError, "date_column >= :date_start AND date_column < :date_end"):
+                validate_grounded_sql(sql, self.plan, self.grounding)
+
+    def test_date_filter_rejects_sysdate_math(self) -> None:
+        for expression in (
             "po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -6)\nAND po.ORDERDATE < TRUNC(SYSDATE) + 1",
-            "po.ORDERDATE BETWEEN ADD_MONTHS(TRUNC(SYSDATE), -6) AND ADD_MONTHS(TRUNC(SYSDATE), -5)",
-        )
-        with self.assertRaises(GroundedSqlSemanticError):
-            validate_grounded_sql(sql, self.plan, self.grounding)
+            "po.ORDERDATE >= TRUNC(SYSDATE) - 30\nAND po.ORDERDATE < TRUNC(SYSDATE) + 1",
+            "po.ORDERDATE >= SYSDATE - 180\nAND po.ORDERDATE < :date_end",
+        ):
+            sql = PURCHASE_RANKING_SQL.replace("po.ORDERDATE >= :date_start\nAND po.ORDERDATE < :date_end", expression)
+            with self.assertRaises(GroundedSqlValidationError) as ctx:
+                validate_grounded_sql(sql, self.plan, self.grounding)
+            self.assertRegex(str(ctx.exception), "SYSDATE|Unsupported SQL function")
 
-    def test_last_one_month_accepts_calendar_month_boundary(self) -> None:
-        plan = self.plan.model_copy(update={
-            "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text="last 1 month")
-        })
+    def test_absolute_date_requires_half_open_bind_bounds(self) -> None:
+        plan = absolute_purchase_ranking_plan()
         grounding = ground_query_plan(plan)
-        sql = PURCHASE_RANKING_SQL.replace("-6", "-1")
-        validate_grounded_sql(sql, plan, grounding)
-
-    def test_last_month_rejects_wrong_month_count(self) -> None:
-        plan = self.plan.model_copy(update={
-            "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text="last month")
-        })
-        grounding = ground_query_plan(plan)
-        with self.assertRaises(GroundedSqlSemanticError):
-            validate_grounded_sql(PURCHASE_RANKING_SQL, plan, grounding)
-
-    def test_last_thirty_days_remains_day_based(self) -> None:
-        plan = self.plan.model_copy(update={
-            "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text="last 30 days")
-        })
-        grounding = ground_query_plan(plan)
-        sql = PURCHASE_RANKING_SQL.replace(
-            "ADD_MONTHS(TRUNC(SYSDATE), -6)", "TRUNC(SYSDATE) - 30"
+        validate_grounded_sql(FULLY_QUALIFIED_PURCHASE_RANKING_SQL, plan, grounding)
+        between = FULLY_QUALIFIED_PURCHASE_RANKING_SQL.replace(
+            "INVENTORY.PURCHASEORDER.ORDERDATE >= :date_start\nAND INVENTORY.PURCHASEORDER.ORDERDATE < :date_end",
+            "INVENTORY.PURCHASEORDER.ORDERDATE BETWEEN :date_start AND :date_end",
         )
-        validate_grounded_sql(sql, plan, grounding)
-
-    def test_last_thirty_days_accepts_redundant_generic_date_filter(self) -> None:
-        plan = self.plan.model_copy(update={
-            "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text="last 30 days"),
-            "filters": [QueryFilter(
-                concept="date",
-                operator=FilterOperator.GREATER_THAN,
-                value="30 days ago",
-                value_type="date",
-            )],
-        })
-        grounding = ground_query_plan(plan)
-        sql = PURCHASE_RANKING_SQL.replace(
-            "ADD_MONTHS(TRUNC(SYSDATE), -6)", "TRUNC(SYSDATE) - 30"
-        )
-        validate_grounded_sql(sql, plan, grounding)
-
-    def test_last_thirty_days_rejects_month_logic(self) -> None:
-        plan = self.plan.model_copy(update={
-            "date_range": DateRange(kind=DateRangeKind.RELATIVE, original_text="last 30 days")
-        })
-        grounding = ground_query_plan(plan)
-        with self.assertRaisesRegex(GroundedSqlSemanticError, "TRUNC\\(SYSDATE\\) - 30"):
-            validate_grounded_sql(PURCHASE_RANKING_SQL, plan, grounding)
-
-    def test_month_range_rejects_fractional_day_approximation(self) -> None:
-        sql = PURCHASE_RANKING_SQL.replace(
-            "ADD_MONTHS(TRUNC(SYSDATE), -6)", "TRUNC(SYSDATE - 182.5)"
-        )
-        with self.assertRaisesRegex(GroundedSqlSemanticError, "ADD_MONTHS\(TRUNC\(SYSDATE\), -6\)"):
-            validate_grounded_sql(sql, self.plan, self.grounding)
-
-    def test_month_range_rejects_integer_day_approximation(self) -> None:
-        sql = PURCHASE_RANKING_SQL.replace(
-            "ADD_MONTHS(TRUNC(SYSDATE), -6)", "SYSDATE - 180"
-        )
-        with self.assertRaisesRegex(GroundedSqlSemanticError, "day approximations"):
-            validate_grounded_sql(sql, self.plan, self.grounding)
+        with self.assertRaisesRegex(GroundedSqlSemanticError, "never BETWEEN"):
+            validate_grounded_sql(between, plan, grounding)
 
     def test_corrected_fully_qualified_supplier_ranking_sql_passes(self) -> None:
         plan = absolute_purchase_ranking_plan()
@@ -175,10 +142,10 @@ class GroundedSqlValidatorTests(unittest.TestCase):
         sql = """SELECT pm.PARTYNAME AS supplier, SUM(po.NET) AS value
 FROM INVENTORY.PURCHASEORDER po
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
-WHERE po.ORDERDATE BETWEEN :start_date AND :end_date
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
 GROUP BY pm.PARTYNAME
-ORDER BY value DESC
-FETCH FIRST 10 ROWS ONLY"""
+ORDER BY value DESC"""
         validate_grounded_sql(sql, plan, grounding)
 
     def test_unique_unqualified_columns_pass(self) -> None:
@@ -187,10 +154,10 @@ FETCH FIRST 10 ROWS ONLY"""
         sql = """SELECT PARTYNAME AS supplier, SUM(NET) AS value
 FROM INVENTORY.PURCHASEORDER
 JOIN SCM.PARTYMASTER ON SUP_CODE = PARTYCODE
-WHERE ORDERDATE BETWEEN :start_date AND :end_date
+WHERE ORDERDATE >= :date_start
+AND ORDERDATE < :date_end
 GROUP BY PARTYNAME
-ORDER BY value DESC
-FETCH FIRST 10 ROWS ONLY"""
+ORDER BY value DESC"""
         validate_grounded_sql(sql, plan, grounding)
 
     def test_valid_supplier_code_does_not_require_master_display(self) -> None:
@@ -214,10 +181,10 @@ GROUP BY po.SUP_CODE"""
     def test_supplier_code_cannot_replace_requested_supplier_display(self) -> None:
         sql = """SELECT po.SUP_CODE AS supplier, SUM(po.NET) AS value
 FROM INVENTORY.PURCHASEORDER po
-WHERE po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -6)
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
 GROUP BY po.SUP_CODE
-ORDER BY value DESC
-FETCH FIRST 10 ROWS ONLY"""
+ORDER BY value DESC"""
         with self.assertRaisesRegex(GroundedSqlSemanticError, "PARTYNAME"):
             validate_grounded_sql(sql, self.plan, self.grounding)
 
@@ -294,8 +261,8 @@ GROUP BY m.DEPT_CODE"""
         sql = """SELECT items.ITEM_NAME, SUM(issue.QTY) AS issued_quantity
 FROM INVENTORY.ISSUE issue
 JOIN INVENTORY.INVITEMS items ON issue.CODE = items.ITEM_CODE
-WHERE issue.ISSUEDATE >= ADD_MONTHS(TRUNC(SYSDATE), -1)
-AND issue.ISSUEDATE < TRUNC(SYSDATE) + 1
+WHERE issue.ISSUEDATE >= :date_start
+AND issue.ISSUEDATE < :date_end
 GROUP BY items.ITEM_NAME"""
         validate_grounded_sql(sql, plan, grounding)
 
@@ -362,15 +329,46 @@ GROUP BY items.ITEM_NAME"""
             "GROUP BY pm.PARTYNAME", ""
         ), GroundedSqlSemanticError)
 
+    def test_rejects_aggregate_beside_ungrouped_column(self) -> None:
+        # fix.md #7: the first real end-to-end pass produced
+        # `SELECT ORDERDATE, SUM(QTY) ... ORDER BY ORDERDATE` with no GROUP BY --
+        # Oracle raises ORA-00937. The check is on the SQL text, independent of
+        # the plan, so any plan/prompt mistake still fails closed here.
+        plan = QueryPlan(
+            original_question="purchase quantity by supplier in the last six months",
+            domain="purchase",
+            operation="aggregate",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase quantity", aggregation=Aggregation.SUM)],
+            dimensions=[Dimension(concept="supplier", grouping=True)],
+            date_range=DateRange(kind=DateRangeKind.RELATIVE, original_text="last six months"),
+            requested_output=RequestedOutput(fields=["supplier", "purchase quantity"]),
+            confidence=0.9,
+        )
+        grounding = ground_query_plan(plan)
+        grouped = """SELECT pm.PARTYNAME AS supplier, po.ORDERDATE, SUM(po.QTY) AS purchase_quantity
+FROM INVENTORY.PURCHASEORDER po
+JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
+GROUP BY pm.PARTYNAME, po.ORDERDATE"""
+        validate_grounded_sql(grouped, plan, grounding)
+        with self.assertRaisesRegex(GroundedSqlSemanticError, "non-aggregated column in GROUP BY: po.ORDERDATE"):
+            validate_grounded_sql(grouped.replace("GROUP BY pm.PARTYNAME, po.ORDERDATE", "GROUP BY pm.PARTYNAME"), plan, grounding)
+
     def test_rejects_missing_date_filter(self) -> None:
         self.assert_rejected(PURCHASE_RANKING_SQL.replace(
-            "WHERE po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -6)", ""
+            "WHERE po.ORDERDATE >= :date_start\nAND po.ORDERDATE < :date_end", ""
         ), GroundedSqlSemanticError)
 
-    def test_rejects_missing_limit(self) -> None:
-        self.assert_rejected(PURCHASE_RANKING_SQL.replace(
-            "FETCH FIRST 10 ROWS ONLY", ""
-        ), GroundedSqlSemanticError)
+    def test_rejects_model_supplied_limit_syntax(self) -> None:
+        # The company Oracle is 11.2 (no FETCH FIRST) and ROWNUM only limits
+        # correctly around an ordered subquery. The model must not write any
+        # limit; nlp_execution.add_execution_probe_limit wraps the validated
+        # SQL with ROWNUM afterwards.
+        for suffix in ("\nFETCH FIRST 10 ROWS ONLY", "\nOFFSET 5 ROWS", "\nAND ROWNUM <= 10"):
+            with self.assertRaisesRegex(GroundedSqlSemanticError, "Do not write a row limit"):
+                validate_grounded_sql(PURCHASE_RANKING_SQL + suffix, self.plan, self.grounding)
 
     def test_rejects_sort_direction_attached_to_wrong_field(self) -> None:
         sql = PURCHASE_RANKING_SQL.replace(
@@ -381,17 +379,15 @@ GROUP BY items.ITEM_NAME"""
             validate_grounded_sql(sql, self.plan, self.grounding)
 
     def test_rejects_nested_select_limit_as_outer_limit(self) -> None:
-        sql = "WITH unused_rows AS (SELECT po.NET FROM INVENTORY.PURCHASEORDER po FETCH FIRST 10 ROWS ONLY) " + PURCHASE_RANKING_SQL.replace(
-            "FETCH FIRST 10 ROWS ONLY", ""
-        )
+        sql = "WITH unused_rows AS (SELECT po.NET FROM INVENTORY.PURCHASEORDER po) " + PURCHASE_RANKING_SQL
         with self.assertRaises(UnsafeGroundedSqlError):
             validate_grounded_sql(sql, self.plan, self.grounding)
 
     def test_rejects_limit_with_oracle_specific_error(self) -> None:
-        sql = PURCHASE_RANKING_SQL.replace("FETCH FIRST 10 ROWS ONLY", "LIMIT 10")
+        sql = PURCHASE_RANKING_SQL + "\nLIMIT 10"
         with self.assertRaisesRegex(
             OracleDialectGroundedSqlError,
-            r"Oracle SQL does not support LIMIT; use FETCH FIRST <N> ROWS ONLY",
+            r"Oracle SQL does not support LIMIT; do not write a row limit",
         ):
             validate_grounded_sql(sql, self.plan, self.grounding)
 
@@ -440,7 +436,7 @@ WHERE po.SUP_CODE = :supplier OR po.SUP_CODE LIKE 'ABC%'"""
         # A bind literally named `:limit` must not be mistaken for the
         # unsupported MySQL/Postgres LIMIT clause; it should still be
         # rejected, but for the real reason (no literal row count present).
-        sql = PURCHASE_RANKING_SQL.replace("FETCH FIRST 10 ROWS ONLY", "FETCH FIRST :limit ROWS ONLY")
+        sql = PURCHASE_RANKING_SQL + "\nFETCH FIRST :limit ROWS ONLY"
         try:
             validate_grounded_sql(sql, self.plan, self.grounding)
             self.fail("Expected a rejection for the missing literal row limit.")
@@ -452,7 +448,7 @@ WHERE po.SUP_CODE = :supplier OR po.SUP_CODE LIKE 'ABC%'"""
     def test_real_limit_clause_is_still_rejected_next_to_a_limit_named_bind(self) -> None:
         # Guards against a regression that disables the LIMIT check entirely
         # instead of just excluding bind-name matches.
-        sql = PURCHASE_RANKING_SQL.replace("FETCH FIRST 10 ROWS ONLY", "LIMIT :limit")
+        sql = PURCHASE_RANKING_SQL + "\nLIMIT :limit"
         with self.assertRaisesRegex(
             OracleDialectGroundedSqlError, "Oracle SQL does not support LIMIT",
         ):
@@ -462,7 +458,7 @@ WHERE po.SUP_CODE = :supplier OR po.SUP_CODE LIKE 'ABC%'"""
         plan = absolute_purchase_ranking_plan()
         grounding = ground_query_plan(plan)
         sql = FULLY_QUALIFIED_PURCHASE_RANKING_SQL.replace(
-            "BETWEEN :start_date AND :end_date",
+            ">= :date_start",
             ">= TO_DATE('2025-01-01', 'YYYY-MM-DD')",
         )
         with self.assertRaisesRegex(UnsafeGroundedSqlError, "named bind parameters"):

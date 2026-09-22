@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from app import nlp_router
 from app.grounded_sql_generator import GroundedSqlResult
+from app.grounded_sql_validator import GroundedSqlValidationError
 from app.nlp_execution import (
     ExecutionRejectedError,
     ExecutionResultError,
@@ -18,6 +19,7 @@ from app.nlp_execution import (
     ReportType,
     UnsupportedResultValueError,
     _normalise_result,
+    date_bounds,
     execute_nlp_query,
 )
 from app.query_plan import (
@@ -70,19 +72,14 @@ def ranking_plan(period: str = "last 30 days") -> QueryPlan:
 
 
 def ranking_sql(period: str = "last 30 days") -> str:
-    lower = (
-        "po.ORDERDATE >= TRUNC(SYSDATE) - 30"
-        if period == "last 30 days"
-        else "po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -6)"
-    )
-    return f"""SELECT pm.PARTYNAME AS supplier, SUM(po.NET) AS total_purchase_value
+    # Date bounds are two binds; nlp_execution.date_bounds supplies 'YYYYMMDD' values.
+    return """SELECT pm.PARTYNAME AS supplier, SUM(po.NET) AS total_purchase_value
 FROM INVENTORY.PURCHASEORDER po
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
-WHERE {lower}
-AND po.ORDERDATE < TRUNC(SYSDATE) + 1
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
 GROUP BY pm.PARTYNAME
-ORDER BY total_purchase_value DESC
-FETCH FIRST 10 ROWS ONLY"""
+ORDER BY total_purchase_value DESC"""
 
 
 def preview(sql: str) -> GroundedSqlResult:
@@ -129,7 +126,10 @@ class NLPExecutionTests(unittest.TestCase):
         self.assertEqual(result.report_type, ReportType.RANKING)
         self.assertEqual(result.rows, [["ACME", "12.50"]])
         self.assertEqual(result.selected_fields, ["supplier", "total_purchase_value"])
-        self.assertIn("TRUNC(SYSDATE) - 30", runner.calls[0][0])
+        binds = runner.calls[0][1]
+        self.assertRegex(binds["date_start"], r"^\d{8}$")
+        self.assertRegex(binds["date_end"], r"^\d{8}$")
+        self.assertLess(binds["date_start"], binds["date_end"])
 
     def test_six_month_predicate_executes_once(self) -> None:
         plan = ranking_plan("last 6 months")
@@ -139,8 +139,8 @@ class NLPExecutionTests(unittest.TestCase):
             dependencies=dependencies(plan, ranking_sql("last 6 months"), runner),
         )
         self.assertEqual(len(runner.calls), 1)
-        self.assertIn("ADD_MONTHS(TRUNC(SYSDATE), -6)", runner.calls[0][0])
-        self.assertIn("ORDERDATE < TRUNC(SYSDATE) + 1", runner.calls[0][0])
+        self.assertNotIn("SYSDATE", runner.calls[0][0])
+        self.assertEqual(sorted(runner.calls[0][1]), ["date_end", "date_start"])
 
     def test_aggregate_report_states_returned_value(self) -> None:
         plan = QueryPlan(
@@ -224,9 +224,31 @@ class NLPExecutionTests(unittest.TestCase):
             max_rows=2,
         )
         self.assertEqual(len(runner.calls), 1)
-        self.assertIn("FETCH FIRST 3 ROWS ONLY", runner.calls[0][0])
+        self.assertIn("WHERE ROWNUM <= 3", runner.calls[0][0])
         self.assertEqual(result.rows, [[1], [2]])
         self.assertTrue(result.truncated)
+
+    def test_runner_receives_validated_sql_wrapped_only_by_rownum(self) -> None:
+        # P1: the model's SQL is validated as written; the only thing added
+        # before execution is the deterministic ROWNUM wrapper carrying the
+        # plan's own limit (Oracle 11.2 has no FETCH FIRST).
+        plan = ranking_plan()
+        runner = RecordingRunner()
+        execute_nlp_query(plan.original_question, dependencies=dependencies(plan, ranking_sql(), runner))
+        executed = " ".join(runner.calls[0][0].split())
+        self.assertIn(" ".join(ranking_sql().split()), executed)
+        self.assertRegex(executed, r"(?i)^SELECT \* FROM \( SELECT .* \) WHERE ROWNUM <= 10$")
+        self.assertNotIn("FETCH", executed)
+
+    def test_model_limit_syntax_executes_zero_times(self) -> None:
+        plan = ranking_plan()
+        runner = RecordingRunner()
+        with self.assertRaises(GroundedSqlValidationError):
+            execute_nlp_query(
+                plan.original_question,
+                dependencies=dependencies(plan, ranking_sql() + "\nFETCH FIRST 10 ROWS ONLY", runner),
+            )
+        self.assertEqual(runner.calls, [])
 
     def test_clarification_and_rejected_grounding_execute_zero_times(self) -> None:
         ambiguous = ranking_plan().model_copy(update={
@@ -527,13 +549,11 @@ class NLPExecutionTests(unittest.TestCase):
         )
         sql = """SELECT SUM(po.NET) AS total_purchase_value
 FROM INVENTORY.PURCHASEORDER po
-WHERE po.ORDERDATE <= :end_date AND po.ORDERDATE >= :start_date"""
+WHERE po.ORDERDATE < :end_date AND po.ORDERDATE >= :start_date"""
         runner = RecordingRunner({"columns": ["TOTAL_PURCHASE_VALUE"], "rows": [[1]]})
         execute_nlp_query(plan.original_question, dependencies=dependencies(plan, sql, runner))
-        self.assertEqual(
-            runner.calls[0][1],
-            {"start_date": date(2025, 1, 1), "end_date": date(2025, 12, 31)},
-        )
+        # inclusive 2025-12-31 -> exclusive bound 20260101; values are 'YYYYMMDD' strings
+        self.assertEqual(runner.calls[0][1], {"start_date": "20250101", "end_date": "20260101"})
 
     def test_reversed_absolute_date_range_executes_zero_times(self) -> None:
         plan = QueryPlan(
@@ -552,10 +572,45 @@ WHERE po.ORDERDATE <= :end_date AND po.ORDERDATE >= :start_date"""
         )
         sql = """SELECT SUM(po.NET) AS total_purchase_value
 FROM INVENTORY.PURCHASEORDER po
-WHERE po.ORDERDATE >= :start_date AND po.ORDERDATE <= :end_date"""
+WHERE po.ORDERDATE >= :start_date AND po.ORDERDATE < :end_date"""
         runner = RecordingRunner({"columns": ["TOTAL_PURCHASE_VALUE"], "rows": [[1]]})
         with self.assertRaises(Exception):
             execute_nlp_query(plan.original_question, dependencies=dependencies(plan, sql, runner))
+        self.assertEqual(runner.calls, [])
+
+    # -- date_bounds: deterministic 'YYYYMMDD' half-open bounds (P2) ---------
+
+    def test_relative_month_bounds_use_calendar_months(self) -> None:
+        # Oracle ADD_MONTHS semantics: month-end maps to month-end, otherwise clamp.
+        six = DateRange(kind=DateRangeKind.RELATIVE, original_text="last 6 months")
+        self.assertEqual(date_bounds(six, today=date(2026, 9, 22)), ("20260322", "20260923"))
+        one = DateRange(kind=DateRangeKind.RELATIVE, original_text="last month")
+        self.assertEqual(date_bounds(one, today=date(2026, 3, 31)), ("20260228", "20260401"))
+        self.assertEqual(date_bounds(one, today=date(2026, 5, 31)), ("20260430", "20260601"))
+        year = DateRange(kind=DateRangeKind.RELATIVE, original_text="last one year")
+        self.assertEqual(date_bounds(year, today=date(2026, 9, 22)), ("20250922", "20260923"))
+
+    def test_relative_day_bounds_include_today(self) -> None:
+        thirty = DateRange(kind=DateRangeKind.RELATIVE, original_text="last 30 days")
+        self.assertEqual(date_bounds(thirty, today=date(2026, 9, 22)), ("20260823", "20260923"))
+
+    def test_absolute_bounds_are_half_open(self) -> None:
+        inclusive = DateRange(kind=DateRangeKind.ABSOLUTE, start="2025-01-01", end="2025-12-31")
+        self.assertEqual(date_bounds(inclusive), ("20250101", "20260101"))
+        exclusive = DateRange(kind=DateRangeKind.ABSOLUTE, start="2025-01-01", end="2026-01-01",
+                              inclusive_start=False, inclusive_end=False)
+        self.assertEqual(date_bounds(exclusive), ("20250102", "20260101"))
+
+    def test_date_binds_are_yyyymmdd_strings_never_python_dates(self) -> None:
+        for value in date_bounds(DateRange(kind=DateRangeKind.ABSOLUTE, start="2025-01-01", end="2025-12-31")):
+            self.assertIsInstance(value, str)
+            self.assertRegex(value, r"^\d{8}$")
+
+    def test_unparsed_relative_range_executes_zero_times(self) -> None:
+        plan = ranking_plan("recently")
+        runner = RecordingRunner()
+        with self.assertRaises(ParameterBindingError):
+            execute_nlp_query(plan.original_question, dependencies=dependencies(plan, ranking_sql(), runner))
         self.assertEqual(runner.calls, [])
 
     def test_unsupported_question_and_executor_failure_are_controlled(self) -> None:

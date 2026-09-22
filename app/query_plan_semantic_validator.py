@@ -185,6 +185,11 @@ def validate_query_plan_semantics(plan: QueryPlan, nlp_analysis: NLPAnalysis | N
                 if not dimension.grouping:
                     violations.append(f"Aggregate ranking dimension '{name}' must use grouping=true.")
 
+    if operation == "detail" and has_aggregate:
+        # "last 5 purchase qty of X" lists records; summing them would need a
+        # GROUP BY the plan never asked for (fix.md #7, ORA-00937 on real Oracle).
+        violations.append("Detail operation lists individual records; measures must use aggregation none.")
+
     if operation == "aggregate" and has_aggregate:
         for field in output_fields - measures:
             dimension = dimensions.get(field)

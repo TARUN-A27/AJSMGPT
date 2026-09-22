@@ -35,9 +35,9 @@ class OfflineDatatypeValidationTests(unittest.TestCase):
             dv.validate_sql_datatypes(MRS_NUMBER_SQL, {"mrs_number": "890330-A"})
 
     def test_mrs_due_date_bind_accepted(self) -> None:
-        dv.validate_sql_datatypes(
-            MRS_DUE_DATE_SQL, {"date_from": date(2026, 1, 1), "date_to": date(2026, 12, 31)}
-        )
+        # Business dates are VARCHAR2(8) 'YYYYMMDD' in the company database
+        # (catalog datatype_category DATE_TEXT): only 8-digit strings bind.
+        dv.validate_sql_datatypes(MRS_DUE_DATE_SQL, {"date_from": "20260101", "date_to": "20270101"})
 
     def test_mrs_rejection_reason_is_text_not_a_status_filter(self) -> None:
         # REASONFORREJECTIONSTORES is a plain text display column; it is only
@@ -52,9 +52,15 @@ class OfflineDatatypeValidationTests(unittest.TestCase):
         dv.validate_sql_datatypes(QTY_SQL, {"qty": 10})
 
     def test_valid_date_bind(self) -> None:
-        dv.validate_sql_datatypes(
-            DATE_SQL, {"date_from": date(2026, 1, 1), "date_to": date(2026, 12, 31)}
-        )
+        dv.validate_sql_datatypes(DATE_SQL, {"date_from": "20260101", "date_to": "20270101"})
+
+    def test_date_text_rejects_python_date_bind(self) -> None:
+        # A Python date would be sent as an Oracle DATE and compared against
+        # 'YYYYMMDD' text under NLS DD-MON-RR: ORA-01861 or a wrong answer.
+        with self.assertRaisesRegex(ValueError, "DATE_TEXT"):
+            dv.validate_sql_datatypes(DATE_SQL, {"date_from": date(2026, 1, 1), "date_to": date(2026, 12, 31)})
+        with self.assertRaisesRegex(ValueError, "DATE_TEXT"):
+            dv.validate_sql_datatypes(DATE_SQL, {"date_from": "2026-01-01", "date_to": "2026-12-31"})
 
     def test_invalid_text_to_numeric_bind(self) -> None:
         with self.assertRaises(ValueError):
@@ -76,9 +82,7 @@ class OfflineDatatypeValidationTests(unittest.TestCase):
             "WHERE PO.ORDERDATE BETWEEN :date_from AND :date_to "
             "GROUP BY PO.SUP_CODE"
         )
-        dv.validate_sql_datatypes(
-            sql, {"date_from": date(2026, 6, 1), "date_to": date(2026, 9, 1)}
-        )
+        dv.validate_sql_datatypes(sql, {"date_from": "20260601", "date_to": "20260901"})
 
     def test_no_live_oracle_metadata_lookup(self) -> None:
         self.assertFalse(hasattr(dv, "oracledb"))

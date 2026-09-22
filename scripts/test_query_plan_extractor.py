@@ -32,6 +32,9 @@ def plan_json(**overrides) -> str:
         "measures": [{"concept": "value", "aggregation": "sum"}],
         "confidence": 0.9,
     }
+    if overrides.get("operation") == "detail" and "measures" not in overrides:
+        # A detail plan lists records; its measures are never aggregated.
+        value["measures"] = [{"concept": "value"}]
     value.update(overrides)
     return json.dumps(value)
 

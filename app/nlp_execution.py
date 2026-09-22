@@ -8,7 +8,8 @@ import re
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+import calendar
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 from typing import Any, Literal, Protocol
@@ -24,10 +25,11 @@ from app.oracle_client import (
     OracleUnavailableError,
     run_safe_select,
 )
-from app.query_plan import Aggregation, DateRangeKind, EntityStatus, FilterOperator, QueryPlan
+from app.query_plan import Aggregation, DateRange, DateRangeKind, EntityStatus, FilterOperator, QueryPlan
 from app.query_plan_extractor import extract_query_plan
 from app.schema_grounding import GroundedSchemaPlan, ground_query_plan
 from app.spacy_nlp import NLPAnalysis, analyze_question_with_spacy
+from app.sql_safety import add_oracle_row_limit
 from app.text_correction import TextCorrectionResult, correct_question_text
 from app.v1_capabilities import CapabilityDecision, evaluate_capability
 
@@ -322,7 +324,7 @@ def _bind_names_for_column(sql: str, full_column: str) -> list[str]:
     return list(dict.fromkeys(name.lower() for name in names))
 
 
-def _absolute_date_bind_names(sql: str, full_column: str) -> tuple[str, str] | None:
+def _date_bind_names(sql: str, full_column: str) -> tuple[str, str] | None:
     masked = _masked_sql(sql)
     for variant in _column_variants(sql, full_column):
         pattern = re.escape(variant).replace(r"\.", r"\s*\.\s*")
@@ -402,10 +404,85 @@ def _filter_values(operator: FilterOperator, value: Any) -> list[Any]:
     return values
 
 
+_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+    "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+}
+_RELATIVE_UNITS = r"(months?|days?|years?)"
+
+
+def relative_date_spec(text: str) -> tuple[str, int] | None:
+    """Parse 'last 6 months' / 'past 30 days' / 'last year' -> (unit, count)."""
+    match = re.search(
+        rf"\b(?:last|past|previous)\s+(\d+|{'|'.join(_NUMBER_WORDS)})\s+{_RELATIVE_UNITS}\b", text, re.IGNORECASE
+    ) or re.search(rf"\b(\d+|{'|'.join(_NUMBER_WORDS)})\s+{_RELATIVE_UNITS}\b", text, re.IGNORECASE)
+    if match:
+        number = match.group(1).lower()
+        count = int(number) if number.isdigit() else _NUMBER_WORDS[number]
+        unit = match.group(2).lower()
+    else:
+        implicit = re.search(rf"\b(?:last|past|previous)\s+{_RELATIVE_UNITS}\b", text, re.IGNORECASE)
+        if not implicit:
+            return None
+        count, unit = 1, implicit.group(1).lower()
+    if count <= 0:
+        return None
+    return ("months" if unit.startswith("month") else "years" if unit.startswith("year") else "days", count)
+
+
+def _add_months(value: date, months: int) -> date:
+    """Oracle ADD_MONTHS semantics: month-end stays month-end, otherwise clamp the day."""
+    month_index = value.year * 12 + value.month - 1 + months
+    year, month = divmod(month_index, 12)
+    month += 1
+    last_day = calendar.monthrange(year, month)[1]
+    source_last_day = calendar.monthrange(value.year, value.month)[1]
+    day = last_day if value.day == source_last_day else min(value.day, last_day)
+    return date(year, month, day)
+
+
+def date_bounds(date_range: DateRange, today: date | None = None) -> tuple[str, str]:
+    """Half-open [start, end) bounds as 'YYYYMMDD' strings, computed here so the
+    model never writes date arithmetic. The company database stores business
+    dates as VARCHAR2(8) 'YYYYMMDD' text; comparing them to DATE values fails
+    (ORA-01861 under NLS DD-MON-RR), string comparison is exact."""
+    today = today or date.today()
+    if date_range.kind is DateRangeKind.RELATIVE:
+        spec = relative_date_spec(date_range.original_text or f"{date_range.start or ''} {date_range.end or ''}")
+        if spec is None:
+            raise ParameterBindingError("Relative date range could not be resolved to a bounded period.")
+        unit, count = spec
+        if unit == "months":
+            start = _add_months(today, -count)
+        elif unit == "years":
+            start = _add_months(today, -12 * count)
+        else:
+            start = today - timedelta(days=count)
+        end = today + timedelta(days=1)
+    elif date_range.kind is DateRangeKind.ABSOLUTE:
+        if not date_range.start or not date_range.end:
+            raise ParameterBindingError("Absolute date ranges require start and end values.")
+        try:
+            start = date.fromisoformat(date_range.start)
+            end = date.fromisoformat(date_range.end)
+        except ValueError as exc:
+            raise ParameterBindingError("Absolute date values must use ISO dates.") from exc
+        if not date_range.inclusive_start:
+            start += timedelta(days=1)
+        if date_range.inclusive_end:
+            end += timedelta(days=1)
+        if start >= end:
+            raise ParameterBindingError("Absolute date range start must not be after end.")
+    else:
+        raise ParameterBindingError("Unspecified date ranges cannot be bound.")
+    return start.strftime("%Y%m%d"), end.strftime("%Y%m%d")
+
+
 def build_bind_parameters(
     sql: str,
     plan: QueryPlan,
     grounding: GroundedSchemaPlan,
+    today: date | None = None,
 ) -> dict[str, OracleBindValue]:
     """Derive an exact bind mapping only from validated plan values."""
     positional = re.findall(r"(?<!:):(\d+)\b", _masked_sql(sql))
@@ -438,9 +515,7 @@ def build_bind_parameters(
             result,
         )
 
-    if plan.date_range and plan.date_range.kind is DateRangeKind.ABSOLUTE:
-        if not plan.date_range.start or not plan.date_range.end:
-            raise ParameterBindingError("Absolute date ranges require start and end values.")
+    if plan.date_range and plan.date_range.kind is not DateRangeKind.UNSPECIFIED:
         date_columns = [
             f"{column.full_table_name}.{column.column_name}"
             for column in grounding.selected_columns
@@ -450,19 +525,13 @@ def build_bind_parameters(
             (
                 names
                 for column in date_columns
-                if (names := _absolute_date_bind_names(sql, column)) is not None
+                if (names := _date_bind_names(sql, column)) is not None
             ),
             None,
         )
         if date_names is None:
-            raise ParameterBindingError("Absolute date range binds are unresolved.")
-        try:
-            start_value = date.fromisoformat(plan.date_range.start)
-            end_value = date.fromisoformat(plan.date_range.end)
-        except ValueError as exc:
-            raise ParameterBindingError("Absolute date values must use ISO dates.") from exc
-        if start_value > end_value:
-            raise ParameterBindingError("Absolute date range start must not be after end.")
+            raise ParameterBindingError("Date range binds are unresolved.")
+        start_value, end_value = date_bounds(plan.date_range, today)
         _assign_bind(result, date_names[0], start_value)
         _assign_bind(result, date_names[1], end_value)
 
@@ -479,14 +548,21 @@ def build_bind_parameters(
 
 
 def add_execution_probe_limit(sql: str, plan: QueryPlan, max_rows: int) -> tuple[str, int, str]:
-    """Apply a database-side sentinel limit without trusting model-supplied limits."""
+    """Wrap an already-validated SELECT in the Oracle-11g row limit.
+
+    The model never writes a limit (the validator rejects FETCH/OFFSET/ROWNUM);
+    this is the only place one is added, from the plan's own limit or the
+    service default plus one sentinel row, via the same ROWNUM wrapper the
+    safe-select path has always used. An ORDER BY inside the wrapped SELECT is
+    exactly the 11g top-N idiom.
+    """
+    if re.search(r"\bFETCH\b|\bOFFSET\b|\bROWNUM\b", _masked_sql(sql), re.IGNORECASE):
+        raise GroundedSqlValidationError("Unexpected model-supplied row limit.")
     if plan.limit is not None:
         if plan.limit > max_rows:
             raise ParameterBindingError("Requested row limit exceeds the V1 execution maximum.")
-        return sql, plan.limit, "requested"
-    if re.search(r"\bFETCH\s+(?:FIRST|NEXT)\b|\bROWNUM\b", _masked_sql(sql), re.IGNORECASE):
-        raise GroundedSqlValidationError("Unexpected model-supplied row limit.")
-    return f"{sql.rstrip()}\nFETCH FIRST {max_rows + 1} ROWS ONLY", max_rows, "service_default"
+        return add_oracle_row_limit(sql, max_rows=plan.limit), plan.limit, "requested"
+    return add_oracle_row_limit(sql, max_rows=max_rows + 1), max_rows, "service_default"
 
 
 def _json_safe(value: Any) -> Any:
@@ -689,16 +765,18 @@ def execute_nlp_query(
         )
 
     preview = deps.generate_sql(plan, grounding)
+    binds = build_bind_parameters(preview.sql, plan, grounding)
+    selected_fields = selected_fields_from_sql(preview.sql)
+
+    # Validation is the last check of the MODEL's SQL. What follows it is a
+    # deterministic wrapper (ROWNUM limit) that is a pure function of this
+    # validated string and a validated integer -- never of model output.
+    validate_grounded_sql(preview.sql, plan, grounding)
     execution_sql, response_limit, limit_source = add_execution_probe_limit(
         preview.sql,
         plan,
         service_limit,
     )
-    binds = build_bind_parameters(execution_sql, plan, grounding)
-    selected_fields = selected_fields_from_sql(execution_sql)
-
-    # This must remain the final operation before the single runner call.
-    validate_grounded_sql(execution_sql, plan, grounding)
     started = time.monotonic()
     try:
         raw = runner(execution_sql, binds)

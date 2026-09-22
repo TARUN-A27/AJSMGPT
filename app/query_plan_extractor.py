@@ -51,6 +51,7 @@ operation feels like a perfect fit.
 For "last/latest/recent N" or "first/earliest N" questions (records, not a calendar range), use operation=detail with a
 sorting entry on the relevant date concept (descending for last/latest/recent, ascending for first/earliest) and
 limit=N. For the same wording without an explicit N, use operation=detail with that same sorting entry and no limit.
+A detail operation lists individual records: every measure in it uses aggregation none (never sum/count/average).
 Dimensions only affect requested output or grouping. Date ranges are filters, not dimensions. Ranking by an aggregate requires grouping=true for the ranked result dimension.
 Always set business_subject to the thing the question is about (e.g. purchase, mrs, issue, supplier, material); a plan
 with only entities and no business_subject, measure, or dimension is invalid.

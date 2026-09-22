@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.grounded_sql_validator import validate_grounded_sql
+from app.nlp_execution import add_execution_probe_limit
 from app.query_plan import (
     Aggregation,
     BusinessSubject,
@@ -89,8 +90,7 @@ CASES: list[AcceptanceCase] = [
 FROM INVENTORY.PURCHASEORDER po
 JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
 WHERE items.ITEM_NAME = :material_name
-ORDER BY po.ORDERDATE DESC
-FETCH FIRST 1 ROWS ONLY""",
+ORDER BY po.ORDERDATE DESC""",
         expect_order_by=True,
         expect_limit=1,
     ),
@@ -115,8 +115,7 @@ FETCH FIRST 1 ROWS ONLY""",
 FROM INVENTORY.PURCHASEORDER po
 JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
 WHERE items.ITEM_NAME = :material_name
-ORDER BY po.ORDERDATE DESC
-FETCH FIRST 3 ROWS ONLY""",
+ORDER BY po.ORDERDATE DESC""",
         expect_order_by=True,
         expect_limit=3,
     ),
@@ -134,8 +133,8 @@ FETCH FIRST 3 ROWS ONLY""",
         expected_tables={"INVENTORY.PURCHASEORDER"},
         sql="""SELECT COUNT(po.QTY) AS material_count
 FROM INVENTORY.PURCHASEORDER po
-WHERE po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -1)
-AND po.ORDERDATE < TRUNC(SYSDATE) + 1""",
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end""",
     ),
     AcceptanceCase(
         question="Which supplier is given lowest price?",
@@ -155,8 +154,7 @@ AND po.ORDERDATE < TRUNC(SYSDATE) + 1""",
 FROM INVENTORY.PURCHASEORDER po
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
 GROUP BY pm.PARTYNAME
-ORDER BY purchase_value ASC
-FETCH FIRST 1 ROWS ONLY""",
+ORDER BY purchase_value ASC""",
         expect_group_by=True,
         expect_order_by=True,
         expect_limit=1,
@@ -179,8 +177,7 @@ FETCH FIRST 1 ROWS ONLY""",
 FROM INVENTORY.PURCHASEORDER po
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
 GROUP BY pm.PARTYNAME
-ORDER BY order_count DESC
-FETCH FIRST 1 ROWS ONLY""",
+ORDER BY order_count DESC""",
         expect_group_by=True,
         expect_order_by=True,
         expect_limit=1,
@@ -203,11 +200,10 @@ FETCH FIRST 1 ROWS ONLY""",
         sql="""SELECT items.ITEM_NAME AS material, SUM(po.NET) AS purchase_value
 FROM INVENTORY.PURCHASEORDER po
 JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
-WHERE po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -1)
-AND po.ORDERDATE < TRUNC(SYSDATE) + 1
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
 GROUP BY items.ITEM_NAME
-ORDER BY purchase_value DESC
-FETCH FIRST 1 ROWS ONLY""",
+ORDER BY purchase_value DESC""",
         expect_group_by=True,
         expect_order_by=True,
         expect_limit=1,
@@ -233,11 +229,10 @@ FETCH FIRST 1 ROWS ONLY""",
         sql="""SELECT pm.PARTYNAME AS supplier, MIN(po.NET) AS purchase_value
 FROM INVENTORY.PURCHASEORDER po
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
-WHERE po.ORDERDATE >= ADD_MONTHS(TRUNC(SYSDATE), -12)
-AND po.ORDERDATE < TRUNC(SYSDATE) + 1
+WHERE po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
 GROUP BY pm.PARTYNAME
-ORDER BY purchase_value ASC
-FETCH FIRST 1 ROWS ONLY""",
+ORDER BY purchase_value ASC""",
         expect_group_by=True,
         expect_order_by=True,
         expect_limit=1,
@@ -292,8 +287,7 @@ FROM INVENTORY.PURCHASEORDER po
 JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
 WHERE pm.PARTYNAME = :supplier_name
-ORDER BY po.ORDERDATE DESC
-FETCH FIRST 1 ROWS ONLY""",
+ORDER BY po.ORDERDATE DESC""",
         expect_order_by=True,
         expect_limit=1,
     ),
@@ -319,8 +313,7 @@ FROM INVENTORY.PURCHASEORDER po
 JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
 JOIN SCM.PARTYMASTER pm ON po.SUP_CODE = pm.PARTYCODE
 WHERE items.ITEM_NAME = :material_name
-ORDER BY po.ORDERDATE DESC
-FETCH FIRST 1 ROWS ONLY""",
+ORDER BY po.ORDERDATE DESC""",
         expect_order_by=True,
         expect_limit=1,
     ),
@@ -346,9 +339,9 @@ FETCH FIRST 1 ROWS ONLY""",
 FROM INVENTORY.PURCHASEORDER po
 JOIN INVENTORY.INVITEMS items ON po.ITEM_CODE = items.ITEM_CODE
 WHERE po.SUP_CODE = :supplier_code
-AND po.ORDERDATE BETWEEN :start_date AND :end_date
-ORDER BY po.ORDERDATE DESC
-FETCH FIRST 1 ROWS ONLY""",
+AND po.ORDERDATE >= :date_start
+AND po.ORDERDATE < :date_end
+ORDER BY po.ORDERDATE DESC""",
         expect_order_by=True,
         expect_limit=1,
     ),
@@ -390,7 +383,8 @@ WHERE m.DEPT_CODE = :department""",
         expected_tables={"INVENTORY.MRS_TEMP"},
         sql="""SELECT m.MRSDATE
 FROM INVENTORY.MRS_TEMP m
-WHERE m.MRSDATE BETWEEN :start_date AND :end_date""",
+WHERE m.MRSDATE >= :date_start
+AND m.MRSDATE < :date_end""",
     ),
     AcceptanceCase(
         question="how much cost consumed last month?",
@@ -409,8 +403,8 @@ WHERE m.MRSDATE BETWEEN :start_date AND :end_date""",
         expected_tables={"INVENTORY.ISSUE"},
         sql="""SELECT SUM(issue.ISSUEVALUE) AS consumption_value
 FROM INVENTORY.ISSUE issue
-WHERE issue.ISSUEDATE >= ADD_MONTHS(TRUNC(SYSDATE), -1)
-AND issue.ISSUEDATE < TRUNC(SYSDATE) + 1""",
+WHERE issue.ISSUEDATE >= :date_start
+AND issue.ISSUEDATE < :date_end""",
     ),
     AcceptanceCase(
         question="latest issue for yarn in 2024",
@@ -436,9 +430,9 @@ AND issue.ISSUEDATE < TRUNC(SYSDATE) + 1""",
 FROM INVENTORY.ISSUE issue
 JOIN INVENTORY.INVITEMS items ON issue.CODE = items.ITEM_CODE
 WHERE items.ITEM_NAME = :material_name
-AND issue.ISSUEDATE BETWEEN :start_date AND :end_date
-ORDER BY issue.ISSUEDATE DESC
-FETCH FIRST 1 ROWS ONLY""",
+AND issue.ISSUEDATE >= :date_start
+AND issue.ISSUEDATE < :date_end
+ORDER BY issue.ISSUEDATE DESC""",
         expect_order_by=True,
         expect_limit=1,
     ),
@@ -528,9 +522,12 @@ class V1AcceptanceMatrixTests(unittest.TestCase):
                 if case.expect_order_by:
                     self.assertRegex(case.sql, r"(?i)\bORDER\s+BY\b")
                 if case.expect_limit is not None:
-                    self.assertRegex(
-                        case.sql, rf"(?i)\bFETCH\s+FIRST\s+{case.expect_limit}\s+ROWS\s+ONLY\b"
-                    )
+                    # The model never writes a limit; the deterministic wrapper
+                    # applies the plan's own limit after validation.
+                    self.assertEqual(case.plan.limit, case.expect_limit)
+                    wrapped, _, _ = add_execution_probe_limit(case.sql, case.plan, 100)
+                    self.assertRegex(wrapped, rf"(?i)WHERE\s+ROWNUM\s*<=\s*{case.expect_limit}\b")
+                    self.assertNotRegex(case.sql, r"(?i)\bFETCH\b|\bROWNUM\b")
                 for entity in case.plan.entities:
                     if entity.original_value:
                         self.assertNotIn(

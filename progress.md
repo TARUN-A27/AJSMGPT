@@ -176,6 +176,24 @@ The deterministic resolver is already wired (`app/entity_resolution.py`, fail-cl
 - Index refresh job for `data/entity_index.sqlite3` / `full_value_index.sqlite3` from Oracle master tables (read-only, scheduled on the server).
 - Ambiguity UX: when >1 candidate, return a clarification instead of guessing.
 
+### B2. Conversation memory (multi-turn context) — new idea, 2026-09-23
+Today every `/v1/nlp/*` call is stateless: one question, one grounded answer, nothing carried forward. Tarun
+asked for AJSMGPT to "consider the previous prompt" — a genuine, good idea, but a different shape than V1's
+current single-question API, so it's recorded here rather than started now.
+- **What it needs, minimum:** a session/conversation id the client sends; server-side storage of the last N
+  QueryPlans (or just the last one) keyed by that id; a rule for what "carry forward" means — e.g. an unresolved
+  pronoun/ellipsis ("what about last month?") reuses the prior plan's `business_subject`/entities and only
+  overrides the field the new text actually names (here, `date_range`).
+- **Where it must NOT weaken anything:** carried-forward entities still go through the same fail-closed
+  `resolve_plan_entities` gate as a fresh one — "remembered" is not a substitute for "verified." A stale
+  resolved entity from 10 turns ago should not be trusted forever; needs an expiry/re-verify rule.
+- **Open design questions, not decided:** in-memory per-session dict (simple, lost on restart, fine for a single
+  process) vs. a real store; how many turns of history; whether this is a new `/v1/nlp/*` field (a `session_id`
+  the existing endpoints accept) or a genuinely new endpoint (CLAUDE.md §2 currently says "do not add endpoints" —
+  would need revisiting deliberately, not by accident).
+- **Not started.** Do not build this piece by piece alongside other V1 work; it changes the interaction model and
+  deserves its own scoped task once V1 is frozen.
+
 ### C. Report layer
 - `answer_formatter.py` → structured report: title, filters applied, table, totals, row count, SQL shown on request.
 - Export: CSV/XLSX download from `/v1/nlp/execute` result. ⏳ CSV exists unwired: `app/plugins.py` `export` (2026-09-22).

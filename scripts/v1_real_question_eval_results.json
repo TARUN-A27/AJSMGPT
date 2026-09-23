@@ -18,7 +18,7 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"last supply of mouse\",\n  \"domain\": \"unknown\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"supply\",\n    \"original_text\": \"supply\"\n  },\n  \"measures\": [],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"unspecified\",\n    \"start\": null,\n    \"end\": null,\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": null\n  },\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"supply\",\n      \"reason\": \"Unclear which supply metric or record is being referred to (e.g., last supply date, last supply quantity, etc.).\",\n      \"options\": [\"last supply date\", \"last supply quantity\", \"last supply record\"],\n      \"blocking\": true\n    },\n    {\n      \"field\": \"mouse\",\n      \"reason\": \"Unclear if 'mouse' refers to a material, item, or supplier.\",\n      \"options\": [\"material\", \"item\", \"supplier\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.5\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"last supply of mouse\",\n  \"domain\": \"unknown\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"supply\",\n    \"original_text\": \"supply\"\n  },\n  \"measures\": [],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\",\n      \"confidence\": 0.5\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"unspecified\",\n    \"start\": null,\n    \"end\": null,\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": null\n  },\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"supply\",\n      \"reason\": \"Unclear which supply metric or record is being referenced.\",\n      \"options\": [\"last supply date\", \"last supply quantity\", \"last supplier\"],\n      \"blocking\": true\n    },\n    {\n      \"field\": \"mouse\",\n      \"reason\": \"Unclear if 'mouse' refers to a material, item, or supplier.\",\n      \"options\": [\"material\", \"item\", \"supplier\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.5\n}"
       }
     ],
     "full_query_plan": {
@@ -70,11 +70,11 @@
       "ambiguities": [
         {
           "field": "supply",
-          "reason": "Unclear which supply metric or record is being referred to (e.g., last supply date, last supply quantity, etc.).",
+          "reason": "Unclear which supply metric or record is being referenced.",
           "options": [
             "last supply date",
             "last supply quantity",
-            "last supply record"
+            "last supplier"
           ],
           "blocking": true
         },
@@ -93,7 +93,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 69.4,
+    "elapsed_s": 62.2,
     "category": "supplier_purchase",
     "occurrence_count": 26,
     "expected_unsupported": false
@@ -114,7 +114,7 @@
       },
       {
         "caller": "grounded_sql_generator",
-        "response": "{\n  \"sql\": \"SELECT INVENTORY.INVITEMS.ITEM_NAME, INVENTORY.PURCHASEORDER.ORDERDATE, INVENTORY.PURCHASEORDER.QTY FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC\",\n  \"selected_fields\": [\"INVENTORY.INVITEMS.ITEM_NAME\", \"INVENTORY.PURCHASEORDER.ORDERDATE\", \"INVENTORY.PURCHASEORDER.QTY\"],\n  \"applied_filters\": [],\n  \"assumptions\": [],\n  \"confidence\": 0.9\n}"
+        "response": "{\n  \"sql\": \"SELECT INVENTORY.INVITEMS.ITEM_NAME, INVENTORY.PURCHASEORDER.ORDERDATE, INVENTORY.PURCHASEORDER.QTY FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC\",\n  \"selected_fields\": [\n    \"INVENTORY.INVITEMS.ITEM_NAME\",\n    \"INVENTORY.PURCHASEORDER.ORDERDATE\",\n    \"INVENTORY.PURCHASEORDER.QTY\"\n  ],\n  \"applied_filters\": [],\n  \"assumptions\": [],\n  \"confidence\": 0.9\n}"
       }
     ],
     "full_query_plan": {
@@ -307,7 +307,7 @@
       "compound_conditions": []
     },
     "full_sql_result": null,
-    "elapsed_s": 104.0,
+    "elapsed_s": 93.2,
     "category": "purchase_analytics",
     "occurrence_count": 24,
     "expected_unsupported": false
@@ -388,7 +388,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 48.3,
+    "elapsed_s": 41.2,
     "category": "supplier_purchase",
     "occurrence_count": 12,
     "expected_unsupported": false
@@ -434,7 +434,7 @@
       },
       {
         "caller": "grounded_sql_generator",
-        "response": "{\n  \"sql\": \"SELECT INVENTORY.PURCHASEORDER.ORDERDATE FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE WHERE INVENTORY.INVITEMS.ITEM_NAME = :item_name ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC\",\n  \"selected_fields\": [\"INVENTORY.PURCHASEORDER.ORDERDATE\"],\n  \"applied_filters\": [],\n  \"assumptions\": [],\n  \"confidence\": 0.9\n}"
+        "response": "{\n  \"sql\": \"SELECT INVENTORY.PURCHASEORDER.ORDERDATE FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE WHERE INVENTORY.INVITEMS.ITEM_NAME = :ITEM_NAME ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC\",\n  \"selected_fields\": [\"INVENTORY.PURCHASEORDER.ORDERDATE\"],\n  \"applied_filters\": [],\n  \"assumptions\": [],\n  \"confidence\": 0.9\n}"
       }
     ],
     "full_query_plan": {
@@ -584,7 +584,7 @@
       "compound_conditions": []
     },
     "full_sql_result": {
-      "sql": "SELECT INVENTORY.PURCHASEORDER.ORDERDATE FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE WHERE INVENTORY.INVITEMS.ITEM_NAME = :item_name ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC",
+      "sql": "SELECT INVENTORY.PURCHASEORDER.ORDERDATE FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE WHERE INVENTORY.INVITEMS.ITEM_NAME = :ITEM_NAME ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC",
       "selected_fields": [
         "INVENTORY.PURCHASEORDER.ORDERDATE"
       ],
@@ -592,7 +592,7 @@
       "assumptions": [],
       "confidence": 0.9
     },
-    "elapsed_s": 60.8,
+    "elapsed_s": 54.6,
     "category": "purchase_analytics",
     "occurrence_count": 10,
     "expected_unsupported": false
@@ -637,7 +637,15 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"Last 5 purchase qty of \\\"BARCODE SCANNER\\\"\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"purchase\",\n    \"original_text\": \"purchase\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"quantity\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"qty\"\n    }\n  ],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"BARCODE SCANNER\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"relative\",\n    \"recency_direction\": \"desc\",\n    \"recency_limit\": 5\n  },\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": 5,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"quantity\", \"date\"]\n  },\n  \"confidence\": 0.9\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"Last 5 purchase qty of \\\"BARCODE SCANNER\\\"\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"purchase\",\n    \"original_text\": \"purchase\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"quantity\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"qty\"\n    }\n  ],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"BARCODE SCANNER\",\n      \"normalized_value\": \"barcode scanner\",\n      \"candidates\": [\"BARCODE SCANNER\"],\n      \"confidence\": 0.9,\n      \"status\": \"resolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"relative\",\n    \"start\": null,\n    \"end\": null,\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": \"last 5\"\n  },\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": 5,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"date\", \"quantity\"]\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.9\n}"
+      },
+      {
+        "caller": "query_plan_extractor",
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"Last 5 purchase qty of \\\"BARCODE SCANNER\\\"\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"purchase\",\n    \"original_text\": \"purchase\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"quantity\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"qty\"\n    }\n  ],\n  \"dimensions\": [\n    {\n      \"concept\": \"date\",\n      \"grouping\": false,\n      \"original_text\": \"date\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"BARCODE SCANNER\",\n      \"normalized_value\": \"barcode scanner\",\n      \"selected_value\": \"BARCODE SCANNER\",\n      \"candidates\": [\"BARCODE SCANNER\"],\n      \"confidence\": 0.9,\n      \"status\": \"resolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"relative\",\n    \"start\": null,\n    \"end\": null,\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": \"last 5\"\n  },\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": 5,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"date\", \"quantity\"]\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.9\n}"
+      },
+      {
+        "caller": "grounded_sql_generator",
+        "response": "{\n  \"sql\": \"SELECT INVENTORY.PURCHASEORDER.ORDERDATE, INVENTORY.PURCHASEORDER.QTY FROM INVENTORY.PURCHASEORDER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE WHERE INVENTORY.INVITEMS.ITEM_NAME = :material_name ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC FETCH FIRST 5 ROWS ONLY\",\n  \"selected_fields\": [\"INVENTORY.PURCHASEORDER.ORDERDATE\", \"INVENTORY.PURCHASEORDER.QTY\"],\n  \"applied_filters\": [],\n  \"assumptions\": [],\n  \"confidence\": 0.9\n}"
       },
       {
         "caller": "grounded_sql_generator",
@@ -666,18 +674,20 @@
         {
           "concept": "date",
           "grouping": false,
-          "original_text": null
+          "original_text": "date"
         }
       ],
       "entities": [
         {
           "concept": "material",
           "original_value": "BARCODE SCANNER",
-          "normalized_value": null,
-          "selected_value": null,
-          "candidates": [],
-          "confidence": 0.5,
-          "status": "unresolved"
+          "normalized_value": "barcode scanner",
+          "selected_value": "BARCODE SCANNER",
+          "candidates": [
+            "BARCODE SCANNER"
+          ],
+          "confidence": 0.9,
+          "status": "resolved"
         }
       ],
       "filters": [],
@@ -695,8 +705,8 @@
         "format": "table",
         "detail_level": "record",
         "fields": [
-          "quantity",
-          "date"
+          "date",
+          "quantity"
         ]
       },
       "ambiguities": [],
@@ -823,7 +833,7 @@
       "assumptions": [],
       "confidence": 0.9
     },
-    "elapsed_s": 73.3,
+    "elapsed_s": 156.5,
     "category": "purchase_analytics",
     "occurrence_count": 10,
     "expected_unsupported": false
@@ -903,7 +913,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 41.8,
+    "elapsed_s": 37.2,
     "category": "purchase_analytics",
     "occurrence_count": 6,
     "expected_unsupported": false
@@ -921,15 +931,15 @@
         "none:rate"
       ],
       "grouping_dimensions": [],
-      "date_range": null,
-      "requested_limit": 1,
+      "date_range": "",
+      "requested_limit": null,
       "confidence": 0.8
     },
     "grounding": null,
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"material mouse last purchased rate?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"purchase\",\n    \"original_text\": \"purchase\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"rate\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"rate\"\n    }\n  ],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": false,\n      \"original_text\": \"material\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"sorting\": [\n    {\n      \"field_concept\": \"purchase_date\",\n      \"direction\": \"desc\"\n    }\n  ],\n  \"limit\": 1,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"material\", \"rate\", \"purchase_date\"]\n  },\n  \"confidence\": 0.8\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"material mouse last purchased rate?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"purchase\",\n    \"original_text\": \"purchase\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"rate\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"rate\"\n    }\n  ],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": false,\n      \"original_text\": \"material\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"unspecified\",\n    \"start\": null,\n    \"end\": null,\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": \"\"\n  },\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"purchase_date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.8\n}"
       }
     ],
     "full_query_plan": {
@@ -952,11 +962,6 @@
       ],
       "dimensions": [
         {
-          "concept": "material",
-          "grouping": false,
-          "original_text": "material"
-        },
-        {
           "concept": "purchase_date",
           "grouping": false,
           "original_text": null
@@ -974,7 +979,14 @@
         }
       ],
       "filters": [],
-      "date_range": null,
+      "date_range": {
+        "kind": "unspecified",
+        "start": null,
+        "end": null,
+        "inclusive_start": true,
+        "inclusive_end": true,
+        "original_text": ""
+      },
       "comparison": null,
       "sorting": [
         {
@@ -983,13 +995,11 @@
           "priority": 0
         }
       ],
-      "limit": 1,
+      "limit": null,
       "requested_output": {
         "format": "table",
-        "detail_level": "record",
+        "detail_level": "summary",
         "fields": [
-          "material",
-          "rate",
           "purchase_date"
         ]
       },
@@ -998,7 +1008,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 45.5,
+    "elapsed_s": 53.7,
     "category": "purchase_analytics",
     "occurrence_count": 6,
     "expected_unsupported": false
@@ -1013,9 +1023,7 @@
       "operation": "detail",
       "subject": "supply",
       "measures": [],
-      "grouping_dimensions": [
-        "supplier"
-      ],
+      "grouping_dimensions": [],
       "date_range": "",
       "requested_limit": null,
       "confidence": 0.5
@@ -1024,7 +1032,7 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"last supply from supplier Prime compu systems\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"supply\",\n    \"original_text\": \"supply\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"supplier\",\n      \"grouping\": true,\n      \"original_text\": \"supplier\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"supplier\",\n      \"original_value\": \"Prime compu systems\",\n      \"status\": \"unresolved\",\n      \"confidence\": 0.5\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"unspecified\",\n    \"start\": null,\n    \"end\": null,\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": \"\"\n  },\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.5\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"last supply from supplier Prime compu systems\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"supply\",\n    \"original_text\": \"supply\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"supplier\",\n      \"grouping\": false,\n      \"original_text\": \"supplier\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"supplier\",\n      \"original_value\": \"Prime compu systems\",\n      \"normalized_value\": null,\n      \"selected_value\": null,\n      \"candidates\": [],\n      \"confidence\": 0.5,\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"unspecified\",\n    \"start\": null,\n    \"end\": null,\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": \"\"\n  },\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.5\n}"
       }
     ],
     "full_query_plan": {
@@ -1039,11 +1047,6 @@
       },
       "measures": [],
       "dimensions": [
-        {
-          "concept": "supplier",
-          "grouping": true,
-          "original_text": "supplier"
-        },
         {
           "concept": "date",
           "grouping": false,
@@ -1091,7 +1094,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 53.6,
+    "elapsed_s": 54.7,
     "category": "supplier_purchase",
     "occurrence_count": 6,
     "expected_unsupported": false
@@ -1172,7 +1175,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 41.8,
+    "elapsed_s": 40.2,
     "category": "purchase_analytics",
     "occurrence_count": 4,
     "expected_unsupported": false
@@ -1198,7 +1201,7 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"What is the price of mouse?\",\n  \"domain\": \"unknown\",\n  \"operation\": \"lookup\",\n  \"business_subject\": {\n    \"concept\": \"price\",\n    \"original_text\": \"price\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"rate\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"price\"\n    }\n  ],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"price\",\n      \"reason\": \"Unclear whether the question refers to a unit price, list price, or other pricing model.\",\n      \"options\": [\"unit price\", \"list price\", \"other pricing model\"],\n      \"blocking\": false\n    },\n    {\n      \"field\": \"mouse\",\n      \"reason\": \"Unclear whether 'mouse' refers to a product (e.g., computer mouse) or a supplier (e.g., a company named 'Mouse').\",\n      \"options\": [\"product\", \"supplier\"],\n      \"blocking\": false\n    }\n  ],\n  \"confidence\": 0.5\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"What is the price of mouse?\",\n  \"domain\": \"unknown\",\n  \"operation\": \"lookup\",\n  \"business_subject\": {\n    \"concept\": \"price\",\n    \"original_text\": \"price\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"rate\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"price\"\n    }\n  ],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"price\",\n      \"reason\": \"Unclear if the question refers to a specific product or general pricing.\",\n      \"options\": [\"specific product price\", \"general pricing\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.5\n}"
       }
     ],
     "full_query_plan": {
@@ -1244,29 +1247,19 @@
       "ambiguities": [
         {
           "field": "price",
-          "reason": "Unclear whether the question refers to a unit price, list price, or other pricing model.",
+          "reason": "Unclear if the question refers to a specific product or general pricing.",
           "options": [
-            "unit price",
-            "list price",
-            "other pricing model"
+            "specific product price",
+            "general pricing"
           ],
-          "blocking": false
-        },
-        {
-          "field": "mouse",
-          "reason": "Unclear whether 'mouse' refers to a product (e.g., computer mouse) or a supplier (e.g., a company named 'Mouse').",
-          "options": [
-            "product",
-            "supplier"
-          ],
-          "blocking": false
+          "blocking": true
         }
       ],
       "confidence": 0.5
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 59.6,
+    "elapsed_s": 45.8,
     "category": "purchase_analytics",
     "occurrence_count": 4,
     "expected_unsupported": false
@@ -1358,7 +1351,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 53.0,
+    "elapsed_s": 49.8,
     "category": "supplier_purchase",
     "occurrence_count": 4,
     "expected_unsupported": false
@@ -1441,52 +1434,28 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 35.9,
+    "elapsed_s": 36.9,
     "category": "purchase_analytics",
     "occurrence_count": 3,
     "expected_unsupported": false
   },
   {
     "question": "how much cost consumed last month?",
-    "classification": "GROUNDING_FAILURE",
-    "stage": "GROUNDING",
-    "reason": "Multiple equally supported V1 columns match this concept.",
-    "catalog_limitation": null,
-    "query_plan": {
-      "domain": "consumption",
-      "operation": "aggregate",
-      "subject": "consumption",
-      "measures": [
-        "sum:value"
-      ],
-      "grouping_dimensions": [],
-      "date_range": "last month",
-      "requested_limit": null,
-      "confidence": 0.9
-    },
-    "grounding": {
-      "family": "consumption",
-      "confidence": 0.0,
-      "tables": [
-        "INVENTORY.INVITEMS",
-        "INVENTORY.ISSUE",
-        "INVENTORY.PURCHASEORDER"
-      ],
-      "columns": [
-        "INVENTORY.INVITEMS.ITEM_CODE",
-        "INVENTORY.ISSUE.CODE",
-        "INVENTORY.PURCHASEORDER.ITEM_CODE",
-        "INVENTORY.PURCHASEORDER.NET"
-      ],
-      "relationships": [
-        "FK_ISSUE",
-        "ITEMCODE_INVITEMS-ITEMCODE"
-      ]
-    },
+    "classification": "SQL_VALIDATION_FAILURE",
+    "stage": "SQL_VALIDATION",
+    "reason": "Quoted identifiers are outside the preview SQL subset.",
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
         "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"how much cost consumed last month?\",\n  \"domain\": \"consumption\",\n  \"operation\": \"aggregate\",\n  \"business_subject\": {\n    \"concept\": \"consumption\",\n    \"original_text\": \"cost consumed\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"value\",\n      \"aggregation\": \"sum\",\n      \"original_text\": \"cost\"\n    }\n  ],\n  \"dimensions\": [],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"relative\",\n    \"original_text\": \"last month\"\n  },\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.9\n}"
+      },
+      {
+        "caller": "grounded_sql_generator",
+        "response": "{\n  \"sql\": \"SELECT SUM(\\\"INVENTORY.ISSUE\\\".\\\"ISSUEVALUE\\\") AS \\\"cost\\\" FROM \\\"INVENTORY.ISSUE\\\" WHERE \\\"ISSUEDATE\\\" >= :date_start AND \\\"ISSUEDATE\\\" < :date_end\",\n  \"selected_fields\": [\"cost\"],\n  \"applied_filters\": [\"ISSUEDATE >= :date_start\", \"ISSUEDATE < :date_end\"],\n  \"assumptions\": [],\n  \"confidence\": 0.85\n}"
+      },
+      {
+        "caller": "grounded_sql_generator",
+        "response": "{\n  \"sql\": \"SELECT SUM(\\\"INVENTORY.ISSUE\\\".\\\"ISSUEVALUE\\\") AS \\\"cost\\\" FROM \\\"INVENTORY.ISSUE\\\" WHERE \\\"ISSUEDATE\\\" >= :date_start AND \\\"ISSUEDATE\\\" < :date_end\",\n  \"selected_fields\": [\"cost\"],\n  \"applied_filters\": [\"ISSUEDATE >= :date_start\", \"ISSUEDATE < :date_end\"],\n  \"assumptions\": [],\n  \"confidence\": 0.85\n}"
       }
     ],
     "full_query_plan": {
@@ -1547,91 +1516,50 @@
       ],
       "selected_tables": [
         {
-          "full_table_name": "INVENTORY.INVITEMS",
-          "role": "related",
-          "confidence": 1.0
-        },
-        {
           "full_table_name": "INVENTORY.ISSUE",
           "role": "anchor",
           "confidence": 0.85
-        },
-        {
-          "full_table_name": "INVENTORY.PURCHASEORDER",
-          "role": "related",
-          "confidence": 1.0
         }
       ],
       "selected_columns": [
         {
-          "full_table_name": "INVENTORY.INVITEMS",
-          "column_name": "ITEM_CODE",
-          "logical_concept": "relationship_identifier",
-          "role": "join_identifier",
-          "confidence": 1.0
+          "full_table_name": "INVENTORY.ISSUE",
+          "column_name": "ISSUEDATE",
+          "logical_concept": "consumption_date",
+          "role": "date_filter",
+          "confidence": 0.8
         },
         {
           "full_table_name": "INVENTORY.ISSUE",
-          "column_name": "CODE",
-          "logical_concept": "relationship_identifier",
-          "role": "join_identifier",
-          "confidence": 1.0
-        },
-        {
-          "full_table_name": "INVENTORY.PURCHASEORDER",
-          "column_name": "ITEM_CODE",
-          "logical_concept": "relationship_identifier",
-          "role": "join_identifier",
-          "confidence": 1.0
-        },
-        {
-          "full_table_name": "INVENTORY.PURCHASEORDER",
-          "column_name": "NET",
-          "logical_concept": "purchase_value",
+          "column_name": "ISSUEVALUE",
+          "logical_concept": "consumption_value",
           "role": "measure",
-          "confidence": 0.85
+          "confidence": 0.8
         }
       ],
-      "allowed_relationship_paths": [
-        {
-          "constraint_names": [
-            "FK_ISSUE",
-            "ITEMCODE_INVITEMS-ITEMCODE"
-          ],
-          "tables": [
-            "INVENTORY.ISSUE",
-            "INVENTORY.INVITEMS",
-            "INVENTORY.PURCHASEORDER"
-          ],
-          "confidence": 1.0
-        }
-      ],
+      "allowed_relationship_paths": [],
       "entity_column_candidates": {},
       "evidence": [
         {
           "requirement": "measure:value",
-          "logical_concept": "purchase_value",
-          "source": "metadata and purchase analytics router",
-          "confidence": 0.85
-        }
-      ],
-      "confidence": 0.0,
-      "ambiguities": [
+          "logical_concept": "consumption_value",
+          "source": "metadata NUMBER(12,2); live profile 2026-09-22: ISSUE.ISSUEVALUE with ISSRATE per issue line; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md \u00a72.2",
+          "confidence": 0.8
+        },
         {
           "requirement": "date_range:date",
-          "reason": "Multiple equally supported V1 columns match this concept.",
-          "candidates": [
-            "INVENTORY.ISSUE.ISSUEDATE",
-            "INVENTORY.PURCHASEORDER.ORDERDATE"
-          ],
-          "blocking": true
+          "logical_concept": "consumption_date",
+          "source": "metadata VARCHAR2(8); live profile 2026-09-22: 100% YYYYMMDD strings",
+          "confidence": 0.8
         }
       ],
+      "confidence": 0.8,
+      "ambiguities": [],
       "reject_reasons": [],
       "compound_conditions": []
     },
     "full_sql_result": null,
-    "elapsed_s": 36.6,
+    "elapsed_s": 72.5,
     "category": "purchase_analytics",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -1652,7 +1580,7 @@
       ],
       "date_range": null,
       "requested_limit": null,
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "grounding": {
       "family": "purchase_orders",
@@ -1673,7 +1601,7 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"list out order pending material names?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"material\",\n    \"original_text\": \"material names\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": true,\n      \"original_text\": \"material names\"\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"material\"]\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.95\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"list out order pending material names?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"material\",\n    \"original_text\": \"material names\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": true,\n      \"original_text\": \"material names\"\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"material\"]\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.9\n}"
       }
     ],
     "full_query_plan": {
@@ -1708,7 +1636,7 @@
         ]
       },
       "ambiguities": [],
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "full_grounding": {
       "source_query_plan": {
@@ -1793,7 +1721,7 @@
       "compound_conditions": []
     },
     "full_sql_result": null,
-    "elapsed_s": 34.7,
+    "elapsed_s": 31.7,
     "category": "purchase_analytics",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -1874,7 +1802,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 46.7,
+    "elapsed_s": 41.7,
     "category": "purchase_analytics",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -1965,7 +1893,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 45.9,
+    "elapsed_s": 41.6,
     "category": "purchase_analytics",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2045,7 +1973,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 40.5,
+    "elapsed_s": 35.9,
     "category": "purchase_analytics",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2137,7 +2065,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 55.6,
+    "elapsed_s": 52.0,
     "category": "supplier_purchase",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2151,17 +2079,17 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"Which supplier is taken highest orders?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"ranking\",\n  \"business_subject\": {\n    \"concept\": \"supplier\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"supplier\",\n      \"grouping\": true\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"orders\",\n      \"direction\": \"desc\"\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"orders\",\n      \"reason\": \"The measure 'orders' is not explicitly defined in the question, but it is implied by the context of ranking suppliers by the highest orders.\",\n      \"options\": [\"orders\", \"total_orders\", \"order_value\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.8\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"Which supplier is taken highest orders?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"ranking\",\n  \"business_subject\": {\n    \"concept\": \"supplier\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"supplier\",\n      \"grouping\": true\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"orders\",\n      \"direction\": \"desc\"\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"orders\",\n      \"reason\": \"The measure 'orders' is not explicitly defined in the question, but it is implied by the context of ranking suppliers by the highest orders.\",\n      \"options\": [\"orders\", \"order_value\", \"total_orders\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.8\n}"
       },
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"Which supplier is taken highest orders?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"ranking\",\n  \"business_subject\": {\n    \"concept\": \"supplier\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"supplier\",\n      \"grouping\": true\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"orders\",\n      \"direction\": \"desc\"\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"orders\",\n      \"reason\": \"The measure 'orders' is not explicitly defined in the question, but it is implied by the context of ranking suppliers by the highest orders.\",\n      \"options\": [\"orders\", \"total_orders\", \"order_value\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.8\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"Which supplier is taken highest orders?\",\n  \"domain\": \"purchase\",\n  \"operation\": \"ranking\",\n  \"business_subject\": {\n    \"concept\": \"supplier\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"supplier\",\n      \"grouping\": true\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [\n    {\n      \"field_concept\": \"orders\",\n      \"direction\": \"desc\"\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"orders\",\n      \"reason\": \"The measure 'orders' is not explicitly defined in the question, but it is implied by the context of ranking suppliers by the highest orders.\",\n      \"options\": [\"orders\", \"order_value\", \"total_orders\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.8\n}"
       }
     ],
     "full_query_plan": null,
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 96.2,
+    "elapsed_s": 85.2,
     "category": "supplier_purchase",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2240,7 +2168,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 42.1,
+    "elapsed_s": 38.3,
     "category": "purchase_analytics",
     "occurrence_count": 2,
     "expected_unsupported": false
@@ -2361,7 +2289,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 84.8,
+    "elapsed_s": 74.5,
     "category": "purchase_analytics",
     "occurrence_count": 2,
     "expected_unsupported": false
@@ -2380,14 +2308,14 @@
       ],
       "grouping_dimensions": [],
       "date_range": "in 2026",
-      "requested_limit": 1,
-      "confidence": 0.8
+      "requested_limit": null,
+      "confidence": 0.7
     },
     "grounding": null,
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"latest purchase rate of printer toner in 2026\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"purchase\",\n    \"original_text\": \"purchase\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"rate\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"rate\"\n    }\n  ],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": false,\n      \"original_text\": \"printer toner\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"printer toner\",\n      \"status\": \"unresolved\",\n      \"confidence\": 0.9\n    }\n  ],\n  \"filters\": [\n    {\n      \"concept\": \"date\",\n      \"operator\": \"in\",\n      \"value\": \"2026\",\n      \"value_type\": \"year\",\n      \"original_text\": \"in 2026\"\n    }\n  ],\n  \"date_range\": {\n    \"kind\": \"absolute\",\n    \"start\": \"2026-01-01\",\n    \"end\": \"2026-12-31\",\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": \"in 2026\"\n  },\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": 1,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"material\", \"rate\", \"date\"]\n  },\n  \"confidence\": 0.8\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"latest purchase rate of printer toner in 2026\",\n  \"domain\": \"purchase\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"purchase\",\n    \"original_text\": \"purchase\"\n  },\n  \"measures\": [\n    {\n      \"concept\": \"rate\",\n      \"aggregation\": \"none\",\n      \"original_text\": \"rate\"\n    }\n  ],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": false,\n      \"original_text\": \"printer toner\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"printer toner\",\n      \"status\": \"unresolved\",\n      \"confidence\": 0.5\n    }\n  ],\n  \"filters\": [\n    {\n      \"concept\": \"date\",\n      \"operator\": \"in\",\n      \"value\": \"2026\",\n      \"value_type\": \"year\",\n      \"original_text\": \"in 2026\"\n    }\n  ],\n  \"date_range\": {\n    \"kind\": \"absolute\",\n    \"start\": \"2026-01-01\",\n    \"end\": \"2026-12-31\",\n    \"inclusive_start\": true,\n    \"inclusive_end\": true,\n    \"original_text\": \"in 2026\"\n  },\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\",\n      \"priority\": 0\n    }\n  ],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": [\"material\", \"rate\", \"date\"]\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"rate\",\n      \"reason\": \"Unclear whether 'rate' refers to purchase rate, price rate, or another metric.\",\n      \"options\": [\"purchase rate\", \"price rate\", \"other\"],\n      \"blocking\": false\n    }\n  ],\n  \"confidence\": 0.7\n}"
       }
     ],
     "full_query_plan": {
@@ -2427,7 +2355,7 @@
           "normalized_value": null,
           "selected_value": null,
           "candidates": [],
-          "confidence": 0.9,
+          "confidence": 0.5,
           "status": "unresolved"
         }
       ],
@@ -2456,7 +2384,7 @@
           "priority": 0
         }
       ],
-      "limit": 1,
+      "limit": null,
       "requested_output": {
         "format": "table",
         "detail_level": "record",
@@ -2466,12 +2394,23 @@
           "date"
         ]
       },
-      "ambiguities": [],
-      "confidence": 0.8
+      "ambiguities": [
+        {
+          "field": "rate",
+          "reason": "Unclear whether 'rate' refers to purchase rate, price rate, or another metric.",
+          "options": [
+            "purchase rate",
+            "price rate",
+            "other"
+          ],
+          "blocking": false
+        }
+      ],
+      "confidence": 0.7
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 73.6,
+    "elapsed_s": 76.0,
     "category": "purchase_analytics",
     "occurrence_count": 2,
     "expected_unsupported": false
@@ -2573,7 +2512,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 52.8,
+    "elapsed_s": 46.3,
     "category": "mrs",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2635,7 +2574,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 33.9,
+    "elapsed_s": 30.7,
     "category": "mrs",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2701,7 +2640,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 42.8,
+    "elapsed_s": 39.2,
     "category": "mrs",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2710,7 +2649,7 @@
     "question": "What is status of last month placed MRS?",
     "classification": "ENTITY_RESOLUTION_REJECTION",
     "stage": "ENTITY_RESOLUTION",
-    "reason": "The validated QueryPlan confidence is below the execution threshold.; Entity 'supplier' requires verified resolution before execution.",
+    "reason": "Entity 'material' requires verified resolution before execution.",
     "query_plan": {
       "domain": "mrs",
       "operation": "detail",
@@ -2718,14 +2657,14 @@
       "measures": [],
       "grouping_dimensions": [],
       "date_range": "last month",
-      "requested_limit": 1000,
-      "confidence": 0.5
+      "requested_limit": null,
+      "confidence": 0.8
     },
     "grounding": null,
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"What is status of last month placed MRS?\",\n  \"domain\": \"mrs\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"mrs\",\n    \"original_text\": \"MRS\"\n  },\n  \"measures\": [],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"supplier\",\n      \"original_value\": \"MRS\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [],\n  \"date_range\": {\n    \"kind\": \"relative\",\n    \"original_text\": \"last month\"\n  },\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\"\n    }\n  ],\n  \"limit\": 1000,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"record\",\n    \"fields\": []\n  },\n  \"confidence\": 0.5\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"What is status of last month placed MRS?\",\n  \"domain\": \"mrs\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"mrs\",\n    \"original_text\": \"mrs\"\n  },\n  \"measures\": [],\n  \"dimensions\": [],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"MRS\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [\n    {\n      \"concept\": \"date\",\n      \"operator\": \"in\",\n      \"value\": \"last month\",\n      \"value_type\": \"date_range\",\n      \"original_text\": \"last month\"\n    }\n  ],\n  \"date_range\": {\n    \"kind\": \"relative\",\n    \"original_text\": \"last month\"\n  },\n  \"sorting\": [\n    {\n      \"field_concept\": \"date\",\n      \"direction\": \"desc\"\n    }\n  ],\n  \"confidence\": 0.8\n}"
       }
     ],
     "full_query_plan": {
@@ -2735,7 +2674,7 @@
       "operation": "detail",
       "business_subject": {
         "concept": "mrs",
-        "original_text": "MRS",
+        "original_text": "mrs",
         "synonyms": []
       },
       "measures": [],
@@ -2748,7 +2687,7 @@
       ],
       "entities": [
         {
-          "concept": "supplier",
+          "concept": "material",
           "original_value": "MRS",
           "normalized_value": null,
           "selected_value": null,
@@ -2757,7 +2696,15 @@
           "status": "unresolved"
         }
       ],
-      "filters": [],
+      "filters": [
+        {
+          "concept": "date",
+          "operator": "in",
+          "value": "last month",
+          "value_type": "date_range",
+          "original_text": "last month"
+        }
+      ],
       "date_range": {
         "kind": "relative",
         "start": null,
@@ -2774,20 +2721,20 @@
           "priority": 0
         }
       ],
-      "limit": 1000,
+      "limit": null,
       "requested_output": {
         "format": "table",
-        "detail_level": "record",
+        "detail_level": "summary",
         "fields": [
           "date"
         ]
       },
       "ambiguities": [],
-      "confidence": 0.5
+      "confidence": 0.8
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 39.7,
+    "elapsed_s": 38.2,
     "category": "mrs",
     "occurrence_count": 3,
     "expected_unsupported": false
@@ -2852,7 +2799,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 31.4,
+    "elapsed_s": 34.2,
     "category": "mrs",
     "occurrence_count": 2,
     "expected_unsupported": false
@@ -2927,7 +2874,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 47.0,
+    "elapsed_s": 50.3,
     "category": "mrs",
     "occurrence_count": 2,
     "expected_unsupported": false
@@ -3007,7 +2954,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 44.4,
+    "elapsed_s": 46.5,
     "category": "mrs",
     "occurrence_count": 2,
     "expected_unsupported": false
@@ -3077,7 +3024,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 43.4,
+    "elapsed_s": 46.1,
     "category": "mrs",
     "occurrence_count": 2,
     "expected_unsupported": false
@@ -3171,16 +3118,16 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 49.2,
+    "elapsed_s": 51.4,
     "category": "inventory_movement",
     "occurrence_count": 2,
     "expected_unsupported": false
   },
   {
     "question": "how many qty in receipt pending?",
-    "classification": "UNSUPPORTED_EXPECTED",
+    "classification": "CAPABILITY_FAILURE",
     "stage": "CAPABILITY",
-    "reason": "domain='grn': No verified V1 GRN table, columns, or relationship path is catalogued.; Operation 'unknown' is not supported for the V1 grn family.",
+    "reason": "domain='grn': Operation 'unknown' is not supported for the V1 grn family.",
     "query_plan": {
       "domain": "grn",
       "operation": "unknown",
@@ -3254,16 +3201,17 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 43.9,
+    "elapsed_s": 46.8,
     "category": "inventory_movement",
     "occurrence_count": 3,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "how many qty received in last one year?",
-    "classification": "UNSUPPORTED_EXPECTED",
-    "stage": "CAPABILITY",
-    "reason": "domain='grn': No verified V1 GRN table, columns, or relationship path is catalogued.; Operation 'detail' is not supported for the V1 grn family.",
+    "classification": "GROUNDING_FAILURE",
+    "stage": "GROUNDING",
+    "reason": "No verified V1 column supports this required concept.",
+    "catalog_limitation": "No verified V1 column supports this required concept",
     "query_plan": {
       "domain": "grn",
       "operation": "detail",
@@ -3276,7 +3224,17 @@
       "requested_limit": null,
       "confidence": 0.9
     },
-    "grounding": null,
+    "grounding": {
+      "family": "grn",
+      "confidence": 0.0,
+      "tables": [
+        "INVENTORY.GRN"
+      ],
+      "columns": [
+        "INVENTORY.GRN.GRNDATE"
+      ],
+      "relationships": []
+    },
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
@@ -3323,18 +3281,81 @@
       "ambiguities": [],
       "confidence": 0.9
     },
-    "full_grounding": null,
+    "full_grounding": {
+      "source_query_plan": {
+        "domain": "grn",
+        "operation": "detail",
+        "business_subject": "quantity",
+        "measures": [
+          "quantity"
+        ],
+        "dimensions": [],
+        "entities": [],
+        "has_date_range": true
+      },
+      "candidate_schemas": [
+        "INVENTORY",
+        "SCM"
+      ],
+      "selected_tables": [
+        {
+          "full_table_name": "INVENTORY.GRN",
+          "role": "anchor",
+          "confidence": 0.85
+        }
+      ],
+      "selected_columns": [
+        {
+          "full_table_name": "INVENTORY.GRN",
+          "column_name": "GRNDATE",
+          "logical_concept": "grn_date",
+          "role": "date_filter",
+          "confidence": 0.85
+        }
+      ],
+      "allowed_relationship_paths": [],
+      "entity_column_candidates": {},
+      "evidence": [
+        {
+          "requirement": "date_range:date",
+          "logical_concept": "grn_date",
+          "source": "metadata VARCHAR2(8); live profile 2026-09-22: GRNDATE 2008-04-03 to today, 100% YYYYMMDD strings",
+          "confidence": 0.85
+        }
+      ],
+      "confidence": 0.0,
+      "ambiguities": [
+        {
+          "requirement": "measure:quantity",
+          "reason": "Multiple equally supported V1 columns match this concept.",
+          "candidates": [
+            "INVENTORY.GRN.GRNQTY",
+            "INVENTORY.GRN.PENDING",
+            "INVENTORY.GRN.REJQTY"
+          ],
+          "blocking": true
+        }
+      ],
+      "reject_reasons": [
+        {
+          "requirement": "business_subject:quantity",
+          "reason": "No verified V1 column supports this required concept."
+        }
+      ],
+      "compound_conditions": []
+    },
     "full_sql_result": null,
-    "elapsed_s": 31.6,
+    "elapsed_s": 33.3,
     "category": "inventory_movement",
     "occurrence_count": 3,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "how many qty received?",
-    "classification": "UNSUPPORTED_EXPECTED",
-    "stage": "CAPABILITY",
-    "reason": "domain='grn': No verified V1 GRN table, columns, or relationship path is catalogued.; Operation 'aggregate' is not supported for the V1 grn family.",
+    "classification": "GROUNDING_FAILURE",
+    "stage": "GROUNDING",
+    "reason": "No verified V1 column supports this required concept.",
+    "catalog_limitation": "No verified V1 column supports this required concept",
     "query_plan": {
       "domain": "grn",
       "operation": "aggregate",
@@ -3347,7 +3368,15 @@
       "requested_limit": null,
       "confidence": 0.9
     },
-    "grounding": null,
+    "grounding": {
+      "family": "grn",
+      "confidence": 0.0,
+      "tables": [
+        "INVENTORY.GRN"
+      ],
+      "columns": [],
+      "relationships": []
+    },
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
@@ -3387,18 +3416,65 @@
       "ambiguities": [],
       "confidence": 0.9
     },
-    "full_grounding": null,
+    "full_grounding": {
+      "source_query_plan": {
+        "domain": "grn",
+        "operation": "aggregate",
+        "business_subject": "quantity",
+        "measures": [
+          "quantity"
+        ],
+        "dimensions": [],
+        "entities": [],
+        "has_date_range": false
+      },
+      "candidate_schemas": [
+        "INVENTORY",
+        "SCM"
+      ],
+      "selected_tables": [
+        {
+          "full_table_name": "INVENTORY.GRN",
+          "role": "anchor",
+          "confidence": 0.85
+        }
+      ],
+      "selected_columns": [],
+      "allowed_relationship_paths": [],
+      "entity_column_candidates": {},
+      "evidence": [],
+      "confidence": 0.0,
+      "ambiguities": [
+        {
+          "requirement": "measure:quantity",
+          "reason": "Multiple equally supported V1 columns match this concept.",
+          "candidates": [
+            "INVENTORY.GRN.GRNQTY",
+            "INVENTORY.GRN.PENDING",
+            "INVENTORY.GRN.REJQTY"
+          ],
+          "blocking": true
+        }
+      ],
+      "reject_reasons": [
+        {
+          "requirement": "business_subject:quantity",
+          "reason": "No verified V1 column supports this required concept."
+        }
+      ],
+      "compound_conditions": []
+    },
     "full_sql_result": null,
-    "elapsed_s": 29.6,
+    "elapsed_s": 31.3,
     "category": "inventory_movement",
     "occurrence_count": 3,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "is material mouse received?",
-    "classification": "UNSUPPORTED_EXPECTED",
+    "classification": "CAPABILITY_FAILURE",
     "stage": "CAPABILITY",
-    "reason": "domain='grn': No verified V1 GRN table, columns, or relationship path is catalogued.; Operation 'unknown' is not supported for the V1 grn family.",
+    "reason": "domain='grn': Operation 'unknown' is not supported for the V1 grn family.",
     "query_plan": {
       "domain": "grn",
       "operation": "unknown",
@@ -3407,13 +3483,13 @@
       "grouping_dimensions": [],
       "date_range": null,
       "requested_limit": null,
-      "confidence": 0.7
+      "confidence": 0.5
     },
     "grounding": null,
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"is material mouse received?\",\n  \"domain\": \"grn\",\n  \"operation\": \"unknown\",\n  \"business_subject\": {\n    \"concept\": \"material\",\n    \"original_text\": \"material\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": false,\n      \"original_text\": \"material\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [\n    {\n      \"concept\": \"material\",\n      \"operator\": \"equals\",\n      \"value\": \"mouse\",\n      \"value_type\": \"string\",\n      \"original_text\": \"material\"\n    }\n  ],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"operation\",\n      \"reason\": \"The question is ambiguous in terms of the operation required (e.g., whether it is a lookup, status check, or confirmation).\",\n      \"options\": [\"lookup\", \"status\", \"confirmation\"],\n      \"blocking\": true\n    },\n    {\n      \"field\": \"business_subject\",\n      \"reason\": \"The question is about the receipt status of a material, which is a GRN (Goods Receipt Note) subject.\",\n      \"options\": [\"grn\"],\n      \"blocking\": false\n    }\n  ],\n  \"confidence\": 0.7\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"is material mouse received?\",\n  \"domain\": \"grn\",\n  \"operation\": \"unknown\",\n  \"business_subject\": {\n    \"concept\": \"material\",\n    \"original_text\": \"material\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": false,\n      \"original_text\": \"material\"\n    }\n  ],\n  \"entities\": [\n    {\n      \"concept\": \"material\",\n      \"original_value\": \"mouse\",\n      \"status\": \"unresolved\"\n    }\n  ],\n  \"filters\": [\n    {\n      \"concept\": \"received\",\n      \"operator\": \"is_null\",\n      \"value_type\": \"boolean\",\n      \"original_text\": \"received\"\n    }\n  ],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"operation\",\n      \"reason\": \"The question is ambiguous in terms of the operation required (e.g., whether it is a lookup, detail, or status check).\",\n      \"options\": [\"lookup\", \"detail\", \"status\"],\n      \"blocking\": true\n    },\n    {\n      \"field\": \"received\",\n      \"reason\": \"The term 'received' is ambiguous in the context of GRN (Goods Receipt Note) and could refer to a status, a count, or a confirmation.\",\n      \"options\": [\"status\", \"count\", \"confirmation\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.5\n}"
       }
     ],
     "full_query_plan": {
@@ -3447,11 +3523,11 @@
       ],
       "filters": [
         {
-          "concept": "material",
-          "operator": "equals",
-          "value": "mouse",
-          "value_type": "string",
-          "original_text": "material"
+          "concept": "received",
+          "operator": "is_null",
+          "value": null,
+          "value_type": "boolean",
+          "original_text": "received"
         }
       ],
       "date_range": null,
@@ -3466,37 +3542,40 @@
       "ambiguities": [
         {
           "field": "operation",
-          "reason": "The question is ambiguous in terms of the operation required (e.g., whether it is a lookup, status check, or confirmation).",
+          "reason": "The question is ambiguous in terms of the operation required (e.g., whether it is a lookup, detail, or status check).",
           "options": [
             "lookup",
-            "status",
-            "confirmation"
+            "detail",
+            "status"
           ],
           "blocking": true
         },
         {
-          "field": "business_subject",
-          "reason": "The question is about the receipt status of a material, which is a GRN (Goods Receipt Note) subject.",
+          "field": "received",
+          "reason": "The term 'received' is ambiguous in the context of GRN (Goods Receipt Note) and could refer to a status, a count, or a confirmation.",
           "options": [
-            "grn"
+            "status",
+            "count",
+            "confirmation"
           ],
-          "blocking": false
+          "blocking": true
         }
       ],
-      "confidence": 0.7
+      "confidence": 0.5
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 57.5,
+    "elapsed_s": 62.3,
     "category": "inventory_movement",
     "occurrence_count": 3,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "Today received material names and qty?",
-    "classification": "UNSUPPORTED_EXPECTED",
-    "stage": "CAPABILITY",
-    "reason": "domain='grn': No verified V1 GRN table, columns, or relationship path is catalogued.; Operation 'detail' is not supported for the V1 grn family.",
+    "classification": "GROUNDING_FAILURE",
+    "stage": "GROUNDING",
+    "reason": "No verified V1 column supports this required concept.",
+    "catalog_limitation": "No verified V1 column supports this required concept",
     "query_plan": {
       "domain": "grn",
       "operation": "detail",
@@ -3511,7 +3590,24 @@
       "requested_limit": null,
       "confidence": 0.9
     },
-    "grounding": null,
+    "grounding": {
+      "family": "grn",
+      "confidence": 0.0,
+      "tables": [
+        "INVENTORY.GRN",
+        "INVENTORY.INVITEMS"
+      ],
+      "columns": [
+        "INVENTORY.GRN.CODE",
+        "INVENTORY.GRN.GRNDATE",
+        "INVENTORY.GRN.GRNDATE",
+        "INVENTORY.INVITEMS.ITEM_CODE",
+        "INVENTORY.INVITEMS.ITEM_NAME"
+      ],
+      "relationships": [
+        "FK_GRN"
+      ]
+    },
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
@@ -3541,6 +3637,11 @@
           "concept": "material",
           "grouping": true,
           "original_text": "material"
+        },
+        {
+          "concept": "date",
+          "grouping": false,
+          "original_text": null
         }
       ],
       "entities": [],
@@ -3575,24 +3676,146 @@
         "detail_level": "record",
         "fields": [
           "material",
-          "quantity"
+          "quantity",
+          "date"
         ]
       },
       "ambiguities": [],
       "confidence": 0.9
     },
-    "full_grounding": null,
+    "full_grounding": {
+      "source_query_plan": {
+        "domain": "grn",
+        "operation": "detail",
+        "business_subject": "material",
+        "measures": [
+          "quantity"
+        ],
+        "dimensions": [
+          "material",
+          "date"
+        ],
+        "entities": [],
+        "has_date_range": true
+      },
+      "candidate_schemas": [
+        "INVENTORY",
+        "SCM"
+      ],
+      "selected_tables": [
+        {
+          "full_table_name": "INVENTORY.GRN",
+          "role": "anchor",
+          "confidence": 0.85
+        },
+        {
+          "full_table_name": "INVENTORY.INVITEMS",
+          "role": "related",
+          "confidence": 1.0
+        }
+      ],
+      "selected_columns": [
+        {
+          "full_table_name": "INVENTORY.GRN",
+          "column_name": "CODE",
+          "logical_concept": "relationship_identifier",
+          "role": "join_identifier",
+          "confidence": 1.0
+        },
+        {
+          "full_table_name": "INVENTORY.GRN",
+          "column_name": "GRNDATE",
+          "logical_concept": "grn_date",
+          "role": "date_filter",
+          "confidence": 0.85
+        },
+        {
+          "full_table_name": "INVENTORY.GRN",
+          "column_name": "GRNDATE",
+          "logical_concept": "grn_date",
+          "role": "grouping",
+          "confidence": 0.85
+        },
+        {
+          "full_table_name": "INVENTORY.INVITEMS",
+          "column_name": "ITEM_CODE",
+          "logical_concept": "relationship_identifier",
+          "role": "join_identifier",
+          "confidence": 1.0
+        },
+        {
+          "full_table_name": "INVENTORY.INVITEMS",
+          "column_name": "ITEM_NAME",
+          "logical_concept": "material",
+          "role": "grouping",
+          "confidence": 0.85
+        }
+      ],
+      "allowed_relationship_paths": [
+        {
+          "constraint_names": [
+            "FK_GRN"
+          ],
+          "tables": [
+            "INVENTORY.GRN",
+            "INVENTORY.INVITEMS"
+          ],
+          "confidence": 1.0
+        }
+      ],
+      "entity_column_candidates": {},
+      "evidence": [
+        {
+          "requirement": "dimension:material",
+          "logical_concept": "material",
+          "source": "metadata and current business routers",
+          "confidence": 0.85
+        },
+        {
+          "requirement": "dimension:date",
+          "logical_concept": "grn_date",
+          "source": "metadata VARCHAR2(8); live profile 2026-09-22: GRNDATE 2008-04-03 to today, 100% YYYYMMDD strings",
+          "confidence": 0.85
+        },
+        {
+          "requirement": "date_range:date",
+          "logical_concept": "grn_date",
+          "source": "metadata VARCHAR2(8); live profile 2026-09-22: GRNDATE 2008-04-03 to today, 100% YYYYMMDD strings",
+          "confidence": 0.85
+        }
+      ],
+      "confidence": 0.0,
+      "ambiguities": [
+        {
+          "requirement": "measure:quantity",
+          "reason": "Multiple equally supported V1 columns match this concept.",
+          "candidates": [
+            "INVENTORY.GRN.GRNQTY",
+            "INVENTORY.GRN.PENDING",
+            "INVENTORY.GRN.REJQTY"
+          ],
+          "blocking": true
+        }
+      ],
+      "reject_reasons": [
+        {
+          "requirement": "business_subject:material",
+          "reason": "No verified V1 column supports this required concept."
+        }
+      ],
+      "compound_conditions": []
+    },
     "full_sql_result": null,
-    "elapsed_s": 47.9,
+    "elapsed_s": 50.8,
     "category": "inventory_movement",
     "occurrence_count": 3,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "\"dell  system\" stock",
-    "classification": "UNSUPPORTED_EXPECTED",
+    "classification": "CAPABILITY_FAILURE",
     "stage": "CAPABILITY",
-    "reason": "domain='stock': No verified V1 stock measure or stock-value business definition is catalogued.; No verified stock snapshot/date semantics are catalogued.; Operation 'unknown' is not supported for the V1 stock family.",
+    "reason": "domain='stock': Operation 'unknown' is not supported for the V1 stock family.",
     "query_plan": {
       "domain": "stock",
       "operation": "unknown",
@@ -3648,16 +3871,16 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 30.9,
+    "elapsed_s": 32.4,
     "category": "review_required",
     "occurrence_count": 2,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "dell stock",
-    "classification": "UNSUPPORTED_EXPECTED",
+    "classification": "CAPABILITY_FAILURE",
     "stage": "CAPABILITY",
-    "reason": "domain='stock': No verified V1 stock measure or stock-value business definition is catalogued.; No verified stock snapshot/date semantics are catalogued.; Operation 'unknown' is not supported for the V1 stock family.",
+    "reason": "domain='stock': Operation 'unknown' is not supported for the V1 stock family.",
     "query_plan": {
       "domain": "stock",
       "operation": "unknown",
@@ -3713,16 +3936,16 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 28.2,
+    "elapsed_s": 30.7,
     "category": "review_required",
     "occurrence_count": 2,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "dell system show stock",
-    "classification": "UNSUPPORTED_EXPECTED",
+    "classification": "CAPABILITY_FAILURE",
     "stage": "CAPABILITY",
-    "reason": "domain='stock': No verified V1 stock measure or stock-value business definition is catalogued.; No verified stock snapshot/date semantics are catalogued.; Operation 'detail' is not supported for the V1 stock family.",
+    "reason": "domain='stock': Operation 'detail' is not supported for the V1 stock family.",
     "query_plan": {
       "domain": "stock",
       "operation": "detail",
@@ -3768,16 +3991,16 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 25.3,
+    "elapsed_s": 26.9,
     "category": "review_required",
     "occurrence_count": 2,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "keyboard stock",
-    "classification": "UNSUPPORTED_EXPECTED",
+    "classification": "CAPABILITY_FAILURE",
     "stage": "CAPABILITY",
-    "reason": "domain='stock': No verified V1 stock measure or stock-value business definition is catalogued.; No verified stock snapshot/date semantics are catalogued.; Operation 'unknown' is not supported for the V1 stock family.",
+    "reason": "domain='stock': Operation 'unknown' is not supported for the V1 stock family.",
     "query_plan": {
       "domain": "stock",
       "operation": "unknown",
@@ -3833,10 +4056,10 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 27.8,
+    "elapsed_s": 29.7,
     "category": "review_required",
     "occurrence_count": 2,
-    "expected_unsupported": true
+    "expected_unsupported": false
   },
   {
     "question": "current attendance for empcode 165224 on 20260212",
@@ -3915,7 +4138,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 57.4,
+    "elapsed_s": 60.2,
     "category": "attendance",
     "occurrence_count": 4,
     "expected_unsupported": true
@@ -3988,7 +4211,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 41.1,
+    "elapsed_s": 43.6,
     "category": "attendance",
     "occurrence_count": 4,
     "expected_unsupported": true
@@ -4043,7 +4266,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 25.5,
+    "elapsed_s": 27.7,
     "category": "camera_ip",
     "occurrence_count": 4,
     "expected_unsupported": true
@@ -4126,16 +4349,16 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 38.4,
+    "elapsed_s": 40.5,
     "category": "attendance",
     "occurrence_count": 2,
     "expected_unsupported": true
   },
   {
     "question": "when was received?",
-    "classification": "UNSUPPORTED_EXPECTED",
+    "classification": "CAPABILITY_FAILURE",
     "stage": "CAPABILITY",
-    "reason": "domain='grn': No verified V1 GRN table, columns, or relationship path is catalogued.; Operation 'unknown' is not supported for the V1 grn family.",
+    "reason": "domain='grn': Operation 'unknown' is not supported for the V1 grn family.",
     "query_plan": {
       "domain": "grn",
       "operation": "unknown",
@@ -4150,7 +4373,7 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"when was received?\",\n  \"domain\": \"grn\",\n  \"operation\": \"unknown\",\n  \"business_subject\": {\n    \"concept\": \"grn\"\n  },\n  \"measures\": [],\n  \"dimensions\": [],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"operation\",\n      \"reason\": \"The question does not clearly specify whether it is asking for a detail, aggregate, trend, ranking, comparison, or lookup operation.\",\n      \"options\": [\"detail\", \"aggregate\", \"trend\", \"ranking\", \"comparison\", \"lookup\"],\n      \"blocking\": true\n    },\n    {\n      \"field\": \"business_subject\",\n      \"reason\": \"The question refers to 'received' but does not explicitly mention a business subject such as a material, supplier, or GRN.\",\n      \"options\": [\"grn\", \"material\", \"supplier\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.5\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"when was received?\",\n  \"domain\": \"grn\",\n  \"operation\": \"unknown\",\n  \"business_subject\": {\n    \"concept\": \"grn\"\n  },\n  \"measures\": [],\n  \"dimensions\": [],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [\n    {\n      \"field\": \"operation\",\n      \"reason\": \"The question does not clearly specify an operation such as detail, aggregate, trend, ranking, comparison, or lookup.\",\n      \"options\": [\"detail\", \"aggregate\", \"trend\", \"ranking\", \"comparison\", \"lookup\"],\n      \"blocking\": true\n    },\n    {\n      \"field\": \"business_subject\",\n      \"reason\": \"The question refers to 'received' but does not clearly specify the business subject (e.g., GRN, purchase, etc.).\",\n      \"options\": [\"grn\", \"purchase\"],\n      \"blocking\": true\n    }\n  ],\n  \"confidence\": 0.5\n}"
       }
     ],
     "full_query_plan": {
@@ -4179,7 +4402,7 @@
       "ambiguities": [
         {
           "field": "operation",
-          "reason": "The question does not clearly specify whether it is asking for a detail, aggregate, trend, ranking, comparison, or lookup operation.",
+          "reason": "The question does not clearly specify an operation such as detail, aggregate, trend, ranking, comparison, or lookup.",
           "options": [
             "detail",
             "aggregate",
@@ -4192,11 +4415,10 @@
         },
         {
           "field": "business_subject",
-          "reason": "The question refers to 'received' but does not explicitly mention a business subject such as a material, supplier, or GRN.",
+          "reason": "The question refers to 'received' but does not clearly specify the business subject (e.g., GRN, purchase, etc.).",
           "options": [
             "grn",
-            "material",
-            "supplier"
+            "purchase"
           ],
           "blocking": true
         }
@@ -4205,7 +4427,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 44.3,
+    "elapsed_s": 45.9,
     "category": "user_purchase_mrs_questions.txt",
     "occurrence_count": 1,
     "expected_unsupported": false
@@ -4231,7 +4453,7 @@
     "raw_model_calls": [
       {
         "caller": "query_plan_extractor",
-        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"list out material hold at Store officer?\",\n  \"domain\": \"unknown\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"material\",\n    \"original_text\": \"material\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": true,\n      \"original_text\": \"material\"\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.5\n}"
+        "response": "{\n  \"version\": \"1.0\",\n  \"original_question\": \"list out material hold  at Store officer?\",\n  \"domain\": \"unknown\",\n  \"operation\": \"detail\",\n  \"business_subject\": {\n    \"concept\": \"material\",\n    \"original_text\": \"material\"\n  },\n  \"measures\": [],\n  \"dimensions\": [\n    {\n      \"concept\": \"material\",\n      \"grouping\": true,\n      \"original_text\": \"material\"\n    }\n  ],\n  \"entities\": [],\n  \"filters\": [],\n  \"date_range\": null,\n  \"comparison\": null,\n  \"sorting\": [],\n  \"limit\": null,\n  \"requested_output\": {\n    \"format\": \"table\",\n    \"detail_level\": \"summary\",\n    \"fields\": []\n  },\n  \"ambiguities\": [],\n  \"confidence\": 0.5\n}"
       }
     ],
     "full_query_plan": {
@@ -4268,7 +4490,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 29.4,
+    "elapsed_s": 31.3,
     "category": "user_purchase_mrs_questions.txt",
     "occurrence_count": 1,
     "expected_unsupported": false
@@ -4350,7 +4572,7 @@
     },
     "full_grounding": null,
     "full_sql_result": null,
-    "elapsed_s": 44.5,
+    "elapsed_s": 47.4,
     "category": "user_purchase_mrs_questions.txt",
     "occurrence_count": 1,
     "expected_unsupported": false

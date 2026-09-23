@@ -87,19 +87,20 @@ Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture red
 Detail and fix plan per item: `fix.md`.
 47-question real evaluation (`scripts/v1_real_question_eval_results.json`):
 ```text
-UNSUPPORTED_EXPECTED         23   ← by design
+CAPABILITY_FAILURE           12   ← stock/grn now genuinely reachable (fix.md #13); model op-choice failures
+UNSUPPORTED_EXPECTED         13   ← by design (attendance, camera_ip, PO/MRS-pending status, dell system stock*)
 ENTITY_RESOLUTION_REJECTION  10   ← values absent from the offline fixture (recheck on real master data)
-CAPABILITY_FAILURE            5   ← mrs lookup/unknown operation
-QUERY_PLAN_FAILURE            4   ← all model behaviour (low confidence, undeclared sort field)
-PASS_PIPELINE                 2   ← both now executable on Oracle 11.2 (ROWNUM wrapper, 'YYYYMMDD' binds)
-GROUNDING_FAILURE             2   ← order-pending (P6), cross-domain date alias collision (fix.md #10)
-SQL_VALIDATION_FAILURE        1   ← model omitted the entity filter; correct rejection
-SQL_GENERATION / ENVIRONMENT  0
+GROUNDING_FAILURE              4   ← bare "quantity"/"cost" alias gaps found + fixed same day (fix.md #13); PO-pending
+QUERY_PLAN_FAILURE             4   ← all model behaviour (low confidence, undeclared sort field)
+SQL_VALIDATION_FAILURE         2   ← model wrote quoted identifiers / omitted the entity filter; correct rejections
+PASS_PIPELINE                  2
+SQL_GENERATION / ENVIRONMENT   0
 ```
-Re-run 2026-09-22 after the Oracle-executability fixes (offline, stub runner, 0 Oracle calls). Count moved 3 → 2 but
-quality went up: before, 2 of the 3 passing SQLs would have raised ORA-00937 and all 3 would have failed on
-`FETCH FIRST` and DATE binds. Both current passes are executable as written. The QueryPlan failures are model
-behaviour and are the real input to Step 4.
+Re-run 2026-09-23 offline (8b, stub runner, 0 Oracle calls) after the stock/GRN catalog work (fix.md #13). 10 of
+the 13 remaining `UNSUPPORTED_EXPECTED` moved to genuine `CAPABILITY_FAILURE`/`GROUNDING_FAILURE` — no longer
+refused by design, now real, measurable model/catalog gaps. The same session also ran the real evaluator against
+**live Oracle** for the first time (Step 6, fix.md #13): first-ever live `PASS_PIPELINE`, 4 rounds, 4 real gaps
+found and fixed same day.
 
 ## 7. Test commands
 Tests are `unittest` scripts. Run the one for the component you changed:

@@ -375,15 +375,19 @@ class QueryPlanSemanticValidatorTests(unittest.TestCase):
     def test_unknown_operation_on_unsupported_domain_is_not_caught_here(self) -> None:
         # Left to the capability gate downstream, which has the catalogued
         # unsupported-family message; this validator must not duplicate it.
-        stock = plan(
-            domain="stock",
+        # "stock" is no longer this example (2026-09-23: it is now a
+        # supported family, fix.md #13, and _supported_domains() below
+        # correctly starts catching "unknown" on it here instead) --
+        # "attendance" was never catalogued and has no profiled table.
+        attendance = plan(
+            domain="attendance",
             operation="unknown",
             dimensions=[],
             sorting=[],
             limit=None,
             confidence=0.5,
         )
-        validate_query_plan_semantics(stock)
+        validate_query_plan_semantics(attendance)
 
     # -- fail-closed: "due" without a nameable date concept ------------------
 

@@ -134,7 +134,10 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn("No verified V1 column", result.reject_reasons[0].reason)
 
     def test_unsupported_domain_is_rejected(self):
-        result = ground_query_plan(plan("stock", "stock"))
+        # "stock" is no longer this example (2026-09-23: it is now a
+        # supported domain, fix.md #13) -- "attendance" was never
+        # catalogued and has no profiled table.
+        result = ground_query_plan(plan("attendance", "attendance"))
         self.assertFalse(result.is_grounded)
         self.assertEqual(result.reject_reasons[0].requirement, "domain")
         self.assertEqual(result.selected_tables, [])
@@ -252,6 +255,78 @@ class SchemaGroundingTests(unittest.TestCase):
 
     # -- P3: verified measure columns from the 2026-09-22 schema study --------
 
+    def test_stock_quantity_sums_across_mill_hod_rows(self):
+        # fix.md #13: ITEMSTOCK holds 1-31 rows per item; the concept is
+        # deliberately measure-only (never a display/grouping column) so a
+        # non-aggregated read can never look like a valid single answer.
+        result = ground_query_plan(plan(
+            "stock", "stock", operation="aggregate",
+            measures=[Measure(concept="stock quantity", aggregation=Aggregation.SUM)],
+            entities=[EntityReference(concept="material", original_value="keyboard", confidence=0.8,
+                                       status=EntityStatus.UNRESOLVED)],
+        ))
+        self.assert_grounded(result)
+        self.assertIn(("INVENTORY.ITEMSTOCK", "STOCK", "measure"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
+    def test_grn_received_and_pending_quantity_ground_to_grn_table(self):
+        result = ground_query_plan(plan(
+            "grn", "grn", operation="aggregate",
+            measures=[Measure(concept="received quantity", aggregation=Aggregation.SUM)],
+            date_range=DateRange(kind=DateRangeKind.RELATIVE, original_text="last one year"),
+        ))
+        self.assert_grounded(result)
+        self.assertIn(("INVENTORY.GRN", "GRNQTY", "measure"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+        self.assertIn(("INVENTORY.GRN", "GRNDATE", "date_filter"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
+        pending = ground_query_plan(plan(
+            "grn", "grn", operation="aggregate",
+            measures=[Measure(concept="pending receipt quantity", aggregation=Aggregation.SUM)],
+        ))
+        self.assert_grounded(pending)
+        self.assertIn(("INVENTORY.GRN", "PENDING", "measure"),
+                      {(c.full_table_name, c.column_name, c.role) for c in pending.selected_columns})
+
+    def test_grn_joins_to_material_and_supplier_via_the_verified_fks(self):
+        # FK_GRN (GRN.CODE -> INVITEMS.ITEM_CODE) and FK_GRN_SUPCODE
+        # (GRN.SUP_CODE -> PARTYMASTER.PARTYCODE) already existed in
+        # data/schema_relationships.json before this catalog work -- adding
+        # them to the catalog's own relationships list only had to match,
+        # never invent, a join.
+        by_material = ground_query_plan(plan(
+            "grn", "grn", operation="detail",
+            measures=[Measure(concept="received quantity")],
+            entities=[EntityReference(concept="material", original_value="keyboard", confidence=0.8,
+                                       status=EntityStatus.UNRESOLVED)],
+        ))
+        self.assert_grounded(by_material)
+        self.assertIn("INVENTORY.INVITEMS", {t.full_table_name for t in by_material.selected_tables})
+
+        by_supplier = ground_query_plan(plan(
+            "grn", "grn", operation="detail",
+            measures=[Measure(concept="received quantity")],
+            entities=[EntityReference(concept="supplier_name", original_value="Prime Compu Systems",
+                                       confidence=0.8, status=EntityStatus.UNRESOLVED)],
+        ))
+        self.assert_grounded(by_supplier)
+        self.assertIn("SCM.PARTYMASTER", {t.full_table_name for t in by_supplier.selected_tables})
+
+    def test_generic_cost_measure_and_subject_ground_on_consumption(self):
+        # Live Step 6 finding (2026-09-23, qwen3:14b): the model used the
+        # bare word "cost" for BOTH business_subject and measure -- neither
+        # matched anything ("cost consumed"/"consumption cost" are two-word
+        # aliases, and "cost" is not a consumption domain alias either).
+        result = ground_query_plan(plan(
+            "consumption", "cost", operation="aggregate",
+            measures=[Measure(concept="cost", aggregation=Aggregation.SUM)],
+            date_range=DateRange(kind=DateRangeKind.RELATIVE, original_text="last month"),
+        ))
+        self.assert_grounded(result)
+        self.assertIn(("INVENTORY.ISSUE", "ISSUEVALUE", "measure"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
     def test_purchase_rate_grounds_as_measure(self):
         # "last purchase rate of barcode scanner in 2026" failed grounding on
         # `measure:rate`; PURCHASEORDER.RATE is NUMBER(14,4), never null.
@@ -319,15 +394,21 @@ class SchemaGroundingTests(unittest.TestCase):
     def test_lookup_shortcut_does_not_override_a_different_unsupported_domain(self):
         # fix.md #12: _domain() used to check operation=="lookup" + subject
         # in {material,item} BEFORE ever looking at plan.domain, so a plan
-        # explicitly tagged domain="grn" (0-concept, unsupported -- "is
-        # material X received?") still grounded as a plain material lookup,
-        # silently discarding the only place "received" was ever recorded.
+        # explicitly tagged domain="grn" -- "is material X received?" --
+        # still grounded as a plain material lookup, silently discarding the
+        # only place "received" was ever recorded.
+        # 2026-09-23: grn became a real, supported domain (fix.md #13), so
+        # the exclusion now surfaces as "business_subject:material has no
+        # verified column" rather than "domain not in the catalog at all" --
+        # the exclusion from the lookup shortcut is still what's proven here
+        # (grn is genuinely in catalog["domains"] now; if the shortcut had
+        # fired instead, this would ground successfully as material_lookup).
         result = ground_query_plan(plan("grn", "material", operation="lookup",
                                          entities=[EntityReference(concept="material", original_value="keyboard",
                                                                     confidence=0.9, status=EntityStatus.RESOLVED,
                                                                     selected_value="keyboard")]))
         self.assertFalse(result.is_grounded)
-        self.assertIn("outside the V1 business schema catalog", result.reject_reasons[0].reason)
+        self.assertEqual(result.reject_reasons[0].requirement, "business_subject:material")
 
     def test_lookup_shortcut_still_applies_when_domain_is_generic(self):
         # Same operation+subject shape, but nothing claims a DIFFERENT

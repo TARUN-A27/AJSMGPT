@@ -467,6 +467,70 @@ ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC""",
 FROM INVENTORY.ISSUE issue""",
     ),
     AcceptanceCase(
+        # fix.md #13 (2026-09-23): grn was unsupported until this session's
+        # stock/GRN catalog work. Previously a rejection-case example that
+        # "grn is not a V1 family"; now a real acceptance case for exactly
+        # that question.
+        question="how many qty received in last one year?",
+        occurrence_count=3,
+        category="inventory_movement",
+        expected_family="grn",
+        plan=QueryPlan(
+            original_question="how many qty received in last one year?",
+            domain="grn", operation="aggregate",
+            business_subject=BusinessSubject(concept="grn"),
+            measures=[Measure(concept="received quantity", aggregation=Aggregation.SUM)],
+            date_range=DateRange(kind=DateRangeKind.RELATIVE, original_text="last one year"),
+            confidence=0.85,
+        ),
+        expected_tables={"INVENTORY.GRN"},
+        sql="""SELECT SUM(g.GRNQTY) AS received_quantity
+FROM INVENTORY.GRN g
+WHERE g.GRNDATE >= :date_start
+AND g.GRNDATE < :date_end""",
+    ),
+    AcceptanceCase(
+        # Same closure as above, for the PENDING column.
+        question="how many qty in receipt pending?",
+        occurrence_count=3,
+        category="inventory_movement",
+        expected_family="grn",
+        plan=QueryPlan(
+            original_question="how many qty in receipt pending?",
+            domain="grn", operation="aggregate",
+            business_subject=BusinessSubject(concept="grn"),
+            measures=[Measure(concept="pending receipt quantity", aggregation=Aggregation.SUM)],
+            confidence=0.85,
+        ),
+        expected_tables={"INVENTORY.GRN"},
+        sql="""SELECT SUM(g.PENDING) AS pending_receipt_quantity
+FROM INVENTORY.GRN g""",
+    ),
+    AcceptanceCase(
+        # fix.md #13: stock is deliberately aggregate-only (ITEMSTOCK holds
+        # 1-31 rows per item; a single row is never a correct stock answer --
+        # see the concept's own evidence note in the catalog).
+        question="what is the stock of keyboard",
+        occurrence_count=2,
+        category="review_required",
+        expected_family="stock",
+        plan=QueryPlan(
+            original_question="what is the stock of keyboard",
+            domain="stock", operation="aggregate",
+            business_subject=BusinessSubject(concept="stock"),
+            measures=[Measure(concept="stock quantity", aggregation=Aggregation.SUM)],
+            entities=[EntityReference(
+                concept="material", original_value="keyboard", confidence=0.8, status=EntityStatus.UNRESOLVED
+            )],
+            confidence=0.85,
+        ),
+        expected_tables={"INVENTORY.ITEMSTOCK", "INVENTORY.INVITEMS"},
+        sql="""SELECT SUM(s.STOCK) AS stock_quantity
+FROM INVENTORY.ITEMSTOCK s
+JOIN INVENTORY.INVITEMS items ON s.ITEMCODE = items.ITEM_CODE
+WHERE items.ITEM_NAME = :material_name""",
+    ),
+    AcceptanceCase(
         question="latest issue for yarn in 2024",
         occurrence_count=2,
         category="inventory_movement",
@@ -510,34 +574,6 @@ class RejectionCase:
 
 
 REJECTION_CASES: list[RejectionCase] = [
-    RejectionCase(
-        question="how many qty received in last one year?",
-        occurrence_count=3,
-        category="inventory_movement",
-        needs_review=False,
-        plan=QueryPlan(
-            original_question="how many qty received in last one year?",
-            domain="grn",
-            operation="aggregate",
-            business_subject=BusinessSubject(concept="goods receipt"),
-            confidence=0.7,
-        ),
-        expected_family="grn",
-    ),
-    RejectionCase(
-        question="how many qty in receipt pending?",
-        occurrence_count=3,
-        category="inventory_movement",
-        needs_review=False,
-        plan=QueryPlan(
-            original_question="how many qty in receipt pending?",
-            domain="grn",
-            operation="detail",
-            business_subject=BusinessSubject(concept="goods receipt"),
-            confidence=0.7,
-        ),
-        expected_family="grn",
-    ),
     RejectionCase(
         # fix.md #12: operation="lookup" + subject="material" used to be
         # accepted as a plain material_lookup regardless of domain, silently

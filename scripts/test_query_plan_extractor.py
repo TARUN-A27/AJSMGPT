@@ -250,17 +250,19 @@ class QueryPlanExtractorTests(unittest.TestCase):
     # -- unsupported domains bypass semantic validation (fix.md #6, gate ordering)
 
     def test_unsupported_domain_plan_is_returned_for_the_capability_gate(self) -> None:
-        # Real Qwen shape for "how many qty received in last one year?" made
-        # deliberately semantically INVALID (sort on a concept the plan never
-        # declares): with the bypass removed this raises. Domain grn is not a
-        # V1 family, so evaluate_capability rejects it and the plan must come
-        # back for that gate to say "GRN is not supported".
-        question = "how many qty received in last one year?"
+        # Real Qwen shape for an attendance question made deliberately
+        # semantically INVALID (sort on a concept the plan never declares):
+        # with the bypass removed this raises. Domain "attendance" is not a
+        # V1 family (2026-09-23: unlike grn/stock, which are now supported --
+        # see fix.md #4/#13 -- attendance was never catalogued and has no
+        # profiled table), so evaluate_capability rejects it and the plan
+        # must come back for that gate to say "attendance is not supported".
+        question = "show current attendance for empcode 165224"
         response = plan_json(
             original_question=question,
-            domain="grn",
+            domain="attendance",
             operation="detail",
-            business_subject={"concept": "receipt"},
+            business_subject={"concept": "attendance"},
             measures=[{"concept": "quantity"}],
             sorting=[{"field_concept": "ghost column", "direction": "desc", "priority": 0}],
             date_range={"kind": "relative", "original_text": "last one year"},
@@ -269,7 +271,7 @@ class QueryPlanExtractorTests(unittest.TestCase):
         )
         call = Calls(response)
         plan = extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
-        self.assertEqual(plan.domain, "grn")
+        self.assertEqual(plan.domain, "attendance")
         self.assertFalse(evaluate_capability(plan).supported)
         self.assertEqual(len(call.calls), 1)
 

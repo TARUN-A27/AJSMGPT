@@ -30,19 +30,19 @@
     },
     {
       "name": "stock",
-      "status": "unsupported",
+      "status": "supported",
       "domains": ["stock", "inventory"],
-      "operations": [],
-      "verified_concepts": [],
-      "limitations": ["No verified V1 stock measure or stock-value business definition is catalogued.", "No verified stock snapshot/date semantics are catalogued."]
+      "operations": ["aggregate"],
+      "verified_concepts": ["stock quantity", "material", "item code"],
+      "limitations": ["Detail and ranking are deliberately not supported: ITEMSTOCK holds 1-31 rows per item (per mill/HOD), so a non-aggregated read of a single row is not a correct stock answer -- only a SUM per item, matching the ERP's own GETTOTALSTOCK function.", "Stock-value (money) is not catalogued, only quantity."]
     },
     {
       "name": "grn",
-      "status": "unsupported",
+      "status": "supported",
       "domains": ["grn", "goods receipt", "goods receipt note"],
-      "operations": [],
-      "verified_concepts": [],
-      "limitations": ["No verified V1 GRN table, columns, or relationship path is catalogued."]
+      "operations": ["detail", "aggregate", "ranking"],
+      "verified_concepts": ["received quantity", "pending receipt quantity", "rejected receipt quantity", "grn date", "material", "item code", "supplier", "supplier name", "supplier code"],
+      "limitations": ["\"Order pending\" as a single yes/no status is not catalogued: the ERP's PO-pending SO/IA/JMD approval ladder (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1) needs value-pinned compound conditions this catalog does not yet support -- fix.md #4.", "GRN.STATUS/FLAG carry no verified meaning and are not exposed."]
     },
     {
       "name": "mrs",

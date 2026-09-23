@@ -16,7 +16,7 @@
     },
     {
       "name": "consumption",
-      "aliases": ["consumption", "issue", "issued"],
+      "aliases": ["consumption", "issue", "issued", "cost"],
       "primary_tables": ["INVENTORY.ISSUE"],
       "confidence": 0.85
     },
@@ -30,6 +30,18 @@
       "name": "material_lookup",
       "aliases": ["material", "item"],
       "primary_tables": ["INVENTORY.INVITEMS"],
+      "confidence": 0.85
+    },
+    {
+      "name": "stock",
+      "aliases": ["stock", "inventory", "stock level", "stock balance"],
+      "primary_tables": ["INVENTORY.ITEMSTOCK"],
+      "confidence": 0.85
+    },
+    {
+      "name": "grn",
+      "aliases": ["grn", "goods receipt", "goods receipt note", "receipt"],
+      "primary_tables": ["INVENTORY.GRN"],
       "confidence": 0.85
     }
   ],
@@ -169,7 +181,7 @@
     },
     {
       "name": "consumption_value",
-      "aliases": ["consumption value", "issue value", "issued value", "cost consumed", "consumption cost", "consumed cost", "value"],
+      "aliases": ["consumption value", "issue value", "issued value", "cost consumed", "consumption cost", "consumed cost", "value", "cost"],
       "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEVALUE", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata NUMBER(12,2); live profile 2026-09-22: ISSUE.ISSUEVALUE with ISSRATE per issue line; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2"}]
     },
     {
@@ -188,6 +200,31 @@
       "columns": [{"table": "INVENTORY.ISSUE", "column": "STATUS", "roles": ["status"], "datatype_category": "NUMERIC", "confidence": 0.65, "evidence": "metadata; status values are not catalogued"}]
     },
     {
+      "name": "stock_quantity",
+      "aliases": ["stock quantity", "stock", "stock level", "stock balance", "quantity in stock", "available stock"],
+      "columns": [{"table": "INVENTORY.ITEMSTOCK", "column": "STOCK", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); ERP FUNCTION GETTOTALSTOCK/GETTOTALSTOCKNEW sums this per item across mill/HOD rows (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1) -- ITEMSTOCK carries 1-31 rows per item, never a single-row answer, which is why the stock capability (app/resources/v1_query_capabilities.json) allows aggregate only, not detail/ranking"}]
+    },
+    {
+      "name": "received_quantity",
+      "aliases": ["received quantity", "received qty", "qty received", "received"],
+      "columns": [{"table": "INVENTORY.GRN", "column": "GRNQTY", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2 goods-receipt lines"}]
+    },
+    {
+      "name": "pending_receipt_quantity",
+      "aliases": ["pending quantity", "pending qty", "qty pending", "receipt pending", "pending receipt"],
+      "columns": [{"table": "INVENTORY.GRN", "column": "PENDING", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); GRN line-level quantity still due against the order, docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2"}]
+    },
+    {
+      "name": "rejected_receipt_quantity",
+      "aliases": ["rejected quantity", "rejected qty", "qty rejected", "receipt rejected"],
+      "columns": [{"table": "INVENTORY.GRN", "column": "REJQTY", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2 REJFLAG=1 on 950 lines with REJREASON"}]
+    },
+    {
+      "name": "grn_date",
+      "aliases": ["grn date", "receipt date", "received date", "date"],
+      "columns": [{"table": "INVENTORY.GRN", "column": "GRNDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE_TEXT", "confidence": 0.85, "evidence": "metadata VARCHAR2(8); live profile 2026-09-22: GRNDATE 2008-04-03 to today, 100% YYYYMMDD strings"}]
+    },
+    {
       "name": "name",
       "aliases": ["name"],
       "columns": [
@@ -199,6 +236,9 @@
   "relationships": [
     {"from_table": "INVENTORY.PURCHASEORDER", "from_column": "ITEM_CODE", "to_table": "INVENTORY.INVITEMS", "to_column": "ITEM_CODE", "constraint_name": "ITEMCODE_INVITEMS-ITEMCODE", "confidence": 1.0, "evidence": "schema_relationships.json"},
     {"from_table": "INVENTORY.PURCHASEORDER", "from_column": "SUP_CODE", "to_table": "SCM.PARTYMASTER", "to_column": "PARTYCODE", "constraint_name": "SUPCODE_PARTYMASTER-PARTYCODE", "confidence": 1.0, "evidence": "schema_relationships.json"},
-    {"from_table": "INVENTORY.ISSUE", "from_column": "CODE", "to_table": "INVENTORY.INVITEMS", "to_column": "ITEM_CODE", "constraint_name": "FK_ISSUE", "confidence": 1.0, "evidence": "schema_relationships.json"}
+    {"from_table": "INVENTORY.ISSUE", "from_column": "CODE", "to_table": "INVENTORY.INVITEMS", "to_column": "ITEM_CODE", "constraint_name": "FK_ISSUE", "confidence": 1.0, "evidence": "schema_relationships.json"},
+    {"from_table": "INVENTORY.GRN", "from_column": "CODE", "to_table": "INVENTORY.INVITEMS", "to_column": "ITEM_CODE", "constraint_name": "FK_GRN", "confidence": 1.0, "evidence": "schema_relationships.json"},
+    {"from_table": "INVENTORY.GRN", "from_column": "SUP_CODE", "to_table": "SCM.PARTYMASTER", "to_column": "PARTYCODE", "constraint_name": "FK_GRN_SUPCODE", "confidence": 1.0, "evidence": "schema_relationships.json"},
+    {"from_table": "INVENTORY.ITEMSTOCK", "from_column": "ITEMCODE", "to_table": "INVENTORY.INVITEMS", "to_column": "ITEM_CODE", "constraint_name": "FK_ITEMSTOCK", "confidence": 1.0, "evidence": "schema_relationships.json"}
   ]
 }

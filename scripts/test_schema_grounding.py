@@ -269,6 +269,30 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.ITEMSTOCK", "STOCK", "measure"),
                       {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
 
+    def test_generic_quantity_is_grn_ambiguous_not_a_silent_purchase_leak(self):
+        # Live Step 6 finding (2026-09-23, qwen3:14b, "how many qty received?"):
+        # received/pending/rejected_receipt_quantity had no bare "quantity"/
+        # "qty" alias (unlike purchase/mrs/consumption_quantity, which all
+        # three share it), so a GRN plan's generic "quantity" measure matched
+        # ONLY those three foreign concepts and silently grounded to
+        # INVENTORY.PURCHASEORDER.QTY -- is_grounded=True, no warning, for a
+        # question about goods receipt. Fixed by adding the same bare
+        # aliases to all three GRN quantity concepts; the correct outcome is
+        # an honest ambiguity naming GRN's own three quantities, not a
+        # silent cross-domain answer.
+        result = ground_query_plan(plan(
+            "grn", "grn", operation="aggregate",
+            measures=[Measure(concept="quantity", aggregation=Aggregation.SUM)],
+        ))
+        self.assertFalse(result.is_grounded)
+        self.assertEqual(len(result.ambiguities), 1)
+        self.assertEqual(
+            set(result.ambiguities[0].candidates),
+            {"INVENTORY.GRN.GRNQTY", "INVENTORY.GRN.PENDING", "INVENTORY.GRN.REJQTY"},
+        )
+        self.assertNotIn(("INVENTORY.PURCHASEORDER", "QTY", "measure"),
+                          {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
     def test_grn_received_and_pending_quantity_ground_to_grn_table(self):
         result = ground_query_plan(plan(
             "grn", "grn", operation="aggregate",

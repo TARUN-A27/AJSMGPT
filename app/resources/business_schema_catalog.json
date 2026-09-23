@@ -206,17 +206,17 @@
     },
     {
       "name": "received_quantity",
-      "aliases": ["received quantity", "received qty", "qty received", "received"],
+      "aliases": ["received quantity", "received qty", "qty received", "received", "quantity", "qty"],
       "columns": [{"table": "INVENTORY.GRN", "column": "GRNQTY", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2 goods-receipt lines"}]
     },
     {
       "name": "pending_receipt_quantity",
-      "aliases": ["pending quantity", "pending qty", "qty pending", "receipt pending", "pending receipt"],
+      "aliases": ["pending quantity", "pending qty", "qty pending", "receipt pending", "pending receipt", "quantity", "qty"],
       "columns": [{"table": "INVENTORY.GRN", "column": "PENDING", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); GRN line-level quantity still due against the order, docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2"}]
     },
     {
       "name": "rejected_receipt_quantity",
-      "aliases": ["rejected quantity", "rejected qty", "qty rejected", "receipt rejected"],
+      "aliases": ["rejected quantity", "rejected qty", "qty rejected", "receipt rejected", "quantity", "qty"],
       "columns": [{"table": "INVENTORY.GRN", "column": "REJQTY", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2 REJFLAG=1 on 950 lines with REJREASON"}]
     },
     {

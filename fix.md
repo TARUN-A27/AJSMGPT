@@ -76,7 +76,14 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
 - **Reason:** `No verified V1 column supports this required concept.`
 - **Where:** `app/schema_grounding.py`, `app/resources/business_schema_catalog.json`
 - **Closed 2026-09-22 (P3, commit `0a11c17`):** `purchase_rate` → `INVENTORY.PURCHASEORDER.RATE` and `consumption_rate` → `INVENTORY.ISSUE.ISSRATE`, both verified in `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` §6.1 + the live column profile; `cost consumed` / `consumption cost` / `consumed cost` added as aliases of the existing `consumption_value` (`ISSUE.ISSUEVALUE`). Capabilities updated. Tests: `test_purchase_rate_grounds_as_measure`, `test_cost_consumed_grounds_to_issue_value`.
-- **Still open — order pending:** the ERP computes PO-pending through the SO/IA/JMD approval ladder (study §6.1), not a single column. Needs value-pinned compound conditions (P6), not a catalog alias. Do not approximate it with `STATUS` — `PURCHASEORDER.STATUS` is constant 0 in the live data.
+- **Still open — PO order pending:** the ERP computes PO-pending through the SO/IA/JMD approval ladder (study §6.1), not a single column. Needs value-pinned compound conditions (P6), not a catalog alias. Do not approximate it with `STATUS` — `PURCHASEORDER.STATUS` is constant 0 in the live data.
+- **MRS pending — verified 2026-09-23** (Tarun's own production query, not inferred; full definition in
+  `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` §6.1): `MRS_TEMP.RejectionStatus=0 AND StoresRejectionStatus=0 AND
+  ItemDelete=0 AND isDelete=0 AND MrsFlag=1 AND (MillCode=0 OR MillCode IS NULL)`, **plus** a `LEFT JOIN MRS ON
+  MrsNo/SlNo` with `NVL(MRS.OrderNo, 0) = 0`. The flag-AND part fits the existing `compound_condition` mechanism;
+  the anti-join to `MRS` does not — V1 has no "no matching row in a second table" grounding capability today.
+  Ready to implement with a small, new, catalog-declared anti-join fragment; not attempted (needs its own careful
+  design + tests, same reasoning as the PO ladder above — do not rush a new grounding mechanism unsupervised).
 
 ## 5. ✅ Zero end-to-end passes
 - **Closed 2026-09-22.** First passes on the Step 3 run (3), then 2 on the re-run after the Oracle-executability

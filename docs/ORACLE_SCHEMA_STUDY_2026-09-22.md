@@ -201,6 +201,15 @@ The INVENTORY schema holds 64 procedures, 40 functions, 52 triggers, 14 types (2
 - **mrs store rejection** — `TRIGGER INVENTORY.STOREREJECTION / ON_UPDATE_STOREREJECTION`: MRS_TEMP.STORESREJECTIONSTATUS = 1 stamps STORESREJECTEDDATETIME, sets ENQUIRYSTATUS = 0 and closes related ENQUIRY rows (CLOSESTATUS = 1).
 - **supplier** — `VIEW INVENTORY.SUPPLIER`: SCM.PARTYMASTER WHERE GOODSTYPECODE = 2 (name=PARTYNAME, ac_code=PARTYCODE).
 - **po net rate** — `ERP report views (TEMP1POORDER*, X3339991)`: PURCHASEORDER.NET / PURCHASEORDER.QTY AS NetRate; QTY is never 0 or null.
+- **mrs pending (verified 2026-09-23 from Tarun's own production query, not inferred)**: an `MRS_TEMP` row is
+  pending when ALL of `RejectionStatus=0`, `StoresRejectionStatus=0`, `ItemDelete=0`, `isDelete=0`, `MrsFlag=1`,
+  `(MillCode=0 OR MillCode IS NULL)`, AND `NVL(MRS.OrderNo, 0) = 0` on a `LEFT JOIN MRS ON MRS.MrsNo = MRS_Temp.MrsNo
+  AND MRS_Temp.SlNo = MRS.SlNo` (catches both "never approved into MRS at all" and "approved but no PO cut yet").
+  The first six conditions fit the existing `compound_condition` mechanism (AND across flag columns, same shape as
+  `mrs_rejected`/`mrs_approved`) — the anti-join to `MRS` does not: V1 has no mechanism today for "no matching row
+  in a second table," only same-domain AND/OR over columns already in scope. Implementing this needs a new,
+  narrow grounding capability (a fixed, catalog-declared anti-join fragment), not attempted in this study or in
+  the 2026-09-23 stock/GRN catalog work — recorded here complete and ready to implement, not guessed at.
 
 Other functions worth reading before cataloguing their concepts: `GETWORKORDERPENDINGSTATUS`, `GETADVREQUESTPENDINGSTATUS`
 (same SO/IA/JMD ladder on ADVREQUEST), `GETNONSTOCK`, `GETOTHERSTOCK`, `GETSERVICESTOCK`, `GETBUDGET`,

@@ -43,5 +43,32 @@ else:
     for owner, count in rows:
         print(f"{owner:<15} {count}")
 
+# docs/ORACLE_READONLY_ACCOUNT.md promises this account is a DATABASE
+# guarantee, not just an application-enforced one -- that claim is only true
+# if it is checked, not assumed. These two dictionary views answer "can this
+# account do anything beyond SELECT", independent of which tables happen to
+# be visible above.
+print("\n" + "=" * 60)
+print("OBJECT PRIVILEGES (expect SELECT only)")
+print("=" * 60)
+
+cur.execute("SELECT DISTINCT PRIVILEGE FROM USER_TAB_PRIVS ORDER BY PRIVILEGE")
+privileges = [row[0] for row in cur.fetchall()]
+if privileges == ["SELECT"]:
+    print("OK: SELECT only.")
+else:
+    print(f"WARNING: non-SELECT object privileges present: {privileges}")
+
+print("\n" + "=" * 60)
+print("SYSTEM PRIVILEGES (expect CREATE SESSION only)")
+print("=" * 60)
+
+cur.execute("SELECT PRIVILEGE FROM USER_SYS_PRIVS ORDER BY PRIVILEGE")
+sys_privileges = [row[0] for row in cur.fetchall()]
+if sys_privileges == ["CREATE SESSION"]:
+    print("OK: CREATE SESSION only.")
+else:
+    print(f"WARNING: unexpected system privileges: {sys_privileges}")
+
 cur.close()
 conn.close()

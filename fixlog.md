@@ -219,3 +219,46 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   `progress.md`, `CLAUDE.md`. No Oracle DDL/DML; every query used was SELECT against a read-only dictionary view.
 - **Tests:** `py_compile` on every script revision; 11 core suites 284/284 unaffected (deployment/scripting
   only, no `app/` changes this round); server-side offline suite also 284/284 after each pull.
+
+### Task 1 (Step 6 live eval, continued) + Task 2 (stock/GRN catalog) — both complete
+- **Prompt:** "continue with task after this also do one big task also / i will be not be available for the
+  task / and before starting tell me what is the task" — described both tasks explicitly, user confirmed
+  "complete both task" and stepped away; continued unsupervised through 4 live-Oracle eval rounds, a bonus
+  business-logic recording (Tarun supplied a real MRS-pending production query mid-turn), and every fix each
+  live round surfaced.
+- **Task 1 done:** `scripts/evaluate_v1_real_questions_live.py` (new) — the same real V1 pipeline as the offline
+  evaluator, entity resolution and execution both taking their real, Oracle-backed defaults (no stubs). Never
+  records `rows`/`columns`/`summary` anywhere, only `row_count` (an aggregate integer) — verified after every one
+  of the 4 rounds run this session. First-ever live `PASS_PIPELINE` against real Oracle (run 3,
+  `how much cost consumed last month?`, `row_count=1`). Full before/after numbers and every fix found: fix.md #13.
+- **Task 2 done:** cataloged `stock` (`ITEMSTOCK.STOCK`, aggregate-only by design — the table holds 1-31 rows per
+  item, matching the ERP's own `GETTOTALSTOCK`) and `grn` (`GRNQTY`/`PENDING`/`REJQTY`/`GRNDATE`, full
+  detail/aggregate/ranking, reusing the already-verified `FK_GRN`/`FK_GRN_SUPCODE`/`FK_ITEMSTOCK` joins — no new
+  join was invented). Deliberately excluded: the PO-pending SO/IA/JMD ladder and the MRS-pending anti-join
+  (both need a new grounding capability this catalog-only work does not attempt). 10 of the 47-question set's
+  24 by-design-refused questions are now genuinely reachable, not just refused.
+- **Bonus, recorded not implemented:** Tarun supplied his own production "pending MRS" query mid-session —
+  recorded verbatim as a verified business definition (`docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` §6.1, fix.md #4)
+  rather than wired in; it needs a `LEFT JOIN ... NVL(OrderNo,0)=0` anti-join pattern V1's grounding has no
+  mechanism for today.
+- **Every live round found one real, previously-invisible gap — each reproduced by isolated test before being
+  fixed, each re-verified after:** (1) the evaluator's own `KNOWN_UNSUPPORTED_DOMAINS` was stale (still called
+  stock/grn by-design-refused after they became real families — would have hidden genuine
+  `CAPABILITY_FAILURE`s as false "working as intended"); (2) `qwen3:14b` used the bare word `"cost"` for both
+  `business_subject` and `measure`, matching nothing; (3) the same model used the bare word `"quantity"` for a
+  GRN question, which — before the fix — silently grounded to `INVENTORY.PURCHASEORDER.QTY` with no warning
+  (the fix.md #10 bug pattern, now found a 4th time); (4) `business_subject="quantity received"` (reverse word
+  order) matched no domain alias. None of these were guessed at — each was confirmed against the actual live
+  captured plan before any catalog edit.
+- **Files:** `app/resources/business_schema_catalog.json`, `app/resources/v1_query_capabilities.json`,
+  `scripts/evaluate_v1_real_questions_live.py` (new), `scripts/evaluate_v1_real_questions.py`,
+  `scripts/test_schema_grounding.py`, `scripts/test_query_plan_extractor.py`,
+  `scripts/test_query_plan_semantic_validator.py`, `scripts/test_v1_acceptance_matrix.py`, `fix.md`,
+  `progress.md`, `CLAUDE.md`, `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md`, `docs/V1_FREEZE_CRITERIA.md`. Every
+  Oracle interaction was SELECT via the existing safe-select path with the read-only `ajsmgpt_ro` account; no
+  DDL/DML; no row data ever left the server.
+- **Tests:** 11 core suites **290/290** (was 284 at the start of this block: `test_schema_grounding` 31→37,
+  `test_v1_acceptance_matrix` 17→20 supported cases / 4→3 rejection cases, `test_query_plan_extractor` and
+  `test_query_plan_semantic_validator` updated to a genuinely-still-uncatalogued domain, "attendance"); `py_compile`
+  clean at every commit; `git diff --check` clean; `git push` succeeded on every commit (the earlier session's
+  publish-permission denial did not recur).

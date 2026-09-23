@@ -77,9 +77,9 @@ Order of work — do not skip ahead:
    P4. Entity resolution on real master data             ✅ commit 7816149
 4. Controlled Qwen3:8b vs Qwen3:14b comparison           ✅ docs/STEP4_MODEL_COMPARISON.md, fix.md #11 — 14b adopted as dev/eval model
 5. Re-run acceptance                                     ✅ test_v1_acceptance_matrix.py 15→17 cases (real 14b result + fix.md #10 anchor)
-6. Connect company Oracle server, validate real results  ← next — deployed and read-only access verified
-   2026-09-23 (docs/ORACLE_READONLY_ACCOUNT.md); live-question eval against real Oracle not yet run
-7. Freeze V1                                             exit criteria proposed, awaiting sign-off — docs/V1_FREEZE_CRITERIA.md
+6. Connect company Oracle server, validate real results  ✅ fix.md #13 — deployed, ajsmgpt_ro verified SELECT-only,
+   4 live-eval rounds against real Oracle, first real PASS_PIPELINE, 4 real gaps found + fixed same day
+7. Freeze V1                                             ← next — exit criteria proposed, awaiting sign-off — docs/V1_FREEZE_CRITERIA.md
 ```
 Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign.
 
@@ -107,7 +107,7 @@ Tests are `unittest` scripts. Run the one for the component you changed:
 python scripts/test_<component>.py
 ```
 Core V1 suites: `test_text_correction`, `test_spacy_nlp`, `test_query_plan_extractor`, `test_query_plan_semantic_validator`, `test_schema_grounding`, `test_grounded_sql_generator`, `test_grounded_sql_validator`, `test_sql_datatype_validator`, `test_nlp_execution`, `test_v1_acceptance_matrix`.
-Baseline: 11 core suites 284/284 (2026-09-23).
+Baseline: 11 core suites 290/290 (2026-09-23).
 
 ## 8. Evaluation commands
 ```bash

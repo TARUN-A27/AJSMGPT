@@ -40,10 +40,10 @@ Core V1 suites (11): 284/284 (2026-09-23, after fix.md #10/#12 and the Step 4/5 
 | consumption | consumption / issue | detail, aggregate, ranking | 6 | ✅ supported |
 | supplier_lookup | purchase, supplier_lookup | lookup | 3 | ✅ supported |
 | material_lookup | purchase, material_lookup | lookup | 3 | ✅ supported |
-| stock | stock, inventory | — | 0 | ❌ unsupported |
-| grn | goods receipt | — | 0 | ❌ unsupported |
+| stock | stock, inventory | aggregate | 3 | ✅ supported (2026-09-23, aggregate-only by design — fix.md #13) |
+| grn | goods receipt | detail, aggregate, ranking | 9 | ✅ supported (2026-09-23 — fix.md #13; PO-pending ladder still open, fix.md #4) |
 
-Catalog: 5 domains · 26 concepts · 3 relationships (`purchase_rate`, `consumption_rate` added 2026-09-22 from the schema study).
+Catalog: 7 domains · 31 concepts · 6 relationships (stock + grn added 2026-09-23 from verified schema columns, fix.md #13).
 
 ### Real-question evaluation (47 questions)
 ```text
@@ -70,12 +70,15 @@ what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~97%   #7, #10, #12 all closed; fix.md #2/#3/#4 remain (need real data
+Deterministic layers (2, 4, 5, 7)         ~97%   #7, #10, #12, #13 closed; fix.md #2/#3 remain (need real data
                                                   or a scoped prompt task, not quick fixes)
 LLM layers (3, 6)                          ~75%   Step 4 done: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1
-Execution + report (8, 9)                  ~70%   SQL is now valid for Oracle 11.2; still never run on it
-Real-question pass rate (14b)             5/47   (24 by-design unsupported → 5/23 of in-scope, all executable)
-Overall V1                                 ~80%   remaining: Step 6's live eval, freeze sign-off
+Execution + report (8, 9)                  ~80%   Step 6 done: real Oracle, first live PASS_PIPELINE (fix.md #13)
+Coverage                                   7/7    stock + grn added 2026-09-23 (10 of 24 previously-refused
+                                                  questions now genuinely reachable, not just refused)
+Live-question eval (14b, real Oracle)     1/47   first pass ever against real Oracle; 4 rounds, 4 real gaps
+                                                  found and fixed same day (fix.md #13) -- see the eval detail
+Overall V1                                 ~85%   remaining: bigger question bank, freeze sign-off
 ```
 
 ---

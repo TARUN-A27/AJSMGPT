@@ -262,8 +262,44 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   assumed) verdict against the 14 tables AJSMGPT actually reads: none of them carry a PUBLIC grant beyond SELECT.
   **Does not affect V1** — checked, not just claimed. **Does matter to whoever owns this database** — flagged in
   `docs/ORACLE_READONLY_ACCOUNT.md`, not fixed (AJSMGPT never runs GRANT/REVOKE).
-- **Not yet done:** the `ajsmgpt-v1.service` systemd unit; Step 6's actual live-question eval against real Oracle.
-- **Files:** `scripts/check_schema_access.py`, `docs/ORACLE_READONLY_ACCOUNT.md`.
+- **Live-question eval — 4 rounds, done same day.** `scripts/evaluate_v1_real_questions_live.py` (new; real
+  entity resolution + real execution, never records `rows`/`columns`/`summary`, only `row_count` — see the
+  file's own docstring). Each round ran all 47/47 questions against real Oracle with `ajsmgpt_ro`, 0 crashes,
+  0 leaked row data (verified after every run: zero `rows`/`columns`/`summary` fields in the results file).
+  **Run 1** (before stock/GRN): `UNSUPPORTED_EXPECTED 24 · ENTITY_RESOLUTION_REJECTION 15 · CAPABILITY_FAILURE 4 ·
+  QUERY_PLAN_FAILURE 2 · GROUNDING_FAILURE 2 · PASS_PIPELINE 0`. **Run 4** (final, stock/GRN + every fix below
+  deployed): `ENTITY_RESOLUTION_REJECTION 16 · UNSUPPORTED_EXPECTED 13 · CAPABILITY_FAILURE 10 ·
+  QUERY_PLAN_FAILURE 4 · GROUNDING_FAILURE 3 · PASS_PIPELINE 1`. `ENTITY_RESOLUTION_REJECTION` rising to 15→16 on
+  real master data is expected, not a regression — exactly what fix.md #2 predicted ("recheck on real master
+  data"): real item/supplier names (`mouse`, `dell`, `dell system`, `yarn`, `printer toner`, a literal
+  `barcode chrome label`) don't case/whitespace-normalize to an exact real `ITEM_NAME`/`PARTYNAME`, and the
+  resolver has no fuzzy matching by design. `CAPABILITY_FAILURE` rising 4→10 is the honest signal the evaluator
+  classifier fix below unlocked: stock questions using `operation=detail`/`unknown` genuinely reach the (now
+  real) stock family and are correctly refused for the wrong operation, not silently mislabeled "working as
+  intended."
+- **First-ever live `PASS_PIPELINE` against real Oracle**, run 3: `how much cost consumed last month?` —
+  `row_count=1`, a real aggregate row from `INVENTORY.ISSUE`. The exact result value was never seen or recorded
+  anywhere (CLAUDE.md §3); only the count and the fact of success are reported here.
+- **Three more live-only findings, each reproduced by isolated test before being fixed, each verified after:**
+  (1) `qwen3:14b` used the bare word `"cost"` for both `business_subject` and `measure` on the question above —
+  no concept had that bare alias (only two-word phrases like `"cost consumed"`); (2) `"how many qty received?"` /
+  `"...in last one year?"` used the bare word `"quantity"` for the measure, which — before the fix — matched
+  only purchase/mrs/consumption's shared `"quantity"`/`"qty"` alias and silently grounded to
+  `INVENTORY.PURCHASEORDER.QTY`, `is_grounded=True`, no warning, for a goods-receipt question. Confirmed the
+  silent leak directly, then fixed by giving GRN's own three quantity concepts the same bare alias — the correct
+  outcome is now an honest ambiguity naming `GRNQTY`/`PENDING`/`REJQTY`, not a cross-domain guess; (3) the same
+  two "qty received" questions separately used `business_subject="quantity received"`, which matched no domain
+  alias and no identifier-role concept — added as a `grn` domain alias, same pattern as fix (1). Fix (3) verified
+  directly rather than through a fifth full live-Oracle round trip (diminishing returns past this point).
+- **Also found and fixed the same day:** the evaluator's own `KNOWN_UNSUPPORTED_DOMAINS`/`_expected_unsupported()`
+  still listed stock/grn as by-design-refused after the catalog work made them real families — caught by run 2
+  still showing stock questions as `UNSUPPORTED_EXPECTED`; both the offline and live evaluators share this
+  constant, so both were restarted after the fix rather than reported with the stale label.
+- **Not yet done:** the `ajsmgpt-v1.service` systemd unit; the acceptance-criteria comparison against
+  `AJSMquery.sql` (needs more than the single `PASS_PIPELINE` this session produced to be a meaningful check).
+- **Files:** `scripts/check_schema_access.py`, `scripts/evaluate_v1_real_questions_live.py`,
+  `scripts/evaluate_v1_real_questions.py`,
+  `docs/ORACLE_READONLY_ACCOUNT.md`.
 
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.

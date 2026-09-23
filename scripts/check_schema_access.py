@@ -75,28 +75,53 @@ else:
 # there -- checked directly here so "SELECT only" above is not overstated.
 # This is a database-wide condition this account did not create and cannot
 # fix (AJSMGPT never runs GRANT/REVOKE); it is reported, not resolved, here.
+#
+# Scoped to the 5 schemas AJSMGPT could ever touch (same filter as "VISIBLE
+# SCHEMAS" above) -- this instance turned out to have ~28,000 PUBLIC grants
+# database-wide (evidently from old cross-database migration tooling: the
+# MICROSOFTDTPROPERTIES/MICROSOFTSEQDTPROPERTIES pattern repeats in schemas
+# AJSMGPT has never heard of, e.g. ACCSHARES/ACCTEX), and dumping all of them
+# every run would bury the one question that actually matters below.
 print("\n" + "=" * 60)
-print("PUBLIC GRANTS this account also inherits (informational, not pass/fail)")
+print("PUBLIC GRANTS in AJSMGPT's 5 schemas (informational, not pass/fail)")
 print("=" * 60)
 
 cur.execute("""
-SELECT TABLE_SCHEMA, TABLE_NAME, PRIVILEGE FROM ALL_TAB_PRIVS
-WHERE GRANTEE = 'PUBLIC' ORDER BY TABLE_SCHEMA, TABLE_NAME, PRIVILEGE
+SELECT TABLE_SCHEMA, PRIVILEGE, COUNT(*) FROM ALL_TAB_PRIVS
+WHERE GRANTEE = 'PUBLIC' AND TABLE_SCHEMA IN ('ADMIN', 'HRDNEW', 'INSUR', 'INVENTORY', 'SCM')
+GROUP BY TABLE_SCHEMA, PRIVILEGE ORDER BY TABLE_SCHEMA, PRIVILEGE
 """)
-public_grants = cur.fetchall()
-if not public_grants:
+by_schema = cur.fetchall()
+if not by_schema:
     print("None.")
 else:
-    non_select = [row for row in public_grants if row[2] != "SELECT"]
-    print(f"{len(public_grants)} PUBLIC object grants visible ({len(non_select)} beyond SELECT):")
-    for schema, table, privilege in public_grants:
-        print(f"  {schema}.{table:<28} {privilege}")
-    if non_select:
-        print("\nNote: PUBLIC grants beyond SELECT are a database-level condition, not")
-        print("something this account's creation introduced or something AJSMGPT can")
-        print("revoke. AJSMGPT's own catalog never references these tables, so this")
-        print("does not affect V1's own read-only behaviour, but it is worth the")
-        print("database owner's attention independently of AJSMGPT.")
+    for schema, privilege, count in by_schema:
+        print(f"  {schema:<10} {privilege:<12} {count}")
+
+# The only question that actually matters for V1: does this touch a table
+# AJSMGPT itself reads? Checked directly, not asserted.
+cur.execute("""
+SELECT TABLE_SCHEMA, TABLE_NAME, PRIVILEGE FROM ALL_TAB_PRIVS
+WHERE GRANTEE = 'PUBLIC' AND PRIVILEGE != 'SELECT'
+  AND (TABLE_SCHEMA, TABLE_NAME) IN (
+    ('INVENTORY','PURCHASEORDER'), ('INVENTORY','INVITEMS'), ('INVENTORY','MRS_TEMP'),
+    ('INVENTORY','ISSUE'), ('INVENTORY','DEPT'), ('SCM','PARTYMASTER'),
+    ('INVENTORY','MRS'), ('INVENTORY','GRN'), ('INVENTORY','INVOICEGRN'),
+    ('INVENTORY','ITEMSTOCK'), ('INVENTORY','UNIT'), ('SCM','PLACE'),
+    ('SCM','STATE'), ('SCM','COUNTRY')
+  )
+""")
+hits = cur.fetchall()
+print()
+if hits:
+    print(f"WARNING: {len(hits)} non-SELECT PUBLIC grant(s) on a table AJSMGPT itself reads:")
+    for schema, table, privilege in hits:
+        print(f"  {schema}.{table} {privilege}")
+else:
+    print("OK: none of AJSMGPT's own 14 tables carry a PUBLIC grant beyond SELECT.")
+print("(PUBLIC grants elsewhere in ADMIN/HRDNEW/INSUR are a pre-existing, database-wide")
+print("condition this account did not create and AJSMGPT cannot revoke -- see")
+print("docs/ORACLE_READONLY_ACCOUNT.md for the full picture.)")
 
 cur.close()
 conn.close()

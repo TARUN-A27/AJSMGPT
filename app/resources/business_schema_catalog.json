@@ -40,7 +40,7 @@
     },
     {
       "name": "grn",
-      "aliases": ["grn", "goods receipt", "goods receipt note", "receipt"],
+      "aliases": ["grn", "goods receipt", "goods receipt note", "receipt", "quantity received", "received quantity"],
       "primary_tables": ["INVENTORY.GRN"],
       "confidence": 0.85
     }

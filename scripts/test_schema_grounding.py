@@ -269,6 +269,25 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.ITEMSTOCK", "STOCK", "measure"),
                       {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
 
+    def test_quantity_received_business_subject_matches_the_grn_domain(self):
+        # Live Step 6 finding (2026-09-23, qwen3:14b, "how many qty received?"
+        # and "...in last one year?"): business_subject="quantity received"
+        # matched no domain alias ("grn"'s own aliases had "receipt" but not
+        # this exact phrase) and no concept with role=identifier, so the
+        # plan was rejected before the measure was ever reached. Added the
+        # exact phrase (and its reverse word order) as grn domain aliases,
+        # mirroring the "cost"/consumption domain-alias fix earlier the same
+        # day. The plan should now fail only on the measure's own, separately
+        # fixed, honest 3-way ambiguity -- not on business_subject.
+        result = ground_query_plan(plan(
+            "grn", "quantity received", operation="aggregate",
+            measures=[Measure(concept="quantity", aggregation=Aggregation.SUM)],
+        ))
+        self.assertFalse(result.is_grounded)
+        self.assertEqual(result.reject_reasons, [])
+        self.assertEqual(len(result.ambiguities), 1)
+        self.assertEqual(result.ambiguities[0].requirement, "measure:quantity")
+
     def test_generic_quantity_is_grn_ambiguous_not_a_silent_purchase_leak(self):
         # Live Step 6 finding (2026-09-23, qwen3:14b, "how many qty received?"):
         # received/pending/rejected_receipt_quantity had no bare "quantity"/

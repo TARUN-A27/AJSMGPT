@@ -176,21 +176,35 @@ The deterministic resolver is already wired (`app/entity_resolution.py`, fail-cl
 - Index refresh job for `data/entity_index.sqlite3` / `full_value_index.sqlite3` from Oracle master tables (read-only, scheduled on the server).
 - Ambiguity UX: when >1 candidate, return a clarification instead of guessing.
 
-### B2. Conversation memory (multi-turn context) — new idea, 2026-09-23
-Today every `/v1/nlp/*` call is stateless: one question, one grounded answer, nothing carried forward. Tarun
-asked for AJSMGPT to "consider the previous prompt" — a genuine, good idea, but a different shape than V1's
-current single-question API, so it's recorded here rather than started now.
-- **What it needs, minimum:** a session/conversation id the client sends; server-side storage of the last N
-  QueryPlans (or just the last one) keyed by that id; a rule for what "carry forward" means — e.g. an unresolved
-  pronoun/ellipsis ("what about last month?") reuses the prior plan's `business_subject`/entities and only
-  overrides the field the new text actually names (here, `date_range`).
-- **Where it must NOT weaken anything:** carried-forward entities still go through the same fail-closed
-  `resolve_plan_entities` gate as a fresh one — "remembered" is not a substitute for "verified." A stale
-  resolved entity from 10 turns ago should not be trusted forever; needs an expiry/re-verify rule.
-- **Open design questions, not decided:** in-memory per-session dict (simple, lost on restart, fine for a single
-  process) vs. a real store; how many turns of history; whether this is a new `/v1/nlp/*` field (a `session_id`
-  the existing endpoints accept) or a genuinely new endpoint (CLAUDE.md §2 currently says "do not add endpoints" —
-  would need revisiting deliberately, not by accident).
+### B2. Conversation memory (multi-turn context) — idea + proposed design, 2026-09-23
+Today every `/v1/nlp/*` call is stateless: one question, one grounded answer, nothing carried forward. Tarun's
+example: Q1 "keyboard stock", Q2 "when will it reach" — Q2 has no subject at all without Q1's context. Recorded
+here, not started — a different shape than V1's current single-question API.
+
+**Proposed approach (Tarun, 2026-09-23): hybrid NLP + Qwen, not Qwen alone.** This is a natural extension of
+V1's existing shape (`text correction → spaCy NLP signals → Qwen QueryPlan` is already a hybrid pipeline), not
+a new architecture:
+1. **Deterministic reference check (new, small):** before calling Qwen, a cheap check — does the current
+   question stand alone (has its own subject/entity), or does it look like a follow-up (bare pronoun "it"/"that",
+   or a business_subject/entity-free plan on the first extraction pass)? spaCy already gives most of this for
+   free (dependency parse flags a pronoun with no local antecedent).
+2. **Memory lookup (new, small):** if it looks like a follow-up, pull the last stored QueryPlan for this
+   session (business_subject, entities, domain).
+3. **Enrich, don't override, the Qwen call:** feed Qwen the resolved context as an explicit note (e.g. "the
+   previous question concerned material 'KEYBOARD', domain 'stock'"), not by silently rewriting the question
+   text. Qwen still builds the QueryPlan; it just isn't guessing what "it" means.
+4. **No shortcut on verification:** the resulting plan — carried-forward entity included — goes through
+   the *exact same* semantic validation, grounding, and fail-closed `resolve_plan_entities` gate as a fresh
+   plan. Memory supplies a candidate, never a verified fact; a stale resolved entity from 10 turns ago is not
+   trusted forever without re-verification.
+
+This keeps the core principle intact ("Qwen proposes, deterministic code verifies") — memory only changes what
+Qwen is given to propose from, not what gets verified or how.
+
+- **Still open, not decided:** in-memory per-session dict (simple, lost on restart) vs. a real store; how many
+  turns of history; whether this is a new field on the existing endpoints (a `session_id` param) or needs a new
+  endpoint (CLAUDE.md §2 currently says "do not add endpoints" — would need revisiting deliberately).
+- **Not started.** Post-V1 (after freeze) — see `docs/V1_FREEZE_CRITERIA.md`.
 - **Not started.** Do not build this piece by piece alongside other V1 work; it changes the interaction model and
   deserves its own scoped task once V1 is frozen.
 

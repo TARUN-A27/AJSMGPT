@@ -109,12 +109,10 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
   actually used the verified join. Closed by requiring the NULL check to use specifically the verified join's
   own alias. 3 new regression tests (`test_appended_or_clause_cannot_widen_the_predicate`,
   `test_left_join_alias_confusion_is_rejected`, `test_appended_or_of_an_already_required_column_is_rejected`).
-- **Not done yet — eval re-run:** the offline 47-question evaluation (`scripts/evaluate_v1_real_questions.py`,
-  needs Ollama) has not been re-run against this new capability. Some currently-recorded `UNSUPPORTED_EXPECTED`
-  results for "order pending"-style questions may now be reachable (`CAPABILITY_FAILURE`, `GROUNDING_FAILURE`, or
-  a real pass) instead of refused-by-design — the same way the stock/GRN catalog work earlier this session
-  flipped 10 of 13 such cases (fix.md #13). Re-running that eval is a follow-up, not done as part of
-  this change.
+- **Eval re-run done (same day, qwen3:8b):** unlike the stock/GRN catalog work (fix.md #13, 10 of 13
+  `UNSUPPORTED_EXPECTED` flipped), this one flipped none — the aggregate 13/12/10/4/4/2/2 split is unchanged.
+  Root cause is upstream of grounding, in QueryPlan extraction; full detail and the specific near-miss
+  questions: fix.md #14.
 
 ## 5. ✅ Zero end-to-end passes
 - **Closed 2026-09-22.** First passes on the Step 3 run (3), then 2 on the re-run after the Oracle-executability
@@ -331,6 +329,36 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - **Files:** `scripts/check_schema_access.py`, `scripts/evaluate_v1_real_questions_live.py`,
   `scripts/evaluate_v1_real_questions.py`,
   `docs/ORACLE_READONLY_ACCOUNT.md`.
+
+## 14. 🟡 Offline eval re-run after PO/MRS-pending: aggregate numbers unchanged — the real bottleneck is QueryPlan extraction, not grounding
+- **Count:** 0 net change. 13/12/10/4/4/2/2 before and after re-running the same 47 questions (qwen3:8b — qwen3:14b
+  is not pulled on this machine right now; ran with 8b on Tarun's explicit choice). 2 individual questions
+  swapped classification, unrelated to this change (see model non-determinism note below).
+- **Reason:** for the 2 closest candidate questions ("list out material hold at Store officer?", "list out
+  material approval pending at Store officer?"), qwen3:8b's QueryPlan extraction produced `domain='unknown'`,
+  never even attempting the mrs/purchase domain. For a 3rd ("list out order pending material names?"), the model
+  produced `domain='purchase'` but dropped "pending" entirely — `entities: []`, `filters: []` — the plan asked
+  only for "material names," so grounding never got a chance to try `po_pending`. That plan then separately
+  failed grounding for an unrelated, already-counted reason (`business_subject="material"` has no
+  identifier-role column and isn't a domain alias under `purchase` — one of the pre-existing 4
+  `GROUNDING_FAILURE`s, not a new gap).
+- **Conclusion:** `po_pending`/`po_pending_at_so/ia/jmd`/`po_approved`/`mrs_pending` are verified correct by 20
+  targeted unit tests (hand-built QueryPlans that exercise them directly) plus an independent review — the
+  deterministic grounding/validation layer works exactly as designed. What's unproven is whether qwen3:8b's
+  QueryPlan extraction reliably represents "pending"/"approval"/"hold" as an entity or filter concept at all for
+  real free-text phrasing; today's 47-question set doesn't contain a clean test of it, and the 2-3 near-miss
+  questions show the model currently drops or misroutes it before grounding is ever reached. Same class of gap
+  as fix.md #3 (operation-choice prompt tuning), but for entity/filter concept recognition specifically — not a
+  reason to doubt today's catalog/validator work, which this run never actually exercised.
+- **Not done:** prompt tuning for this specific gap — needs its own before/after measured pass with real
+  "pending"/"approval"/"hold" phrasings, not a same-session patch.
+- **Model non-determinism, noted not chased:** `"Last 3 purchase details of \"MONITOR\""` flipped
+  `PASS_PIPELINE`→`SQL_VALIDATION_FAILURE` and `"how much cost consumed last month?"` flipped
+  `SQL_VALIDATION_FAILURE`→`PASS_PIPELINE` between this run and the prior recorded one, despite
+  `temperature=0.0`. Neither question touches PO/MRS-pending; treated as pre-existing model-serving noise
+  (real for any offline re-run, not introduced by this session), not a regression.
+- **Where:** `app/query_plan_extractor.py` (entity/filter concept recognition for pending/approval/hold), not
+  `app/schema_grounding.py` or `app/grounded_sql_validator.py` (both unchanged by this eval run).
 
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.

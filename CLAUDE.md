@@ -88,9 +88,10 @@ Detail and fix plan per item: `fix.md`.
 47-question real evaluation (`scripts/v1_real_question_eval_results.json`):
 ```text
 CAPABILITY_FAILURE           12   ← stock/grn now genuinely reachable (fix.md #13); model op-choice failures
-UNSUPPORTED_EXPECTED         13   ← by design (attendance, camera_ip, PO/MRS-pending status, dell system stock*)
+UNSUPPORTED_EXPECTED         13   ← by design (attendance, camera_ip, dell system stock*); PO/MRS-pending is NOW
+                                     supported but the model doesn't route to it for these phrasings (fix.md #14)
 ENTITY_RESOLUTION_REJECTION  10   ← values absent from the offline fixture (recheck on real master data)
-GROUNDING_FAILURE              4   ← bare "quantity"/"cost" alias gaps found + fixed same day (fix.md #13); PO-pending
+GROUNDING_FAILURE              4   ← bare "quantity"/"cost" alias gaps found + fixed same day (fix.md #13)
 QUERY_PLAN_FAILURE             4   ← all model behaviour (low confidence, undeclared sort field)
 SQL_VALIDATION_FAILURE         2   ← model wrote quoted identifiers / omitted the entity filter; correct rejections
 PASS_PIPELINE                  2
@@ -106,9 +107,13 @@ Later the same day: the PO-pending SO/IA/JMD approval ladder and the MRS-pending
 `UNSUPPORTED_EXPECTED`, fix.md #4) were catalogued and implemented — see `po_pending_at_so/ia/jmd`, `po_approved`,
 `po_pending`, and `mrs_pending` in `app/resources/business_schema_catalog.json`. This needed two new grounding/
 validation mechanisms (value-pinned and value-or-null compound conditions, and a catalog-declared anti-join not
-backed by a database FK) in `app/schema_grounding.py` / `app/grounded_sql_validator.py`. The table above still
-reflects the eval run *before* this change — some of the 13 `UNSUPPORTED_EXPECTED` questions about order-pending
-status may now be reachable; re-running the offline eval to measure that is a follow-up, not done yet.
+backed by a database FK) in `app/schema_grounding.py` / `app/grounded_sql_validator.py`. Re-ran the offline eval
+after this (qwen3:8b — qwen3:14b is not pulled on this machine): the table above is the result, and the
+aggregate counts are **unchanged** — unlike the stock/GRN flip (10 of 13), none of today's `UNSUPPORTED_EXPECTED`
+questions flipped. Root cause is upstream of grounding: qwen3:8b's QueryPlan extraction either tags "material
+hold/approval pending at Store officer" as `domain='unknown'`, or (for "order pending material names") drops
+"pending" from entities/filters entirely, so grounding never gets a chance to use the new concepts — which are
+independently verified correct by 20 unit tests and the review below. Detail: fix.md #14.
 
 An independent review of that change (fresh-context agent, adversarial construction against the real validator,
 not just reasoning) found and confirmed two real §3-relevant gaps, both fixed same day: (1) a duplicate of an

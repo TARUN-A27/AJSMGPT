@@ -287,6 +287,11 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   compound-condition fragment appended as a trailing `OR (...)` was invisible to every check (predated this
   session's work — also reproduced against the pre-existing `mrs_approved`); the anti-join's `NVL(...)=0` check
   could bind to a different, wrongly-joined alias of the same physical table than the one verified as the
-  correct `LEFT JOIN`. Full detail: fix.md #4. 293/293 across the 10 core V1 suites. Not done: the offline
-  47-question eval has not been re-run against this, so any "order pending" `UNSUPPORTED_EXPECTED` flips (same pattern as the
-  stock/GRN flip, fix.md #13) are not yet measured.
+  correct `LEFT JOIN`. Full detail: fix.md #4. 293/293 across the 10 core V1 suites.
+- 2026-09-23 — offline 47-question eval re-run (qwen3:8b, requested by Tarun) after the PO/MRS-pending work
+  above: aggregate counts **unchanged** (13/12/10/4/4/2/2) — unlike the stock/GRN flip (10 of 13), none of
+  today's `UNSUPPORTED_EXPECTED` questions moved. Root cause is upstream of grounding: QueryPlan extraction
+  either tags the closest candidate questions `domain='unknown'`, or drops "pending" from entities/filters
+  entirely before grounding is ever reached. Not a defect in today's catalog/validator work, which 20 unit tests
+  and an independent review already verified correct — it's an unproven, separate model-behaviour gap in
+  `app/query_plan_extractor.py`. Full detail: fix.md #14.

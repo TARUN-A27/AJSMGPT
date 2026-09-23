@@ -307,3 +307,25 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   every check offline.
 - **Tests:** 10 core suites **293/293** (was 289 immediately after the new mechanism, before the review; +4
   from the review's regression tests and one hardening test). `py_compile` clean throughout.
+
+### Re-run the offline 47-question eval after PO/MRS-pending (fix.md #14)
+- **Prompt:** "do it then" — confirmed running the offline eval, which needs Ollama, after I asked per
+  CLAUDE.md §9. Surfaced first that `qwen3:14b` (the adopted eval model, fix.md #11) isn't actually pulled on
+  this machine, only `qwen3:8b` — asked which to use rather than silently picking one or pulling a ~9GB model
+  without asking; Tarun chose running with `qwen3:8b` now.
+- **Done:** ran `scripts/evaluate_v1_real_questions.py`, diffed against a backed-up copy of the prior results.
+  Aggregate classification counts came back **identical** (13/12/10/4/4/2/2) — unlike the stock/GRN catalog
+  work, which flipped 10 of 13 `UNSUPPORTED_EXPECTED` questions, today's PO/MRS-pending work flipped none.
+  Dug into why rather than reporting a flat "no change": the 2 closest candidate questions ("material hold /
+  approval pending at Store officer") get `domain='unknown'` from QueryPlan extraction; a 3rd ("order pending
+  material names") gets `domain='purchase'` but the model drops "pending" from entities/filters entirely
+  (empty lists) before grounding is ever reached. None of this reflects badly on today's actual catalog/
+  validator work — that's independently verified by 20 unit tests and a review — it's a separate, previously
+  unmeasured gap in `app/query_plan_extractor.py`, now written up as fix.md #14 rather than left unexplained.
+  Also noted, not chased: 2 unrelated questions swapped `PASS_PIPELINE`/`SQL_VALIDATION_FAILURE` between runs
+  despite `temperature=0.0` — pre-existing model-serving non-determinism, not caused by this session.
+- **Files:** `scripts/v1_real_question_eval_results.json` (regenerated), `fix.md` (#4 updated, #14 new),
+  `progress.md`, `CLAUDE.md`. No code changes; no Oracle access; Ollama used with explicit permission asked
+  and given for both the run itself and the model choice.
+- **Tests:** unaffected (eval script only, no `app/` changes) — 10 core suites still **293/293**, re-confirmed
+  after the run.

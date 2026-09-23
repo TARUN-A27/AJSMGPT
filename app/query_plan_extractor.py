@@ -45,6 +45,9 @@ Keep entity text as the user spoke it. Preserve uncertainty as ambiguities; use 
 Use calibrated confidence, and make ambiguity blocking when competing interpretations would materially change the answer.
 Recognized domains are purchase, mrs, consumption, stock, grn, and unknown. A domain describes the question's real-world
 subject even when it is not yet a supported family; use unknown only when no real-world subject can be identified at all.
+mrs covers material requisition slips, including their approval/hold/rejection status (e.g. pending, approved, or
+rejected, at a stores officer, internal audit, or similar approval stage). purchase covers purchase orders, including
+their own approval/pending status.
 Operations are detail, aggregate, trend, ranking, comparison, lookup, and unknown. Select the closest operation without
 implying implementation details. Use unknown only when the intent genuinely cannot be determined, not merely because no
 operation feels like a perfect fit.
@@ -61,6 +64,16 @@ name or code, supplier_name for a name only, supplier_identifier for a code only
 item_identifier for an item code. Put the spoken value in entities[].original_value; never use the value itself as the
 concept. A filtered entity is not also a dimension: do not repeat it in dimensions unless the user asked to group or
 list by it.
+Not every entity is a supplier or material: a specific record identifier (e.g. an MRS number) or a status/approval/
+workflow condition the question filters by is also a valid entities[].concept. For a status/approval/workflow
+condition, entities[].concept must be the specific status word or phrase itself, exactly as the question states it
+(e.g. concept="pending", concept="approved", concept="rejected", concept="on hold", concept="pending at store
+officer") -- never a generic label such as "status" or "condition", and never split one such phrase into more than
+one entity. For any entity concept other than supplier, supplier_name, supplier_identifier, material, or
+item_identifier, set status to "not_required" -- never "unresolved" or "resolved" -- because its correctness is
+guaranteed directly by the SQL condition generated for it, not by a separate identity lookup; keep the spoken value
+in original_value (or "true" if the concept word itself is the whole condition). Represent such a condition as
+exactly one entity, never also as a filter with the same meaning.
 Return one JSON object only."""
 
 

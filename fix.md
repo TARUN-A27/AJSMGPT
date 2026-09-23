@@ -330,7 +330,7 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   `scripts/evaluate_v1_real_questions.py`,
   `docs/ORACLE_READONLY_ACCOUNT.md`.
 
-## 14. 🟡 Offline eval re-run after PO/MRS-pending: aggregate numbers unchanged — the real bottleneck is QueryPlan extraction, not grounding
+## 14. ✅ Offline eval re-run after PO/MRS-pending: aggregate numbers unchanged — the real bottleneck is QueryPlan extraction, not grounding
 - **Count:** 0 net change. 13/12/10/4/4/2/2 before and after re-running the same 47 questions (qwen3:8b — qwen3:14b
   is not pulled on this machine right now; ran with 8b on Tarun's explicit choice). 2 individual questions
   swapped classification, unrelated to this change (see model non-determinism note below).
@@ -359,6 +359,58 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   (real for any offline re-run, not introduced by this session), not a regression.
 - **Where:** `app/query_plan_extractor.py` (entity/filter concept recognition for pending/approval/hold), not
   `app/schema_grounding.py` or `app/grounded_sql_validator.py` (both unchanged by this eval run).
+
+- **Closed 2026-09-23 (same day, continued).** Traced the actual root cause by reading `app/entity_resolution.py`
+  directly rather than guessing further: `resolve_entity` forces **any** entity concept outside the 5-token
+  identity-verification whitelist (`supplier`/`supplier_name`/`supplier_identifier`/`material`/`item_identifier`)
+  to `UNRESOLVED` — which blocks execution — *unless* the model itself tags it `status: "not_required"`. The
+  SYSTEM_PROMPT never taught the model this concept exists at all. Confirmed with a real example already in the
+  47-question set: `"MRS details for MRS number 890330"` — the model correctly names `concept="mrs_number"`, but
+  since `mrs_number` isn't in the identity-verification whitelist and the model (reasonably, per the old prompt)
+  tagged it `status="resolved"`, it was forced to `UNRESOLVED` — `ENTITY_RESOLUTION_REJECTION`, not the "value
+  absent from the offline fixture" reason the rest of that bucket has. This is a **pre-existing gap**, not
+  introduced by today's PO/MRS-pending work — it already blocked `mrs_number`, and would have blocked
+  `mrs_rejected`/`mrs_approved`/`mrs_pending`/`po_pending*` too the first time any of them reached a real
+  question, despite being fully correct at the grounding/validation layer (20 unit tests, a review) — those
+  tests never exercise `resolve_plan_entities`, so this never showed up until a real end-to-end eval did.
+- **Fix:** extended `SYSTEM_PROMPT` in `app/query_plan_extractor.py`: (1) an entity's concept may be a record
+  identifier or a status/approval/workflow condition, not only supplier/material — described in the model's own
+  words, not a generic label like "status"; (2) for any concept other than the 5 identity-verified tokens, set
+  `status: "not_required"`; (3) added one-line hints connecting `mrs`/`purchase` domains to their
+  approval/hold/rejection vocabulary, since nothing previously told the model those domains cover workflow
+  status at all.
+- **Verified, isolated, not just asserted:** (a) new regression tests in `scripts/test_entity_resolution.py`
+  reproduce the exact failure mode on a compound-condition concept and confirm the fix; (b) a direct isolation
+  test — same question, same model (qwen3:14b), old prompt vs new prompt — showed the *old* prompt makes even
+  14b misclassify `"890330"` as `concept="supplier_identifier"` (guessing it's a supplier code, the closest of
+  the 5 allowed tokens) and fail the same way; only the new prompt gets `concept="mrs_number"`,
+  `status="not_required"`, reaching `PASS_PIPELINE`. The fix, not the model, is what closes this gap.
+- **Real-model caveat:** qwen3:8b (this machine's only local model) could not reliably follow the new
+  concept-naming instruction after two rounds of prompt refinement — it kept inventing generic labels
+  (`"status"`, `"approval_status"`) instead of using the question's own words, and domain stayed `unknown` for
+  the two Store-Officer questions regardless. qwen3:14b (the model fix.md #11 already adopted, for exactly this
+  kind of instruction-following gap) did measurably better: both Store-Officer questions now reach `domain=mrs`
+  (was `unknown`), and concepts came back as literal words (`"hold"`, `"pending"`) instead of invented labels.
+  14b is not pulled on this laptop; reached instead over an SSH port-forward to the company server
+  (`ajsmgpt@103.171.13.142:5555`, itself running Ollama with `qwen3:14b`) at Tarun's direction, since the
+  `.env`-configured `OLLAMA_URL` (a separate LAN host) was transiently unreachable ("no route to host") when
+  this was attempted — unrelated network flakiness, not a code issue; the tunnel was closed after use.
+- **Full 47-question re-run, qwen3:14b + fixed prompt** (`scripts/v1_real_question_eval_results.json`):
+  `CAPABILITY_FAILURE 11, ENTITY_RESOLUTION_REJECTION 6 (was 10), GROUNDING_FAILURE 7, PASS_PIPELINE 4 (was 2),
+  QUERY_PLAN_FAILURE 7, UNSUPPORTED_EXPECTED 12 (was 13), SQL_VALIDATION_FAILURE 0`. This run is **not a clean
+  ablation** of the prompt fix alone — it also reflects 14b's generally stronger QueryPlan extraction (fix.md
+  #11), so the 20 questions that changed classification are a mix of both effects, not attributable to this fix
+  alone. The one cleanly isolated result is the `mrs_number` case above.
+- **Still not resolved (real, smaller, lower priority):** the model still sometimes splits a multi-word status
+  phrase into two separate entities (`"pending"` + `"Store officer"` rather than one phrase matching an existing
+  alias like `mrs_ready_for_approval`'s "store officer pending"), and still occasionally duplicates the same
+  concept into both `entities` and `filters` (harmless — grounding tolerates the duplicate — but not clean).
+  Neither blocks execution; both are prompt-wording refinements for a future pass, not attempted further today
+  (diminishing returns after two refinement rounds).
+- **Files:** `app/query_plan_extractor.py`, `scripts/test_entity_resolution.py`,
+  `scripts/v1_real_question_eval_results.json`, `fix.md`.
+- **Tests:** 11 core suites (added `test_entity_resolution.py` to the tracked list — always part of the real
+  V1 chain per CLAUDE.md §4, just not previously counted here) **318/318**.
 
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.

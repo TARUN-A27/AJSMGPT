@@ -87,33 +87,41 @@ Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture red
 Detail and fix plan per item: `fix.md`.
 47-question real evaluation (`scripts/v1_real_question_eval_results.json`):
 ```text
-CAPABILITY_FAILURE           12   ← stock/grn now genuinely reachable (fix.md #13); model op-choice failures
-UNSUPPORTED_EXPECTED         13   ← by design (attendance, camera_ip, dell system stock*); PO/MRS-pending is NOW
-                                     supported but the model doesn't route to it for these phrasings (fix.md #14)
-ENTITY_RESOLUTION_REJECTION  10   ← values absent from the offline fixture (recheck on real master data)
-GROUNDING_FAILURE              4   ← bare "quantity"/"cost" alias gaps found + fixed same day (fix.md #13)
-QUERY_PLAN_FAILURE             4   ← all model behaviour (low confidence, undeclared sort field)
-SQL_VALIDATION_FAILURE         2   ← model wrote quoted identifiers / omitted the entity filter; correct rejections
-PASS_PIPELINE                  2
+UNSUPPORTED_EXPECTED         12   ← by design (attendance, camera_ip, dell system stock*)
+CAPABILITY_FAILURE           11   ← stock/grn now genuinely reachable (fix.md #13); model op-choice failures
+GROUNDING_FAILURE              7   ← catalog gaps + real, diagnosable model output
+QUERY_PLAN_FAILURE             7   ← all model behaviour (low confidence, undeclared sort field)
+ENTITY_RESOLUTION_REJECTION    6   ← values absent from the offline fixture (recheck on real master data)
+PASS_PIPELINE                  4
+SQL_VALIDATION_FAILURE         0
 SQL_GENERATION / ENVIRONMENT   0
 ```
-Re-run 2026-09-23 offline (8b, stub runner, 0 Oracle calls) after the stock/GRN catalog work (fix.md #13). 10 of
-the 13 remaining `UNSUPPORTED_EXPECTED` moved to genuine `CAPABILITY_FAILURE`/`GROUNDING_FAILURE` — no longer
-refused by design, now real, measurable model/catalog gaps. The same session also ran the real evaluator against
-**live Oracle** for the first time (Step 6, fix.md #13): first-ever live `PASS_PIPELINE`, 4 rounds, 4 real gaps
-found and fixed same day.
+**This table now uses qwen3:14b, not 8b** (see below) — not directly comparable to older 8b-based counts without
+accounting for that model change. History: re-run 2026-09-23 offline (8b, stub runner) after the stock/GRN
+catalog work (fix.md #13): 10 of 13 remaining `UNSUPPORTED_EXPECTED` moved to genuine failures, no longer refused
+by design. Same session, real evaluator against **live Oracle** for the first time (Step 6, fix.md #13):
+first-ever live `PASS_PIPELINE`, 4 rounds, 4 real gaps found and fixed same day.
 
 Later the same day: the PO-pending SO/IA/JMD approval ladder and the MRS-pending anti-join (both previously
 `UNSUPPORTED_EXPECTED`, fix.md #4) were catalogued and implemented — see `po_pending_at_so/ia/jmd`, `po_approved`,
 `po_pending`, and `mrs_pending` in `app/resources/business_schema_catalog.json`. This needed two new grounding/
 validation mechanisms (value-pinned and value-or-null compound conditions, and a catalog-declared anti-join not
-backed by a database FK) in `app/schema_grounding.py` / `app/grounded_sql_validator.py`. Re-ran the offline eval
-after this (qwen3:8b — qwen3:14b is not pulled on this machine): the table above is the result, and the
-aggregate counts are **unchanged** — unlike the stock/GRN flip (10 of 13), none of today's `UNSUPPORTED_EXPECTED`
-questions flipped. Root cause is upstream of grounding: qwen3:8b's QueryPlan extraction either tags "material
-hold/approval pending at Store officer" as `domain='unknown'`, or (for "order pending material names") drops
-"pending" from entities/filters entirely, so grounding never gets a chance to use the new concepts — which are
-independently verified correct by 20 unit tests and the review below. Detail: fix.md #14.
+backed by a database FK) in `app/schema_grounding.py` / `app/grounded_sql_validator.py`. An offline eval re-run
+(8b) then showed the aggregate counts unchanged — the real bottleneck was upstream of grounding, in QueryPlan
+extraction. Investigating why found a bigger, pre-existing gap (fix.md #14): `resolve_entity`
+(`app/entity_resolution.py`) forces *any* entity concept outside the 5-token identity-verified whitelist
+(supplier/material) to `UNRESOLVED` — blocking execution — unless the model itself tags it
+`status: "not_required"`, and the extractor's prompt never taught it that concept exists. This already silently
+blocked `mrs_number` (confirmed on a real question, `"MRS details for MRS number 890330"`), and would have
+blocked every compound-condition concept the moment a real question reached one, despite all of them being
+correct at the grounding/validation layer. Fixed in `app/query_plan_extractor.py`'s `SYSTEM_PROMPT`. qwen3:8b
+(this machine's only local model) could not reliably follow the new concept-naming instruction after two rounds
+of refinement; qwen3:14b (reached over an SSH tunnel to the company server, since it isn't pulled locally) did
+measurably better. The table above is the 14b + fixed-prompt result: `PASS_PIPELINE` 2→4,
+`ENTITY_RESOLUTION_REJECTION` 10→6, `UNSUPPORTED_EXPECTED` 13→12 — not a clean ablation of the prompt fix alone
+(14b is also just generally stronger, fix.md #11), but the `mrs_number` case was isolated cleanly: same
+question, same model, old prompt still fails the same way, only the new prompt reaches `PASS_PIPELINE`. Full
+detail: fix.md #14.
 
 An independent review of that change (fresh-context agent, adversarial construction against the real validator,
 not just reasoning) found and confirmed two real §3-relevant gaps, both fixed same day: (1) a duplicate of an
@@ -129,8 +137,8 @@ Tests are `unittest` scripts. Run the one for the component you changed:
 ```bash
 python scripts/test_<component>.py
 ```
-Core V1 suites: `test_text_correction`, `test_spacy_nlp`, `test_query_plan_extractor`, `test_query_plan_semantic_validator`, `test_schema_grounding`, `test_grounded_sql_generator`, `test_grounded_sql_validator`, `test_sql_datatype_validator`, `test_nlp_execution`, `test_v1_acceptance_matrix`.
-Baseline: 10 core suites 293/293 (2026-09-23, after the PO/MRS-pending catalog work and its independent review).
+Core V1 suites: `test_text_correction`, `test_spacy_nlp`, `test_query_plan_extractor`, `test_query_plan_semantic_validator`, `test_schema_grounding`, `test_grounded_sql_generator`, `test_grounded_sql_validator`, `test_sql_datatype_validator`, `test_nlp_execution`, `test_v1_acceptance_matrix`, `test_entity_resolution`.
+Baseline: 11 core suites 318/318 (2026-09-23, after the PO/MRS-pending catalog work, its review, and the fix.md #14 entity-resolution prompt fix). `test_entity_resolution` added to this list — always part of the real V1 chain (§4), just not previously counted here.
 
 ## 8. Evaluation commands
 ```bash

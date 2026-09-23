@@ -223,6 +223,26 @@ class EntityResolutionTests(unittest.TestCase):
         self.assertEqual(resolved.status, EntityStatus.NOT_REQUIRED)
         self.assertEqual(resolved.original_value, "1")
 
+    def test_compound_condition_concept_without_not_required_fails_closed(self) -> None:
+        # mrs_pending/po_pending/mrs_rejected/mrs_approved are never in
+        # _VERIFIED_SOURCES (their correctness comes from the catalog's
+        # fixed compound_condition/anti_join logic, not an identity lookup) --
+        # if the model forgets to tag status=not_required for one, this is
+        # what actually happens: forced UNRESOLVED, blocking execution, same
+        # as any other unrecognized concept. Reproduces the real-pipeline gap
+        # fix.md #14 found via "MRS number 890330" before fixing the prompt.
+        claimed_resolved = entity("mrs pending", "true", status=EntityStatus.RESOLVED, selected_value="true")
+        resolved = resolve_entity(claimed_resolved, fake_lookup({}))
+        self.assertEqual(resolved.status, EntityStatus.UNRESOLVED)
+
+    def test_compound_condition_concept_with_not_required_is_untouched(self) -> None:
+        # The fix: the model must tag status=not_required itself for exactly
+        # these concepts (app/query_plan_extractor.py's SYSTEM_PROMPT).
+        untouched = entity("mrs pending", "true", status=EntityStatus.NOT_REQUIRED)
+        resolved = resolve_entity(untouched, fake_lookup({}))
+        self.assertEqual(resolved.status, EntityStatus.NOT_REQUIRED)
+        self.assertEqual(resolved.original_value, "true")
+
     def test_empty_original_value_fails_closed(self) -> None:
         resolved = resolve_entity(entity("supplier_name", "   "), fake_lookup(SUPPLIER_ROWS))
         self.assertEqual(resolved.status, EntityStatus.UNRESOLVED)

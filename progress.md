@@ -21,7 +21,7 @@ Current phase: **V1** (grounded, validated, read-only pipeline). Branch: `featur
 | 9 | Business report | `answer_formatter.py` | ✅ built · unverified on real results | — |
 | — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ 17 cases + 4 rejections (2026-09-23) | 2 (supported accept / unsupported reject) |
 
-Core V1 suites (10): 293/293 (2026-09-23, after Step 6 live eval, stock/GRN, PO/MRS-pending, and its review — fix.md #4/#13).
+Core V1 suites (11, `test_entity_resolution` added): 318/318 (2026-09-23, after Step 6 live eval, stock/GRN, PO/MRS-pending, its review, and the fix.md #14 entity-resolution prompt fix).
 
 ### API endpoints (`app/nlp_router.py`)
 | Endpoint | Status |
@@ -79,11 +79,18 @@ Coverage                                   7/7    stock + grn added 2026-09-23 (
                                                   questions now genuinely reachable, not just refused)
 Live-question eval (14b, real Oracle)     1/47   first pass ever against real Oracle; 4 rounds, 4 real gaps
                                                   found and fixed same day (fix.md #13) -- see the eval detail
-Overall V1                                 ~85%   fix.md #4 (PO-pending, MRS-pending) fully closed 2026-09-23 --
-                                                  coverage within existing families grew; number not re-derived
-                                                  pending the eval re-run; remaining: bigger question bank,
+Overall V1                                 ~85%   fix.md #4 (PO-pending, MRS-pending) and #14 (entity-resolution
+                                                  status=not_required prompt gap) both closed 2026-09-23; number
+                                                  not re-derived, offline eval now uses 14b not 8b so it isn't a
+                                                  clean before/after basis; remaining: bigger question bank,
                                                   freeze sign-off
 ```
+47-question offline eval, qwen3:14b + the fix.md #14 prompt fix (2026-09-23, reached over an SSH tunnel to the
+company server since 14b isn't pulled locally): `PASS_PIPELINE` 2→4, `ENTITY_RESOLUTION_REJECTION` 10→6,
+`UNSUPPORTED_EXPECTED` 13→12, `SQL_VALIDATION_FAILURE` 2→0. Not a clean ablation of the prompt fix alone (14b is
+also generally stronger) except for one cleanly isolated case: `"MRS details for MRS number 890330"` reaches
+`PASS_PIPELINE` only with the new prompt — same question, same model, old prompt still fails. Full detail:
+fix.md #14.
 
 ---
 
@@ -295,3 +302,17 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   entirely before grounding is ever reached. Not a defect in today's catalog/validator work, which 20 unit tests
   and an independent review already verified correct — it's an unproven, separate model-behaviour gap in
   `app/query_plan_extractor.py`. Full detail: fix.md #14.
+- 2026-09-23 — fix.md #14 closed, same day. Traced the real root cause: `resolve_entity`
+  (`app/entity_resolution.py`) forces any entity concept outside the 5-token identity-verified whitelist
+  (supplier/material) to `UNRESOLVED`, blocking execution, unless the model tags it `status: "not_required"` --
+  and the extractor's prompt never taught it that. A pre-existing gap, not introduced today: already silently
+  blocked `mrs_number` on a real question (`"MRS details for MRS number 890330"`), and would have blocked every
+  compound-condition concept the first time a real question reached one. Fixed `app/query_plan_extractor.py`'s
+  `SYSTEM_PROMPT`; 2 new regression tests in `scripts/test_entity_resolution.py`. qwen3:8b (this machine's only
+  local model) couldn't reliably follow the new concept-naming instruction after two refinement rounds; qwen3:14b
+  (reached over an SSH tunnel to the company server, at Tarun's direction, since it isn't pulled locally) did
+  measurably better. Full 47-question re-run (14b + fixed prompt): `PASS_PIPELINE` 2→4,
+  `ENTITY_RESOLUTION_REJECTION` 10→6, `UNSUPPORTED_EXPECTED` 13→12 -- not a clean ablation of the prompt alone
+  (14b is also generally stronger), except the `mrs_number` case, isolated cleanly: same question/model, old
+  prompt still fails, only the new prompt passes. `test_entity_resolution` added to the tracked core-suite list
+  (always part of the real chain, just not previously counted). 318/318 across 11 core suites.

@@ -329,3 +329,45 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   and given for both the run itself and the model choice.
 - **Tests:** unaffected (eval script only, no `app/` changes) — 10 core suites still **293/293**, re-confirmed
   after the run.
+
+### Fix the entity-resolution routing gap fix.md #14 found (prompt tuning, not a blind patch)
+- **Prompt:** "do it then" — confirmed starting the fix.md #14 prompt-tuning task, using the same
+  recover-classify-fix-remeasure methodology as Step 3/Step 4 rather than a same-session patch.
+- **Done:** read `app/query_plan_extractor.py` and `app/entity_resolution.py` end to end before touching
+  anything (root cause, not symptom). Found the real mechanism: `resolve_entity` forces any entity concept
+  outside the 5-token identity-verified whitelist (supplier/material) to `UNRESOLVED` — blocking execution —
+  unless the model itself tags `status: "not_required"`, and the extractor's SYSTEM_PROMPT never told it that
+  status value, or that non-supplier/material concepts, exist at all. Checked how big this actually was before
+  fixing anything: enumerated all 10 `ENTITY_RESOLUTION_REJECTION` cases in the just-produced eval and found 9
+  were genuinely the assumed "value not in the small offline fixture" cause, and exactly 1 — `"MRS details for
+  MRS number 890330"` — was this new, worse, permanent-regardless-of-data cause. That one example is what made
+  the fix concrete rather than theoretical.
+- **Fixed** `app/query_plan_extractor.py`'s `SYSTEM_PROMPT`: entities may be a status/approval/workflow concept
+  in the model's own words (not a generic label), tagged `not_required`; added a one-line hint connecting
+  `mrs`/`purchase` domains to their approval vocabulary. Added 2 regression tests in
+  `scripts/test_entity_resolution.py` reproducing the exact failure and confirming the fix, before touching the
+  prompt.
+- **Verified against the real model, iteratively, not just unit tests:** probed the 4 relevant questions
+  directly against qwen3:8b (the only model pulled on this laptop) — real progress on `not_required`, but the
+  model kept inventing generic concept labels ("status", "approval_status") no matter how the instruction was
+  worded, across two refinement rounds. Recognized this matches fix.md #11's own finding (14b is the stronger
+  model) rather than continuing to fight an 8b ceiling — asked before doing anything about it. User said to use
+  SSH to reach the 14b already running on the company server rather than downloading a fresh copy locally;
+  found the connection details in shell history (`ajsmgpt@103.171.13.142:5555`), confirmed qwen3:14b was there,
+  opened a local SSH port-forward, and re-probed through it. Real improvement: both "Store officer" questions
+  now route to `domain=mrs` instead of `unknown`, and concepts come back as literal words instead of invented
+  labels. Ran the full 47-question eval through the tunnel with 14b + the fixed prompt to measure the aggregate
+  effect, then did one more isolation check specifically because a full-eval diff can't separate "the prompt
+  fix helped" from "14b is just better at everything" — reran the one cleanest example (`MRS number 890330`)
+  through 14b with the *old* prompt reverted back in, confirming it still fails the same way. Only the new
+  prompt fixes it, on the same model. Closed the SSH tunnel afterward.
+- **Result, reported honestly rather than oversold:** `PASS_PIPELINE` 2→4, `ENTITY_RESOLUTION_REJECTION` 10→6,
+  `UNSUPPORTED_EXPECTED` 13→12. Recorded plainly that this run mixes the prompt fix with 14b's general strength
+  and isn't a clean ablation except for the one isolated case — didn't claim more credit for the fix than the
+  evidence actually supports. Also recorded what's still not fully fixed (occasional multi-word phrase
+  splitting, occasional entities/filters duplication) as a smaller, lower-priority remainder rather than
+  pretending it's fully solved.
+- **Files:** `app/query_plan_extractor.py`, `scripts/test_entity_resolution.py`,
+  `scripts/v1_real_question_eval_results.json`, `fix.md`, `progress.md`, `CLAUDE.md`.
+- **Tests:** `test_entity_resolution` added to the tracked core-suite list (always part of the real V1 chain,
+  just never counted there before). 11 core suites **318/318**.

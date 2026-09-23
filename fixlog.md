@@ -145,3 +145,17 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   tunnel, never for its filesystem or `.env`.
 - **Tests:** 11 core suites **282/282** (`test_schema_grounding` 29, up from 25; others unchanged); `py_compile`
   clean; catalog JSON re-validated; `git diff --check` clean.
+
+### Step 5 — re-run and extend the acceptance matrix
+- **Prompt:** "start" (Step 5, next after Step 4).
+- **Done:** ran `test_v1_acceptance_matrix.py` — still 15/15 supported + 3/3 rejection cases passing after today's
+  fix.md #10 catalog change. Extended it with 2 cases: (1) the real, verbatim `qwen3:14b` plan+SQL for "last
+  purchase rate of barcode scanner in 2026" from the Step 4 run (a live proof point, not a hand-idealized one —
+  first acceptance case using a bare generic measure concept, "rate", confirming the purchase-domain path fix.md
+  #10 says must keep working); (2) a consumption-domain "how much value consumed?" case, exercising the exact
+  fix.md #10 bug shape through the full `evaluate_capability → ground_query_plan → validate_grounded_sql` chain
+  this file tests (schema_grounding's own unit tests already covered the bug at the grounding level; this pins it
+  at the acceptance level too). Both pass immediately, no further code changes.
+- **Files:** `scripts/test_v1_acceptance_matrix.py`, `progress.md`, `CLAUDE.md`, `fixlog.md`.
+- **Tests:** 11 core suites 282/282 (unchanged test-method count; `test_v1_acceptance_matrix` subtests 15→17
+  supported + 3 rejection); `py_compile` OK; `git diff --check` clean.

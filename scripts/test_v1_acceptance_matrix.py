@@ -19,7 +19,9 @@ from app.query_plan import (
     Dimension,
     EntityReference,
     EntityStatus,
+    FilterOperator,
     Measure,
+    QueryFilter,
     QueryPlan,
     RequestedOutput,
     SortDirection,
@@ -405,6 +407,64 @@ AND m.MRSDATE < :date_end""",
 FROM INVENTORY.ISSUE issue
 WHERE issue.ISSUEDATE >= :date_start
 AND issue.ISSUEDATE < :date_end""",
+    ),
+    AcceptanceCase(
+        # Real Step 4 result (2026-09-23, qwen3:14b, docs/STEP4_MODEL_COMPARISON.md):
+        # verbatim plan+SQL the live pipeline produced and PASS_PIPELINE'd -- pinned
+        # here, not hand-idealized, so a prompt/model regression on this exact shape
+        # is caught. Also the first acceptance case where the model used a bare
+        # generic measure concept ("rate") on the purchase domain -- purchase_rate
+        # is that concept's home domain, so this is the case fix.md #10 says must
+        # keep working once consumption_rate also claims the same generic alias.
+        question="last purchase rate of barcode scanner in 2026",
+        occurrence_count=1,
+        category="purchase_analytics",
+        expected_family="purchase_orders",
+        plan=_purchase_plan(
+            original_question="last purchase rate of barcode scanner in 2026",
+            operation="detail",
+            measures=[Measure(concept="rate", aggregation=Aggregation.NONE)],
+            dimensions=[Dimension(concept="date", grouping=False)],
+            entities=[EntityReference(
+                concept="material", original_value="barcode scanner", confidence=0.8, status=EntityStatus.UNRESOLVED
+            )],
+            filters=[QueryFilter(concept="date", operator=FilterOperator.EQUALS, value="2026", value_type="year")],
+            date_range=DateRange(kind=DateRangeKind.ABSOLUTE, start="2026-01-01", end="2026-12-31", original_text="in 2026"),
+            sorting=[SortInstruction(field_concept="date", direction=SortDirection.DESC, priority=0)],
+            requested_output=RequestedOutput(fields=["date"]),
+            confidence=0.7,
+        ),
+        expected_tables={"INVENTORY.PURCHASEORDER", "INVENTORY.INVITEMS"},
+        sql="""SELECT INVENTORY.PURCHASEORDER.ORDERDATE AS date, INVENTORY.PURCHASEORDER.RATE AS rate
+FROM INVENTORY.PURCHASEORDER
+INNER JOIN INVENTORY.INVITEMS ON INVENTORY.PURCHASEORDER.ITEM_CODE = INVENTORY.INVITEMS.ITEM_CODE
+WHERE INVENTORY.INVITEMS.ITEM_NAME = :material
+AND INVENTORY.PURCHASEORDER.ORDERDATE >= :date_start
+AND INVENTORY.PURCHASEORDER.ORDERDATE < :date_end
+ORDER BY INVENTORY.PURCHASEORDER.ORDERDATE DESC""",
+        expect_order_by=True,
+    ),
+    AcceptanceCase(
+        # fix.md #10 regression anchor at the acceptance level (schema_grounding's
+        # own unit tests already cover this; this pins the same bug shape through
+        # the full capability -> grounding -> SQL-validation chain this file
+        # exercises). Before the fix, "value" on a consumption-domain plan silently
+        # grounded to INVENTORY.PURCHASEORDER.NET -- is_grounded=True, no rejection.
+        question="how much value consumed?",
+        occurrence_count=1,
+        category="purchase_analytics",
+        expected_family="consumption",
+        plan=QueryPlan(
+            original_question="how much value consumed?",
+            domain="consumption",
+            operation="aggregate",
+            business_subject=BusinessSubject(concept="consumption"),
+            measures=[Measure(concept="value", aggregation=Aggregation.SUM)],
+            confidence=0.85,
+        ),
+        expected_tables={"INVENTORY.ISSUE"},
+        sql="""SELECT SUM(issue.ISSUEVALUE) AS value
+FROM INVENTORY.ISSUE issue""",
     ),
     AcceptanceCase(
         question="latest issue for yarn in 2024",

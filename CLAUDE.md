@@ -76,8 +76,8 @@ Order of work — do not skip ahead:
    P3. Catalog: purchase/consumption rate, cost aliases  ✅ commit 0a11c17
    P4. Entity resolution on real master data             ✅ commit 7816149
 4. Controlled Qwen3:8b vs Qwen3:14b comparison           ✅ docs/STEP4_MODEL_COMPARISON.md, fix.md #11 — 14b adopted as dev/eval model
-5. Re-run acceptance                                     ← next
-6. Connect company Oracle server, validate real results
+5. Re-run acceptance                                     ✅ test_v1_acceptance_matrix.py 15→17 cases (real 14b result + fix.md #10 anchor)
+6. Connect company Oracle server, validate real results  ← next
    (needs: branch pushed to origin + DBA SELECT-only account — docs/ORACLE_READONLY_ACCOUNT.md)
 7. Freeze V1
 ```

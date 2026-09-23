@@ -19,7 +19,7 @@ Current phase: **V1** (grounded, validated, read-only pipeline). Branch: `featur
 | 7 | Static SQL validation | `grounded_sql_validator.py`, `sql_safety.py`, `sql_datatype_validator.py` | ✅ done · GROUP BY both ways, half-open date binds, no model-written row limit (fix.md #7, #8, #9) | 46 + 20 |
 | 8 | Read-only Oracle execution | `nlp_execution.py`, `oracle_client.py` | ✅ built · 11g `ROWNUM` wrapper + `'YYYYMMDD'` date binds; never run against company server | 33 |
 | 9 | Business report | `answer_formatter.py` | ✅ built · unverified on real results | — |
-| — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ | 2 (supported accept / unsupported reject) |
+| — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ 17 cases + 3 rejections (2026-09-23) | 2 (supported accept / unsupported reject) |
 
 Core V1 suites (11): 278/278 (2026-09-22, after the Oracle-executability fixes and the independent review).
 
@@ -225,3 +225,6 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
 - 2026-09-23 — fix.md #10 closed (root cause was silent cross-domain measure mis-grounding, not just the date tie
   it surfaced as); Step 4 done (14b adopted as dev/eval model, `docs/STEP4_MODEL_COMPARISON.md`); fix.md #12 opened
   (capability/grounding lookup shortcut discards `plan.domain`).
+- 2026-09-23 — Step 5 done: acceptance matrix grown 15→17 cases with the real 14b-produced plan/SQL for a
+  purchase-rate question (Step 4 evidence, pinned verbatim) and a consumption-domain regression anchor for fix.md
+  #10 (generic "value" alias). All 17 + 3 rejection cases pass; 282/282 core suites unchanged.

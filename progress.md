@@ -19,9 +19,9 @@ Current phase: **V1** (grounded, validated, read-only pipeline). Branch: `featur
 | 7 | Static SQL validation | `grounded_sql_validator.py`, `sql_safety.py`, `sql_datatype_validator.py` | ✅ done · GROUP BY both ways, half-open date binds, no model-written row limit (fix.md #7, #8, #9) | 46 + 20 |
 | 8 | Read-only Oracle execution | `nlp_execution.py`, `oracle_client.py` | ✅ built · 11g `ROWNUM` wrapper + `'YYYYMMDD'` date binds; never run against company server | 33 |
 | 9 | Business report | `answer_formatter.py` | ✅ built · unverified on real results | — |
-| — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ 17 cases + 3 rejections (2026-09-23) | 2 (supported accept / unsupported reject) |
+| — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ 17 cases + 4 rejections (2026-09-23) | 2 (supported accept / unsupported reject) |
 
-Core V1 suites (11): 278/278 (2026-09-22, after the Oracle-executability fixes and the independent review).
+Core V1 suites (11): 284/284 (2026-09-23, after fix.md #10/#12 and the Step 4/5 additions).
 
 ### API endpoints (`app/nlp_router.py`)
 | Endpoint | Status |
@@ -70,12 +70,12 @@ what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~95%   #7 + #10 closed (6 review findings + the cross-domain alias bug);
-                                                  fix.md #12 open (lookup shortcut discards plan.domain)
+Deterministic layers (2, 4, 5, 7)         ~97%   #7, #10, #12 all closed; fix.md #2/#3/#4 remain (need real data
+                                                  or a scoped prompt task, not quick fixes)
 LLM layers (3, 6)                          ~75%   Step 4 done: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1
 Execution + report (8, 9)                  ~70%   SQL is now valid for Oracle 11.2; still never run on it
 Real-question pass rate (14b)             5/47   (24 by-design unsupported → 5/23 of in-scope, all executable)
-Overall V1                                 ~75%   remaining: Step 5, Step 6 (server), freeze
+Overall V1                                 ~78%   remaining: Step 6 (server, blocked on push + DBA account), freeze
 ```
 
 ---

@@ -181,8 +181,23 @@ def _matching_compound_concept(catalog: dict, phrase: str, role: str) -> dict | 
     return None
 
 
+# Kept in sync by hand with app/v1_capabilities.py's identical exclusion
+# (fix.md #12) -- domains the model can tag that name a different, explicitly
+# unsupported family. None of these are schema-catalog domains (they have no
+# verified columns), so excluding them from the lookup shortcut below simply
+# lets them fall through to the catalog lookup, which correctly finds nothing
+# and rejects with "Domain is outside the V1 business schema catalog."
+_OTHER_UNSUPPORTED_DOMAINS = {"stock", "inventory", "grn", "goods receipt", "goods receipt note"}
+
+
 def _domain(catalog: dict, plan: QueryPlan) -> dict | None:
-    if plan.operation.lower() == "lookup" and plan.business_subject:
+    # See app/v1_capabilities.py:_family_name for why the exclusion is
+    # needed: a plan explicitly tagged with a different unsupported domain
+    # (e.g. "grn" for "is material X received?") must fail closed as that
+    # domain, not be silently answered as a plain material/supplier lookup
+    # that never represents what was actually asked.
+    if (plan.operation.lower() == "lookup" and plan.business_subject
+            and _normalise(plan.domain) not in _OTHER_UNSUPPORTED_DOMAINS):
         subject = _normalise(plan.business_subject.concept)
         if subject in {"supplier", "vendor", "party"}:
             return next(domain for domain in catalog["domains"] if domain["name"] == "supplier_lookup")

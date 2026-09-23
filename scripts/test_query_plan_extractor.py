@@ -274,14 +274,23 @@ class QueryPlanExtractorTests(unittest.TestCase):
         self.assertEqual(len(call.calls), 1)
 
     def test_capability_supported_plan_is_validated_regardless_of_domain_label(self) -> None:
-        # Review finding: evaluate_capability maps ANY domain with
-        # operation=lookup + a supplier/material subject to a supported
-        # family, and accepts domain aliases (purchasing, po, ...). Such
-        # plans can execute, so they must never skip semantic validation.
+        # Review finding (2026-09-22): evaluate_capability maps operation=lookup
+        # + a supplier/material subject to a supported family regardless of
+        # domain wording, and accepts domain aliases (purchasing, po, ...).
+        # Such plans can execute, so they must never skip semantic validation.
+        #
+        # fix.md #12 (2026-09-23) narrowed that mapping: a domain that names a
+        # DIFFERENT, explicitly unsupported family (grn, stock) no longer takes
+        # the lookup shortcut, because silently downgrading "is X received" to
+        # a plain identity lookup discards the only place "received" was ever
+        # recorded. "unknown" is not one of those families, so this probe still
+        # demonstrates the original point: an odd/uninformative domain label
+        # must not let a nonsense sort field (a column that is neither a
+        # measure nor a dimension in this plan) skip validation.
         question = "who supplies keyboard"
         lookup_with_ghost_sort = plan_json(
             original_question=question,
-            domain="grn",
+            domain="unknown",
             operation="lookup",
             business_subject={"concept": "supplier"},
             measures=[],
@@ -293,6 +302,25 @@ class QueryPlanExtractorTests(unittest.TestCase):
         with self.assertRaises(QueryPlanValidationError):
             extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
         self.assertEqual(len(call.calls), 2)
+
+        # The same lookup+subject shape, but domain="grn" now names a real,
+        # explicitly unsupported family (fix.md #12) -- capability-unsupported,
+        # so semantic validation is correctly skipped (there is nothing to gain
+        # from validating a plan that is rejected regardless) and extraction
+        # returns the plan rather than raising.
+        question = "is keyboard received"
+        grn_lookup = plan_json(
+            original_question=question,
+            domain="grn",
+            operation="lookup",
+            business_subject={"concept": "material"},
+            entities=[{"concept": "material", "original_value": "keyboard"}],
+        )
+        call = Calls(grn_lookup)
+        plan = extract_query_plan(question, model_call=call, nlp_analysis=analyze_question_with_spacy(question))
+        self.assertEqual(plan.domain, "grn")
+        self.assertFalse(evaluate_capability(plan).supported)
+        self.assertEqual(len(call.calls), 1)
 
         question = "rank suppliers by purchase value"
         alias_domain_bad_ranking = plan_json(

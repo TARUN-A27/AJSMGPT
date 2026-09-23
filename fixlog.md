@@ -159,3 +159,39 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `scripts/test_v1_acceptance_matrix.py`, `progress.md`, `CLAUDE.md`, `fixlog.md`.
 - **Tests:** 11 core suites 282/282 (unchanged test-method count; `test_v1_acceptance_matrix` subtests 15→17
   supported + 3 rejection); `py_compile` OK; `git diff --check` clean.
+
+### fix.md #12 fix + #3 re-diagnosis + freeze-criteria proposal
+- **Prompt:** "let's do it then" (continue autonomously on the "what's left" list after the push was denied by the
+  harness's own permission classifier).
+- **Done — fix.md #12 (fixed):** `app/v1_capabilities.py:_family_name` and `app/schema_grounding.py:_domain` both
+  now exclude domains naming a different, explicitly unsupported family (`stock`/`inventory`, `grn`/`goods
+  receipt`/`goods receipt note`) from the `operation=lookup` + material/supplier shortcut. Verified directly: the
+  three probes from the earlier finding now correctly reject with the real family reason; five legitimate lookup
+  shapes (unknown/empty/purchase-tagged/already-lookup-domain) are unaffected — checked explicitly, not just by
+  absence of a test failure. One existing regression test
+  (`test_capability_supported_plan_is_validated_regardless_of_domain_label`) had pinned the *old* behaviour using
+  `domain="grn"` as its example of "domain label doesn't matter"; updated to `domain="unknown"` for the same point,
+  with a new explicit assertion that `domain="grn"` is now correctly capability-unsupported. New tests:
+  `test_lookup_shortcut_does_not_override_a_different_unsupported_domain`,
+  `test_lookup_shortcut_still_applies_when_domain_is_generic` (`test_schema_grounding.py`), a new `RejectionCase`
+  (`test_v1_acceptance_matrix.py`, 3→4 rejection cases).
+- **Done — fix.md #3 re-diagnosed (not fixed):** checked the live evidence before touching anything. 3 of 4 current
+  `CAPABILITY_FAILURE` (mrs) cases are `operation="unknown"` (the model choosing no valid operation at all), not a
+  missing `lookup` capability; the 4th (`Mrs rejected reason?`) already has a catalogued concept
+  (`mrs_rejection_reason`) reachable via the mrs family's existing `detail` operation. The original fix.md #3 text
+  ("add a lookup capability for mrs") would not have fixed 3 of the 4 cases and was arguably wrong for the 4th.
+  Corrected the recorded diagnosis; the real fix is a `query_plan_extractor.py` prompt/ontology task needing its
+  own measured eval pass (fix.md #6-shaped), not attempted today.
+- **Done — freeze criteria drafted:** `docs/V1_FREEZE_CRITERIA.md`, a proposal (not a decision) splitting "how do
+  we know V1 is done" into coverage (which families ship in v1.0 — proposes adding stock+GRN, already verified,
+  covering 10 of the 24 currently-refused questions) and depth (pass rate on a held-out question set, proposed
+  ≥75%, plus a non-negotiable zero-wrong-answers condition). Explicitly awaiting Tarun's sign-off.
+- **Attempted, blocked by the harness, not by choice:** `git push -u origin feature/v1-query-execution` — denied by
+  the auto-mode permission classifier as an "Out-of-Place Publication." No workaround attempted (would defeat the
+  point of the check); reported to Tarun with the exact command to run himself.
+- **Files:** `app/v1_capabilities.py`, `app/schema_grounding.py`, `scripts/test_schema_grounding.py`,
+  `scripts/test_v1_acceptance_matrix.py`, `scripts/test_query_plan_extractor.py`, `docs/V1_FREEZE_CRITERIA.md`
+  (new), `fix.md`, `progress.md`, `CLAUDE.md`, `fixlog.md`. No Oracle access; nothing pushed.
+- **Tests:** 11 core suites **284/284** (`test_query_plan_extractor` unchanged count but one test's assertions
+  rewritten; `test_schema_grounding` 29→31; `test_v1_acceptance_matrix` rejection cases 3→4); `py_compile` clean;
+  `git diff --check` clean.

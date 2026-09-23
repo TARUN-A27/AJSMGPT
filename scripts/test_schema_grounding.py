@@ -316,6 +316,32 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.ISSUE", "ISSRATE", "measure"), selected)
         self.assertNotIn(("INVENTORY.PURCHASEORDER", "RATE", "measure"), selected)
 
+    def test_lookup_shortcut_does_not_override_a_different_unsupported_domain(self):
+        # fix.md #12: _domain() used to check operation=="lookup" + subject
+        # in {material,item} BEFORE ever looking at plan.domain, so a plan
+        # explicitly tagged domain="grn" (0-concept, unsupported -- "is
+        # material X received?") still grounded as a plain material lookup,
+        # silently discarding the only place "received" was ever recorded.
+        result = ground_query_plan(plan("grn", "material", operation="lookup",
+                                         entities=[EntityReference(concept="material", original_value="keyboard",
+                                                                    confidence=0.9, status=EntityStatus.RESOLVED,
+                                                                    selected_value="keyboard")]))
+        self.assertFalse(result.is_grounded)
+        self.assertIn("outside the V1 business schema catalog", result.reject_reasons[0].reason)
+
+    def test_lookup_shortcut_still_applies_when_domain_is_generic(self):
+        # Same operation+subject shape, but nothing claims a DIFFERENT
+        # unsupported family -- must still take the shortcut (no regression).
+        for domain in ("unknown", "material lookup", ""):
+            with self.subTest(domain=domain):
+                result = ground_query_plan(plan(domain, "material", operation="lookup",
+                                                 entities=[EntityReference(concept="material", original_value="keyboard",
+                                                                            confidence=0.9, status=EntityStatus.RESOLVED,
+                                                                            selected_value="keyboard")]))
+                self.assertTrue(result.is_grounded, result.reject_reasons)
+                self.assertIn(("INVENTORY.INVITEMS", "ITEM_NAME", "entity_filter"),
+                              {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
     def test_cost_consumed_last_month_no_longer_ties_on_date(self):
         # The originally observed symptom: with "value" wrongly grounding to
         # PURCHASEORDER first, selected_tables gained PURCHASEORDER, which

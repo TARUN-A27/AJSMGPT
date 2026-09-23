@@ -56,11 +56,20 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
 - **Depends on:** #1 result (some may reclassify once QueryPlans are correct).
 - **Closed 2026-09-22 (P4, commit `7816149`):** resolution now matches the ERP's own definitions instead of the whole party table — supplier sources carry the fixed scope `GOODSTYPECODE = 2` (the `INVENTORY.SUPPLIER` view, study §6.1), and candidates dedupe by **code** not display name, because 407 `ITEM_NAME`s are shared by more than one `ITEM_CODE` in the live master. Those now return AMBIGUOUS with `NAME [CODE] (obsolete)` candidates surfaced in the rejection message instead of silently resolving to one item. This changes offline counts only after Step 6 (real master data).
 
-## 3. ⬜ MRS `lookup` operation unsupported
-- **Count:** 3 × `CAPABILITY_FAILURE` (mrs)
-- **Reason:** `domain='mrs': Operation 'lookup' is not supported for the V1 mrs family`
-- **Where:** `app/v1_capabilities.py`, `app/resources/v1_query_capabilities.json`
-- **Fix:** either add a verified `lookup` capability for the mrs family (needs catalog backing) or mark these questions `expected_unsupported`.
+## 3. ⬜ MRS `lookup`/`unknown` operation — re-diagnosed 2026-09-23, original framing was wrong
+- **Count (14b re-run):** 4 × `CAPABILITY_FAILURE`, all `domain=mrs`: `Mrs rejected reason?` (`operation=lookup`),
+  `approved MRS for keyboard` / `MRS due for keyboard in 2026` / `MRS due in 2026` (`operation=unknown`, literally
+  the string "unknown", not a missing enum value).
+- **The original framing ("add a verified `lookup` capability for mrs") is not the right fix.** Only 1 of the 4
+  cases even uses `operation=lookup`; the other 3 are the model failing to choose *any* of `detail`/`aggregate`/
+  `ranking` (the mrs family's actual supported operations) and falling back to the literal word `"unknown"`. And
+  for the one `lookup` case, `mrs_rejection_reason` is already a catalogued, verified concept
+  (`app/resources/business_schema_catalog.json`) — the mrs family already supports `detail`, which is the correct
+  operation for "show me this field for this MRS", not a new `lookup` capability. Adding `lookup` to the mrs family
+  would not fix questions 2–4, and is arguably the wrong operation even for question 1.
+- **Real fix is model/prompt (query_plan_extractor.py's operation ontology), same category as fix.md #6** — needs
+  its own measured before/after eval pass like Step 3, not a same-session patch. Not attempted today.
+- **Where:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`'s operation guidance), not `v1_capabilities.py`.
 
 ## 4. 🟡 Grounding: concept has no verified column (rate/cost closed; order-pending open)
 - **Count:** 3 × `GROUNDING_FAILURE` after Step 3 — rate, cost consumed, order pending.
@@ -178,7 +187,7 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   prompt iteration). This is measurement-driven, not a production cutover — Step 6 (live Oracle) is unaffected and
   still needs its own confirmation before any runtime default changes.
 
-## 12. ⬜ Capability + grounding "lookup" shortcut discards `plan.domain` entirely
+## 12. ✅ Capability + grounding "lookup" shortcut discards `plan.domain` entirely
 - **Found:** 2026-09-23, while checking a Step 4 per-question move (`is material mouse received?`, a GRN-shaped
   question the dataset correctly marks `expected_unsupported`). 14b tagged it `domain="grn", operation="lookup"`
   (grn is explicitly `"status": "unsupported"` in `v1_query_capabilities.json` — 0 verified concepts). It should have
@@ -209,6 +218,21 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   pass across the whole matrix (supplier_lookup, material_lookup, and every domain that could be mistagged) — out of
   scope for today's task (fix.md #10 + Step 4), and CLAUDE.md §11 asks that scope not be expanded mid-task.
 - **Where:** `app/v1_capabilities.py:_family_name` (~L53-57), `app/schema_grounding.py:_domain` (~L184-188).
+- **Fixed 2026-09-23.** Both functions now exclude domains that name a DIFFERENT, explicitly unsupported family
+  (`stock`/`inventory`, `grn`/`goods receipt`/`goods receipt note`) from the lookup shortcut, falling through to
+  the normal domain-based path instead — which correctly resolves to that family's own `unsupported` status
+  (`v1_capabilities.py`) or to no schema-catalog domain at all (`schema_grounding.py`, since neither family has
+  verified columns), so both gates now reject with the real reason. Every previously-accepted case is unaffected:
+  the shortcut still applies whenever `plan.domain` is empty, `"unknown"`, already one of the two lookup domains'
+  own names, or a supported family's own name/alias used loosely (e.g. `domain="purchase"` + `operation="lookup"`)
+  — verified directly, not just by absence of a test failure. One existing test
+  (`test_capability_supported_plan_is_validated_regardless_of_domain_label`,
+  `scripts/test_query_plan_extractor.py`) had pinned the OLD behaviour using `domain="grn"` as its example; updated
+  to use `domain="unknown"` for the same point (an odd domain label must not let semantic validation be skipped)
+  and given its own explicit assertion that `domain="grn"` is now correctly capability-unsupported. New tests:
+  `test_lookup_shortcut_does_not_override_a_different_unsupported_domain`,
+  `test_lookup_shortcut_still_applies_when_domain_is_generic` (`test_schema_grounding.py`); a `RejectionCase`
+  for `"is material keyboard received?"` (`test_v1_acceptance_matrix.py`, rejection cases 3→4).
 
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.

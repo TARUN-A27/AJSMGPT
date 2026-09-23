@@ -539,6 +539,28 @@ REJECTION_CASES: list[RejectionCase] = [
         expected_family="grn",
     ),
     RejectionCase(
+        # fix.md #12: operation="lookup" + subject="material" used to be
+        # accepted as a plain material_lookup regardless of domain, silently
+        # discarding that the model tagged this a GRN (receipt-status)
+        # question -- the only place "is it RECEIVED" was ever recorded.
+        question="is material keyboard received?",
+        occurrence_count=1,
+        category="inventory_movement",
+        needs_review=False,
+        plan=QueryPlan(
+            original_question="is material keyboard received?",
+            domain="grn",
+            operation="lookup",
+            business_subject=BusinessSubject(concept="material"),
+            entities=[EntityReference(
+                concept="material", original_value="keyboard", confidence=0.9, status=EntityStatus.RESOLVED,
+                selected_value="keyboard",
+            )],
+            confidence=0.9,
+        ),
+        expected_family="grn",
+    ),
+    RejectionCase(
         question="keyboard stock",
         occurrence_count=2,
         category="review_required",

@@ -49,14 +49,30 @@ def _subject(plan: QueryPlan) -> str:
     return _normalise(plan.business_subject.concept) if plan.business_subject else ""
 
 
+# Domains the model can tag that name a DIFFERENT, explicitly unsupported
+# family (fix.md #12). Kept in sync with the domain-name sets below by hand
+# -- this module has no shared alias registry to draw on instead, and every
+# other domain check here is already written the same repeated-literal way.
+_OTHER_UNSUPPORTED_DOMAINS = {"stock", "inventory", "grn", "goods receipt", "goods receipt note"}
+
+
 def _family_name(plan: QueryPlan) -> str | None:
     domain = _normalise(plan.domain)
     operation = _normalise(plan.operation)
     subject = _subject(plan)
-    if operation == "lookup" and subject in {"supplier", "vendor", "party"}:
-        return "supplier_lookup"
-    if operation == "lookup" and subject in {"material", "item"}:
-        return "material_lookup"
+    # The lookup shortcut below answers "what is this material/supplier's
+    # identity" regardless of domain wording, which is correct when the model
+    # left domain empty/unknown or named a supported family -- but a plan
+    # that explicitly tagged a DIFFERENT, unsupported family (e.g. "grn" for
+    # "is material X received?") must fail with THAT family's real rejection
+    # reason, not be silently downgraded into a plain identity lookup that
+    # never represents "received" at all. Fall through to the domain-based
+    # checks below instead.
+    if operation == "lookup" and domain not in _OTHER_UNSUPPORTED_DOMAINS:
+        if subject in {"supplier", "vendor", "party"}:
+            return "supplier_lookup"
+        if subject in {"material", "item"}:
+            return "material_lookup"
     if domain in {"purchase", "purchasing", "purchase order", "po"}:
         return "purchase_orders"
     if domain in {"supplier lookup"}:

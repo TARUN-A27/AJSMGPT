@@ -195,3 +195,27 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Tests:** 11 core suites **284/284** (`test_query_plan_extractor` unchanged count but one test's assertions
   rewritten; `test_schema_grounding` 29→31; `test_v1_acceptance_matrix` rejection cases 3→4); `py_compile` clean;
   `git diff --check` clean.
+
+### Step 6 deployment: read-only account verification, PUBLIC-grant finding
+- **Prompt:** DBA account created by Tarun (SQL Developer, `system` connection, 15/15 grants succeeded);
+  two rounds of `.env` credential troubleshooting; then "check now" once fixed.
+- **Done:** deployed V1 to `/home/ajsmgpt/AJSMGPT_v1` on the server (cloned, venv, deps, spaCy model, 284/284
+  offline core suite), beside the untouched legacy `ajsmgpt-api.service`. `check_schema_access.py` — which had
+  only ever checked table *visibility*, never the account's actual privileges — extended to check
+  `USER_TAB_PRIVS`/`USER_SYS_PRIVS`: confirmed `ajsmgpt_ro` itself is genuinely `SELECT`-only + `CREATE SESSION`-
+  only.
+- **Found while verifying that, not assumed:** `USER_TAB_PRIVS` doesn't see `GRANT ... TO PUBLIC`. Checked
+  directly and found this Oracle instance has **~28,700 pre-existing PUBLIC object grants database-wide, ~26,500
+  beyond SELECT** (old cross-database migration tooling, by the look of it — the same
+  `MICROSOFTDTPROPERTIES`/`MICROSOFTSEQDTPROPERTIES` pair recurs across dozens of schemas AJSMGPT has never
+  referenced). First version of the check printed the raw unscoped list (useless noise at that scale) and
+  asserted "does not affect V1" without checking it against the specific tables — corrected: narrowed to a
+  per-schema summary for AJSMGPT's 5 schemas, plus a direct check against the 14 tables AJSMGPT actually reads.
+  Verdict, checked not assumed: **none of them carry a PUBLIC grant beyond SELECT.** This is a real database-
+  hygiene item for whoever owns the instance, entirely pre-existing, entirely outside AJSMGPT's ability or remit
+  to fix (it never runs GRANT/REVOKE) — recorded in `docs/ORACLE_READONLY_ACCOUNT.md`, not resolved.
+- **Files:** `scripts/check_schema_access.py` (3 commits: `USER_TAB_PRIVS`/`USER_SYS_PRIVS` check, PUBLIC-grants
+  report, then scoping it after seeing the real scale), `docs/ORACLE_READONLY_ACCOUNT.md`, `fix.md` (#13, new),
+  `progress.md`, `CLAUDE.md`. No Oracle DDL/DML; every query used was SELECT against a read-only dictionary view.
+- **Tests:** `py_compile` on every script revision; 11 core suites 284/284 unaffected (deployment/scripting
+  only, no `app/` changes this round); server-side offline suite also 284/284 after each pull.

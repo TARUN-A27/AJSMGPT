@@ -234,6 +234,30 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   `test_lookup_shortcut_still_applies_when_domain_is_generic` (`test_schema_grounding.py`); a `RejectionCase`
   for `"is material keyboard received?"` (`test_v1_acceptance_matrix.py`, rejection cases 3→4).
 
+## 13. ✅ Step 6 deployment + read-only account verification — done 2026-09-23
+- **Account:** Tarun created `ajsmgpt_ro` via SQL Developer (`system` connection) with the exact grants in
+  `docs/ORACLE_READONLY_ACCOUNT.md`. Two rounds of `ORA-01017` (username/password mismatch) traced to `.env`
+  transcription, not the account itself — resolved by retyping rather than copy-pasting.
+- **Deployment:** branch pushed to `origin`; cloned to `/home/ajsmgpt/AJSMGPT_v1` on the server (beside the
+  legacy `ajsmgpt-api.service`, untouched); venv + `requirements.txt` + `en_core_web_sm` installed; offline core
+  suite **284/284** on the server. `.env` copied and edited by Tarun (I never read or wrote it).
+- **`check_schema_access.py` had never checked what it claimed to.** It only ever verified table *visibility*
+  (`ALL_TABLES` counts), not the account's actual privilege set. Added `USER_TAB_PRIVS`/`USER_SYS_PRIVS` checks —
+  confirmed `ajsmgpt_ro` itself has `SELECT` only and `CREATE SESSION` only, nothing more.
+- **Found while verifying that: `USER_TAB_PRIVS` doesn't see `GRANT ... TO PUBLIC`.** First pass (scoped to
+  5 schemas) showed `UPDATE`/`DELETE` on `HRDNEW.CURRENTATTENDANCE` (2.3M rows), `OVERTIME`, `SHIFTALLOCATION`,
+  `ADMIN.ONETOUCHEMPLOYEE`, `EXECUTE` on `HRDNEW.GETNAME`. Checking the actual scale (not assuming it stopped
+  there) found **~28,700 PUBLIC object grants database-wide, ~26,500 beyond SELECT** — evidently old
+  cross-database migration tooling; the `MICROSOFTDTPROPERTIES`/`MICROSOFTSEQDTPROPERTIES` pattern repeats in
+  schemas AJSMGPT has never referenced (`ACCSHARES`, `ACCTEX`, …). Not something `ajsmgpt_ro`'s creation caused,
+  not something AJSMGPT can revoke. The script's first PUBLIC-grants addition printed the raw unscoped list —
+  useless noise at this scale — so it was rewritten to a per-schema summary plus a **direct, checked** (not
+  assumed) verdict against the 14 tables AJSMGPT actually reads: none of them carry a PUBLIC grant beyond SELECT.
+  **Does not affect V1** — checked, not just claimed. **Does matter to whoever owns this database** — flagged in
+  `docs/ORACLE_READONLY_ACCOUNT.md`, not fixed (AJSMGPT never runs GRANT/REVOKE).
+- **Not yet done:** the `ajsmgpt-v1.service` systemd unit; Step 6's actual live-question eval against real Oracle.
+- **Files:** `scripts/check_schema_access.py`, `docs/ORACLE_READONLY_ACCOUNT.md`.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

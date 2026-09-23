@@ -77,8 +77,8 @@ Order of work — do not skip ahead:
    P4. Entity resolution on real master data             ✅ commit 7816149
 4. Controlled Qwen3:8b vs Qwen3:14b comparison           ✅ docs/STEP4_MODEL_COMPARISON.md, fix.md #11 — 14b adopted as dev/eval model
 5. Re-run acceptance                                     ✅ test_v1_acceptance_matrix.py 15→17 cases (real 14b result + fix.md #10 anchor)
-6. Connect company Oracle server, validate real results  ← next — blocked: push to origin needs Tarun (harness
-   denied it as a publish action this session), DBA account still pending (docs/ORACLE_READONLY_ACCOUNT.md)
+6. Connect company Oracle server, validate real results  ← next — deployed and read-only access verified
+   2026-09-23 (docs/ORACLE_READONLY_ACCOUNT.md); live-question eval against real Oracle not yet run
 7. Freeze V1                                             exit criteria proposed, awaiting sign-off — docs/V1_FREEZE_CRITERIA.md
 ```
 Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign.

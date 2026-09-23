@@ -75,7 +75,7 @@ Deterministic layers (2, 4, 5, 7)         ~97%   #7, #10, #12 all closed; fix.md
 LLM layers (3, 6)                          ~75%   Step 4 done: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1
 Execution + report (8, 9)                  ~70%   SQL is now valid for Oracle 11.2; still never run on it
 Real-question pass rate (14b)             5/47   (24 by-design unsupported → 5/23 of in-scope, all executable)
-Overall V1                                 ~78%   remaining: Step 6 (server, blocked on push + DBA account), freeze
+Overall V1                                 ~80%   remaining: Step 6's live eval, freeze sign-off
 ```
 
 ---
@@ -228,3 +228,9 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
 - 2026-09-23 — Step 5 done: acceptance matrix grown 15→17 cases with the real 14b-produced plan/SQL for a
   purchase-rate question (Step 4 evidence, pinned verbatim) and a consumption-domain regression anchor for fix.md
   #10 (generic "value" alias). All 17 + 3 rejection cases pass; 282/282 core suites unchanged.
+- 2026-09-23 — Step 6 deployment done: `ajsmgpt_ro` read-only account created and verified genuinely SELECT-only
+  (`scripts/check_schema_access.py`, extended to actually check privileges instead of just table visibility);
+  V1 deployed to `/home/ajsmgpt/AJSMGPT_v1` beside the legacy service, 284/284 offline. Found and recorded (not
+  fixed, out of AJSMGPT's control): this Oracle instance has ~28,700 pre-existing PUBLIC object grants
+  database-wide, ~26,500 beyond SELECT — confirmed none land on AJSMGPT's own 14 tables. Live-question eval
+  against real Oracle is next.

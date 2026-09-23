@@ -84,9 +84,14 @@ QUESTION_BANK = PROJECT_ROOT / "AutomateQuery" / "reports" / "question_bank.json
 USER_QUESTIONS_TXT = PROJECT_ROOT / "data" / "user_purchase_mrs_questions.txt"
 RESULTS_PATH = PROJECT_ROOT / "scripts" / "v1_real_question_eval_results.json"
 
-KNOWN_UNSUPPORTED_DOMAINS = {
-    "stock", "inventory", "grn", "goods receipt", "goods receipt note",
-}
+KNOWN_UNSUPPORTED_DOMAINS: set[str] = set()
+# stock/grn/inventory/"goods receipt"(+" note") were here until 2026-09-23
+# (fix.md #13): both are now supported families (aggregate-only for stock,
+# by design -- ITEMSTOCK holds 1-31 rows per item). Leaving them in this set
+# would mislabel a genuine CAPABILITY_FAILURE (e.g. "keyboard stock" asking
+# for operation=detail, which stock deliberately does not support) as
+# UNSUPPORTED_EXPECTED -- "working as intended" when it is really a model
+# operation-choice failure, the more useful signal for Step 4-style work.
 # Domains the V1 catalog never claims to cover at all (HR/security/etc.);
 # the model is explicitly instructed to emit domain="unknown" for these.
 OUT_OF_SCOPE_HINTS = {"unknown", ""}
@@ -167,12 +172,12 @@ def _select_questions() -> list[dict]:
 
 
 def _expected_unsupported(category: str, question: str) -> bool:
-    ql = question.lower()
-    if category == "review_required" and "stock" in ql:
-        return True
+    # "review_required"+stock and "inventory_movement"+receiv/receipt/grn
+    # were here until 2026-09-23 (fix.md #13): stock and grn are now
+    # supported families, so a question naming them is no longer expected
+    # to be refused by design -- whether it actually passes end to end is
+    # now a genuine measurement, not a foregone "working as intended."
     if category in {"attendance", "camera_ip", "vehicle", "document_party"}:
-        return True
-    if category == "inventory_movement" and any(w in ql for w in ("receiv", "receipt", "grn")):
         return True
     return False
 

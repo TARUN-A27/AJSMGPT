@@ -70,5 +70,33 @@ if sys_privileges == ["CREATE SESSION"]:
 else:
     print(f"WARNING: unexpected system privileges: {sys_privileges}")
 
+# USER_TAB_PRIVS above only shows grants made TO THIS NAMED USER. A GRANT ...
+# TO PUBLIC applies to every account on the instance and would not show up
+# there -- checked directly here so "SELECT only" above is not overstated.
+# This is a database-wide condition this account did not create and cannot
+# fix (AJSMGPT never runs GRANT/REVOKE); it is reported, not resolved, here.
+print("\n" + "=" * 60)
+print("PUBLIC GRANTS this account also inherits (informational, not pass/fail)")
+print("=" * 60)
+
+cur.execute("""
+SELECT TABLE_SCHEMA, TABLE_NAME, PRIVILEGE FROM ALL_TAB_PRIVS
+WHERE GRANTEE = 'PUBLIC' ORDER BY TABLE_SCHEMA, TABLE_NAME, PRIVILEGE
+""")
+public_grants = cur.fetchall()
+if not public_grants:
+    print("None.")
+else:
+    non_select = [row for row in public_grants if row[2] != "SELECT"]
+    print(f"{len(public_grants)} PUBLIC object grants visible ({len(non_select)} beyond SELECT):")
+    for schema, table, privilege in public_grants:
+        print(f"  {schema}.{table:<28} {privilege}")
+    if non_select:
+        print("\nNote: PUBLIC grants beyond SELECT are a database-level condition, not")
+        print("something this account's creation introduced or something AJSMGPT can")
+        print("revoke. AJSMGPT's own catalog never references these tables, so this")
+        print("does not affect V1's own read-only behaviour, but it is worth the")
+        print("database owner's attention independently of AJSMGPT.")
+
 cur.close()
 conn.close()

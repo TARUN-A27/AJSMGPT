@@ -75,8 +75,8 @@ Order of work — do not skip ahead:
    P2. Dates: deterministic 'YYYYMMDD' half-open binds   ✅ commit 088b908
    P3. Catalog: purchase/consumption rate, cost aliases  ✅ commit 0a11c17
    P4. Entity resolution on real master data             ✅ commit 7816149
-4. Controlled Qwen3:8b vs Qwen3:14b comparison           ← next
-5. Re-run acceptance
+4. Controlled Qwen3:8b vs Qwen3:14b comparison           ✅ docs/STEP4_MODEL_COMPARISON.md, fix.md #11 — 14b adopted as dev/eval model
+5. Re-run acceptance                                     ← next
 6. Connect company Oracle server, validate real results
    (needs: branch pushed to origin + DBA SELECT-only account — docs/ORACLE_READONLY_ACCOUNT.md)
 7. Freeze V1

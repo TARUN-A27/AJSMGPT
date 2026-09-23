@@ -112,3 +112,36 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Found (new):** fix.md #10 — `how much cost consumed last month?` fails grounding on a cross-domain alias collision (`"date"` on both `purchase_date` and `consumption_date`), not on a missing cost column. Fail-closed and correct; the fix touches grounding scoring for every family, so it is recorded, not patched here.
 - **Files:** `app/grounded_sql_validator.py`, `app/nlp_execution.py`, `app/entity_resolution.py`, `app/sql_datatype_validator.py`, `app/grounded_sql_generator.py`, `scripts/test_grounded_sql_validator.py`, `scripts/test_nlp_execution.py`, `scripts/test_entity_resolution.py`, `scripts/test_sql_datatype_validator.py`, `scripts/v1_real_question_eval_results.json`, `fix.md`, `progress.md`, `CLAUDE.md`, `docs/ORACLE_READONLY_ACCOUNT.md` (new), `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md`, `fixlog.md`
 - **Tests:** 11 core suites **278/278** (`test_grounded_sql_validator` 46, `test_nlp_execution` 30, `test_entity_resolution` 23, `test_sql_datatype_validator` 20, others unchanged); `py_compile` on every changed module; `git diff --check` clean. No Oracle, no `unittest discover`.
+
+### fix.md #10 (true root cause) + Step 4 model comparison + new finding #12
+- **Prompt:** today's session task — Step 4 protocol, run 8b vs 14b using the server for 14b (`ssh -p 5555
+  ajsmgpt@103.171.13.142`), fix.md #10 with tests.
+- **Done — fix.md #10:** re-investigated before fixing. The originally recorded symptom (a date-filter tie between
+  `ORDERDATE`/`ISSUEDATE`) was two steps downstream of the real bug: `"value"` was a bare alias on `purchase_value`
+  only, so a **consumption**-domain plan's generic `"value"` measure had exactly one catalog match and grounded
+  successfully — `is_grounded=True`, zero ambiguity — to `INVENTORY.PURCHASEORDER.NET` instead of
+  `INVENTORY.ISSUE.ISSUEVALUE`. Silent wrong-table grounding, not a rejection. The same asymmetry existed for
+  `"rate"`. Fixed with a 2-line catalog change (added the bare aliases to `consumption_value`/`consumption_rate`,
+  matching the already-correct `quantity`/`qty` pattern shared by all three domains) — no grounding-code change, so
+  no risk to the legitimate cross-table joins (supplier/material lookups) that same scoring code also serves.
+  Verified: consumption now grounds correctly for both "value" and "rate"; purchase is unaffected (regression
+  test); the original date-tie symptom is also gone as a consequence, not a separate fix.
+- **Done — Step 4:** protocol in `docs/STEP4_MODEL_COMPARISON.md`. Server has `qwen3:14b` only (confirmed via a 404
+  before adjusting scope rather than pulling an unneeded second `qwen3:8b`); compared fresh 14b (SSH-tunnelled
+  server run) against the already-committed 8b result. In-scope (23/47): `PASS_PIPELINE` 2→5, `QUERY_PLAN_FAILURE`
+  4→1, `SQL_VALIDATION_FAILURE` 1→0. Decision: 14b adopted as the dev/eval model (fix.md #11); does not change the
+  production runtime default, which stays a Step 6 decision on the real server.
+- **Found (new, not fixed) — fix.md #12:** checking one Step 4 per-question move surfaced that
+  `app/v1_capabilities.py:_family_name` and `app/schema_grounding.py:_domain` both special-case
+  `operation=="lookup" and subject in {material,supplier,...}` *before* ever consulting `plan.domain`. Confirmed
+  end-to-end with a resolved entity: a plan tagged `domain="grn"` (0-concept, explicitly unsupported family) passes
+  capability (`supported=True`) and grounds successfully as a plain `material_lookup`, silently dropping the
+  "received" part of the question with no rejection and no low-confidence signal. Not fixed today — the shortcut is
+  also load-bearing for genuine identity lookups and the correct fix needs its own scoped task and regression pass
+  across supplier_lookup/material_lookup, per CLAUDE.md §11 (no scope expansion mid-task).
+- **Files:** `app/resources/business_schema_catalog.json`, `scripts/test_schema_grounding.py`, `docs/STEP4_MODEL_COMPARISON.md`
+  (new), `fix.md`, `progress.md`, `CLAUDE.md`, `fixlog.md`. No `app/` grounding/capability code changed (fix.md #12
+  is recorded, not patched). No Oracle access; the server was reached only for its Ollama instance via an SSH
+  tunnel, never for its filesystem or `.env`.
+- **Tests:** 11 core suites **282/282** (`test_schema_grounding` 29, up from 25; others unchanged); `py_compile`
+  clean; catalog JSON re-validated; `git diff --check` clean.

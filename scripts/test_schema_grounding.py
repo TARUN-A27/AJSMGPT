@@ -275,6 +275,63 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.ISSUE", "ISSUEVALUE", "measure"),
                       {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
 
+    def test_generic_value_grounds_to_the_plans_own_domain_not_purchase(self):
+        # fix.md #10 root cause: "value" is bare-aliased only on purchase_value
+        # in the catalog, so a consumption-domain plan asking for the generic
+        # word "value" matched ONLY that one concept and silently grounded to
+        # INVENTORY.PURCHASEORDER.NET -- no ambiguity, no rejection, is_grounded
+        # True, wrong table, full confidence. The tie-break scoring in
+        # ground_query_plan() never engaged because there was nothing to break
+        # a tie with: consumption_value had no bare "value" alias to compete.
+        result = ground_query_plan(plan(
+            "consumption", "consumption", operation="aggregate",
+            measures=[Measure(concept="value", aggregation=Aggregation.SUM)],
+        ))
+        self.assert_grounded(result)
+        selected = {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns}
+        self.assertIn(("INVENTORY.ISSUE", "ISSUEVALUE", "measure"), selected)
+        self.assertNotIn(("INVENTORY.PURCHASEORDER", "NET", "measure"), selected)
+
+    def test_generic_value_still_grounds_to_purchase_for_a_purchase_plan(self):
+        # Same generic word, purchase domain: must keep resolving to
+        # PURCHASEORDER.NET now that consumption_value also claims "value".
+        result = ground_query_plan(plan(
+            "purchase", "purchase", operation="aggregate",
+            measures=[Measure(concept="value", aggregation=Aggregation.SUM)],
+        ))
+        self.assert_grounded(result)
+        self.assertIn(("INVENTORY.PURCHASEORDER", "NET", "measure"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
+    def test_generic_rate_grounds_to_the_plans_own_domain_not_purchase(self):
+        # Same bug shape as "value", for "rate": consumption_rate had no bare
+        # "rate" alias, so a consumption plan asking generically for "rate"
+        # would have silently grounded to INVENTORY.PURCHASEORDER.RATE.
+        result = ground_query_plan(plan(
+            "consumption", "consumption", operation="aggregate",
+            measures=[Measure(concept="rate", aggregation=Aggregation.AVERAGE)],
+        ))
+        self.assert_grounded(result)
+        selected = {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns}
+        self.assertIn(("INVENTORY.ISSUE", "ISSRATE", "measure"), selected)
+        self.assertNotIn(("INVENTORY.PURCHASEORDER", "RATE", "measure"), selected)
+
+    def test_cost_consumed_last_month_no_longer_ties_on_date(self):
+        # The originally observed symptom: with "value" wrongly grounding to
+        # PURCHASEORDER first, selected_tables gained PURCHASEORDER, which
+        # made the later date_range:date step score ORDERDATE and ISSUEDATE
+        # equally and reject as AMBIGUOUS. Fixing the measure resolution
+        # removes the pollution and the date filter now resolves outright.
+        result = ground_query_plan(plan(
+            "consumption", "consumption", operation="aggregate",
+            measures=[Measure(concept="value", aggregation=Aggregation.SUM)],
+            date_range=DateRange(kind=DateRangeKind.RELATIVE, original_text="last month"),
+        ))
+        self.assert_grounded(result)
+        self.assertEqual(result.ambiguities, [])
+        self.assertIn(("INVENTORY.ISSUE", "ISSUEDATE", "date_filter"),
+                      {(c.full_table_name, c.column_name, c.role) for c in result.selected_columns})
+
     def test_compound_condition_columns_are_catalog_verified(self):
         # _catalog_is_verified() already runs on every ground_query_plan()
         # call and raises RuntimeError if any column (including compound

@@ -126,21 +126,89 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - 1 of the 1,645 distinct PO suppliers is not `GOODSTYPECODE = 2` and is now permanently unresolvable.
 - AMBIGUOUS candidates put ERP item/party codes in the API response (not in logs).
 
-## 10. ⬜ Cross-domain alias collision: a generic concept grounds to two domains' columns
-- **Found:** 2026-09-22 re-run. `how much cost consumed last month?` → `GROUNDING_FAILURE`, but not for the reason
-  #4 assumed. The model emits generic concepts (`measure.concept = "value"`, date concept `"date"`), and the catalog
-  carries bare aliases on more than one domain: `"value"` on `purchase_value` and `"date"` on both `purchase_date`
-  (`PURCHASEORDER.ORDERDATE`) and `consumption_date` (`ISSUE.ISSUEDATE`). The measure pulls `PURCHASEORDER` into the
-  selected tables, both date columns then score identically, and grounding reports
-  `Multiple equally supported V1 columns match this concept: [INVENTORY.ISSUE.ISSUEDATE, INVENTORY.PURCHASEORDER.ORDERDATE]`
-  on a plan whose `domain` is unambiguously `consumption`.
-- **Where:** `app/schema_grounding.py` candidate scoring (the tie-break uses selected tables/anchors, never
-  `plan.domain`), plus the bare aliases in `app/resources/business_schema_catalog.json`.
-- **Fix (not attempted yet — it changes grounding for every family, so it needs its own task):** prefer candidates
-  whose concept belongs to the plan's domain before falling back to the table-anchor score, or drop the bare
-  `"value"` / `"date"` aliases and require the domain-qualified ones. Do not special-case consumption.
-- **Correct as it stands:** failing closed on the ambiguity is right; silently answering with purchase dates would be
-  the bug.
+## 10. ✅ Cross-domain alias collision: a generic concept grounds to two domains' columns
+- **Found:** 2026-09-22 re-run. `how much cost consumed last month?` → `GROUNDING_FAILURE` (date ambiguity). That
+  ambiguity was only the visible symptom — **the real bug was worse and silent.**
+- **Root cause (traced 2026-09-23, not what the note above assumed):** `_matching_columns` matches by alias text
+  across the *whole* catalog, and the domain-affinity tie-break in `ground_query_plan` (`app/schema_grounding.py`)
+  only runs when **more than one** candidate exists for a phrase. `"value"` was a bare alias on `purchase_value`
+  only — `consumption_value`'s aliases were `["consumption value", "issue value", "issued value", "cost consumed",
+  "consumption cost", "consumed cost"]`, no bare `"value"`. So a **consumption**-domain plan whose measure concept is
+  the generic word `"value"` had exactly **one** catalog match — `purchase_value` (`INVENTORY.PURCHASEORDER.NET`) —
+  and the tie-break never engaged because there was nothing to tie against: `ground_query_plan` grounded it
+  successfully, `is_grounded=True`, zero ambiguities, zero rejections, joined via `ITEM_CODE` to make it look
+  legitimate. **A "how much value was consumed" question would have silently reported the purchase-order NET total
+  instead of `ISSUE.ISSUEVALUE`, with full confidence and no signal anything was wrong.** That mis-grounding then
+  polluted `selected_tables` with `PURCHASEORDER`, which is what made the *later* date-filter step tie between
+  `ORDERDATE` and `ISSUEDATE` — the reported symptom was two steps downstream of the actual defect.
+  The same asymmetry existed for `"rate"` (`purchase_rate` has it, `consumption_rate` did not) — confirmed
+  reproducible the same way, not yet hit by the 47-question set but the identical code path.
+- **Fixed 2026-09-23 (catalog only, no grounding-code change):** added the bare `"value"` / `"rate"` aliases to
+  `consumption_value` / `consumption_rate`, matching the pattern `purchase_quantity` / `mrs_quantity` /
+  `consumption_quantity` already used correctly (all three consistently alias bare `"quantity"`/`"qty"`, which is why
+  quantity never had this bug). This restores the tie-break's own domain-affinity scoring to actually engage: with
+  both concepts as candidates, `consumption_value`'s table (`ISSUE`, a domain anchor) now outscores
+  `purchase_value`'s table (`PURCHASEORDER`, not an anchor) outright — no tie, no cross-domain leak, and the
+  purchase-domain case is unaffected (still resolves to `PURCHASEORDER.NET`, verified by regression test). 2-line
+  diff in `app/resources/business_schema_catalog.json`. Tests:
+  `test_generic_value_grounds_to_the_plans_own_domain_not_purchase`,
+  `test_generic_value_still_grounds_to_purchase_for_a_purchase_plan`,
+  `test_generic_rate_grounds_to_the_plans_own_domain_not_purchase`,
+  `test_cost_consumed_last_month_no_longer_ties_on_date` (confirms the downstream date ambiguity is also gone).
+- **Not changed:** `mrs_due_date` still deliberately excludes bare `"date"` (the dirty-DUEDATE reason already
+  recorded in #8) — this fix does not touch that.
+- **Still worth auditing later, not done today:** whether any other bare generic alias (beyond value/rate/date/qty)
+  has the same one-domain-only asymmetry; today's audit covered all 26 concepts' alias lists by hand and found only
+  these two.
+
+## 11. ✅ Step 4 — Qwen3:8b vs Qwen3:14b comparison
+- **Done 2026-09-23.** Protocol: `docs/STEP4_MODEL_COMPARISON.md`. 8b = the run already committed at `64e901e`
+  (laptop, local Ollama). 14b = fresh run via SSH tunnel to the company server's Ollama (the server has `qwen3:14b`
+  only, not `qwen3:8b` — confirmed by a 404 before falling back to the committed 8b result instead of pulling an
+  unneeded second copy of 8b onto the server).
+- **Result (in-scope buckets, 23 of 47):** `PASS_PIPELINE` 2 → **5**; `QUERY_PLAN_FAILURE` 4 → **1**;
+  `SQL_VALIDATION_FAILURE` 1 → **0**. 8 of 47 questions changed bucket, all but one in the improving direction (the
+  one non-improving move, `CAPABILITY_FAILURE → ENTITY_RESOLUTION_REJECTION` for an MRS question, is neutral — the
+  question is still correctly rejected, just for the fixture-gap reason instead of the wrong-operation reason).
+  Latency: 47.5s/question (8b, laptop CPU) vs 8.1s/question (14b, server RTX 5070) — **not a fair comparison**
+  (different hardware), reported only as a rough figure per the protocol's own caveat.
+- **New failure mode found while checking item (4) of the protocol (not a 14b defect — a pre-existing gate bug the
+  comparison happened to surface):** see #12.
+- **Decision:** 14b is adopted as the **dev/eval** model going forward (Step 5's acceptance re-run and any further
+  prompt iteration). This is measurement-driven, not a production cutover — Step 6 (live Oracle) is unaffected and
+  still needs its own confirmation before any runtime default changes.
+
+## 12. ⬜ Capability + grounding "lookup" shortcut discards `plan.domain` entirely
+- **Found:** 2026-09-23, while checking a Step 4 per-question move (`is material mouse received?`, a GRN-shaped
+  question the dataset correctly marks `expected_unsupported`). 14b tagged it `domain="grn", operation="lookup"`
+  (grn is explicitly `"status": "unsupported"` in `v1_query_capabilities.json` — 0 verified concepts). It should have
+  been rejected as `CAPABILITY_FAILURE`. It was not.
+- **Root cause:** `app/v1_capabilities.py:_family_name` and `app/schema_grounding.py:_domain` **both** contain the
+  identical special case:
+  ```python
+  if operation == "lookup" and subject in {"material", "item"}:      return "material_lookup"  # / material_lookup domain
+  if operation == "lookup" and subject in {"supplier", "vendor", "party"}: return "supplier_lookup"
+  ```
+  This check runs **before** either function ever looks at `plan.domain`. Confirmed end-to-end with a *resolved*
+  entity (`domain="grn", operation="lookup", business_subject.concept="material"`, entity resolved to `"KEYBOARD"`):
+  `evaluate_capability` returns `supported=True, family="material_lookup"`; `ground_query_plan` returns
+  `is_grounded=True`, selecting only `INVENTORY.INVITEMS.ITEM_NAME`. **The model's own domain tag — the only place
+  "this is a receipt-status question, not an identity lookup" was ever recorded — is discarded by both gates before
+  either one is reached, and the SQL that would be generated answers a completely different question ("what is
+  this item") with no rejection, no low-confidence flag, and no indication that "received" was never addressed.**
+  This is not a wrong-number bug (no false measure/aggregate is asserted) — it is a silently non-responsive answer
+  delivered with full confidence, on any domain the model tags with `operation=lookup` + a material/supplier
+  subject: `grn`, `stock`, or any future unsupported family reachable that way.
+- **Why not fixed today:** the shortcut exists on purpose for genuine identity lookups ("what is the item code for
+  KEYBOARD") where `plan.domain` is often absent, "unknown", or a plausible-but-imprecise guess and should *not*
+  block the lookup. The fix has to distinguish that legitimate case from a domain the catalog explicitly marks
+  unsupported, without breaking the former — options include (a) only taking the shortcut when `plan.domain` is
+  empty/`"unknown"`/already one of the two lookup domains' own aliases, rejecting outright when it names a *different
+  known* unsupported family; or (b) requiring the plan carry no measures/dimensions/filters beyond the entity itself
+  before treating it as a plain lookup. Either changes capability+grounding together and needs its own regression
+  pass across the whole matrix (supplier_lookup, material_lookup, and every domain that could be mistagged) — out of
+  scope for today's task (fix.md #10 + Step 4), and CLAUDE.md §11 asks that scope not be expanded mid-task.
+- **Where:** `app/v1_capabilities.py:_family_name` (~L53-57), `app/schema_grounding.py:_domain` (~L184-188).
 
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.

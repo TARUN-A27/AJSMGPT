@@ -70,11 +70,12 @@ what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~95%   both #7 gaps closed + 6 review findings; fix.md #10 open
-LLM layers (3, 6)                          ~65%   unchanged: the remaining failures are model behaviour (Step 4)
+Deterministic layers (2, 4, 5, 7)         ~95%   #7 + #10 closed (6 review findings + the cross-domain alias bug);
+                                                  fix.md #12 open (lookup shortcut discards plan.domain)
+LLM layers (3, 6)                          ~75%   Step 4 done: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1
 Execution + report (8, 9)                  ~70%   SQL is now valid for Oracle 11.2; still never run on it
-Real-question pass rate                   2/47   (24 by-design unsupported → 2/23 of in-scope, both executable)
-Overall V1                                 ~70%   remaining: Step 4 (8b vs 14b), Step 5, Step 6 (server), freeze
+Real-question pass rate (14b)             5/47   (24 by-design unsupported → 5/23 of in-scope, all executable)
+Overall V1                                 ~75%   remaining: Step 5, Step 6 (server), freeze
 ```
 
 ---
@@ -221,3 +222,6 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
 - 2026-09-22 — Step 3 done: QueryPlan failures 20 → 3, first 3 PASS_PIPELINE; fix.md #7 opened (aggregate/GROUP BY validator gap).
 - 2026-09-22 — `app/plugins.py` added (6 post-execution plugins, unwired, tests 15/15); recorded under Post-V1 C.
 - 2026-09-21 — progress.md expanded: per-stage V1 status, endpoint/coverage tables, ~55% completion estimate, 9-step remaining plan, post-V1 needs A–I.
+- 2026-09-23 — fix.md #10 closed (root cause was silent cross-domain measure mis-grounding, not just the date tie
+  it surfaced as); Step 4 done (14b adopted as dev/eval model, `docs/STEP4_MODEL_COMPARISON.md`); fix.md #12 opened
+  (capability/grounding lookup shortcut discards `plan.domain`).

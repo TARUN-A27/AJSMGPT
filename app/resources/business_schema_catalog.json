@@ -169,12 +169,12 @@
     },
     {
       "name": "consumption_value",
-      "aliases": ["consumption value", "issue value", "issued value", "cost consumed", "consumption cost", "consumed cost"],
+      "aliases": ["consumption value", "issue value", "issued value", "cost consumed", "consumption cost", "consumed cost", "value"],
       "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUEVALUE", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata NUMBER(12,2); live profile 2026-09-22: ISSUE.ISSUEVALUE with ISSRATE per issue line; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2"}]
     },
     {
       "name": "consumption_rate",
-      "aliases": ["issue rate", "consumption rate", "issued rate"],
+      "aliases": ["issue rate", "consumption rate", "issued rate", "rate"],
       "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSRATE", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata NUMBER(12,4); live profile 2026-09-22; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §2.2"}]
     },
     {

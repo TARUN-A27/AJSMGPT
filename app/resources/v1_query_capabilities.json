@@ -7,8 +7,8 @@
       "status": "supported",
       "domains": ["purchase"],
       "operations": ["detail", "aggregate", "ranking"],
-      "verified_concepts": ["purchase quantity", "purchase value", "purchase rate", "purchase date", "supplier", "supplier name", "supplier code", "material", "item code"],
-      "limitations": ["No status-code meanings are defined.", "No financial-year rules are defined."]
+      "verified_concepts": ["purchase quantity", "purchase value", "purchase rate", "purchase date", "supplier", "supplier name", "supplier code", "material", "item code", "pending at so", "pending at ia", "pending at jmd", "po approved", "po pending"],
+      "limitations": ["The SO/IA/JMD approval-ladder status is the only status-code meaning defined (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1, fix.md #4); no other PURCHASEORDER status/flag column is catalogued.", "No financial-year rules are defined."]
     },
     {
       "name": "supplier_lookup",
@@ -42,14 +42,14 @@
       "domains": ["grn", "goods receipt", "goods receipt note"],
       "operations": ["detail", "aggregate", "ranking"],
       "verified_concepts": ["received quantity", "pending receipt quantity", "rejected receipt quantity", "grn date", "material", "item code", "supplier", "supplier name", "supplier code"],
-      "limitations": ["\"Order pending\" as a single yes/no status is not catalogued: the ERP's PO-pending SO/IA/JMD approval ladder (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1) needs value-pinned compound conditions this catalog does not yet support -- fix.md #4.", "GRN.STATUS/FLAG carry no verified meaning and are not exposed."]
+      "limitations": ["\"Order pending\" as PO approval status is a purchase_orders concept (\"po pending\"/\"pending at so/ia/jmd\"), not a GRN one; GRN's own pending/received/rejected quantities are unrelated to PO approval and are already catalogued above.", "GRN.STATUS/FLAG carry no verified meaning and are not exposed."]
     },
     {
       "name": "mrs",
       "status": "supported",
       "domains": ["mrs"],
       "operations": ["detail", "aggregate", "ranking"],
-      "verified_concepts": ["mrs quantity", "mrs date", "department code", "item code"],
+      "verified_concepts": ["mrs quantity", "mrs date", "department code", "item code", "mrs rejected", "mrs approved", "mrs pending"],
       "limitations": ["Department-name lookup is unsupported because no verified MRS-to-department relationship is catalogued."]
     },
     {

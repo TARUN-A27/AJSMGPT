@@ -262,3 +262,48 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   `test_query_plan_semantic_validator` updated to a genuinely-still-uncatalogued domain, "attendance"); `py_compile`
   clean at every commit; `git diff --check` clean; `git push` succeeded on every commit (the earlier session's
   publish-permission denial did not recur).
+
+### PO-pending ladder + MRS-pending anti-join (fix.md #4), plus their independent review
+- **Prompt:** asked what the next big task should be; I recommended the PO-pending SO/IA/JMD approval ladder
+  and the MRS-pending anti-join — the two items `docs/V1_FREEZE_CRITERIA.md` had, that same morning, recorded
+  as deferred to v1.1+. Flagged that contradiction plainly rather than silently overriding my own doc. User
+  confirmed: "yes start that use sub-agents also think and finish."
+- **Done:** built two new, genuinely new grounding/validation mechanisms rather than approximating with what
+  already existed — value-pinned and value-or-null compound conditions, and a catalog-declared anti-join not
+  backed by a database FK (none exists for `MRS_TEMP`→`MRS` in `data/schema_relationships.json`; verified
+  instead from the ERP's own business logic — `FUNCTION GETORDERPENDINGSTATUS` for the PO ladder, Tarun's own
+  production query for MRS-pending). 6 new catalog concepts: `po_pending_at_so`, `po_pending_at_ia` (deliberately
+  pins only 2 of 3 flags — the source doc never restates the third for that row, and asserting it would be an
+  unverified inference), `po_pending_at_jmd`, `po_approved`, `po_pending` (any stage, by negation), `mrs_pending`
+  (5 pinned flags + a value-or-null flag + the anti-join, all on one concept). Deliberately avoided a bare
+  "pending"/"approved" alias on the new concepts — this catalog's alias lookup is first-match-wins with no
+  domain scoring (the fix.md #10 bug class), so a shared bare alias between two domains would either misground
+  or falsely refuse; used domain-qualified aliases instead and added a test proving no collision.
+- **Independent review (fresh agent, adversarial construction against the real validator, not just reasoning)
+  found 2 real gaps, both fixed same day:** (1) a duplicate of an already-satisfied compound-condition fragment
+  appended as a trailing `OR (<already-true thing>)` was invisible to every check — nothing verified what lay
+  outside the tracked required positions, so Oracle's own operator precedence read the whole WHERE as "the real
+  condition OR that other thing." Reproduced against the pre-existing `mrs_approved` too, so this predated
+  today's work; not a regression from the new mechanisms, but they widened its blast radius. Closed by
+  rejecting any WHERE-clause `OR` outside a required OR-combinator gap or a value-or-null clause's own span.
+  (2) the anti-join's `NVL(...)=0` check resolved its column via *any* alias of the physical table, so a second,
+  wrongly-shaped join (e.g. a plain `JOIN` on a partial key) could supply the alias the NULL check reads from
+  while an unrelated, correctly-shaped `LEFT JOIN` under a different alias satisfied the composite-key check —
+  passing validation on SQL that never actually used the verified join. Closed by requiring the NULL check to
+  use specifically the verified join's own alias. Both had concrete adversarial SQL that passed validation
+  before the fix; both now have named regression tests, reproduced first, fixed after.
+- **Also:** a docs-sync agent updated `fix.md`/`progress.md`/`docs/V1_FREEZE_CRITERIA.md`/the schema-study doc
+  to match (I verified its diffs myself before trusting them, corrected one stale test count and one file
+  omission it couldn't have known about from a later small fix). `docs/V1_FREEZE_CRITERIA.md`'s coverage section
+  now explains the reprioritization plainly rather than leaving a same-day contradiction. Explicitly not done:
+  the offline 47-question eval was not re-run against this (would need Ollama, not asked for); the goods-receipt
+  reading of "PO pending" (`GRN` absent / `MRS_TEMP`/`MRS` state, §8 of the schema study) is a different,
+  still-open question, noted as such so it isn't mistaken for resolved.
+- **Files:** `app/schema_grounding.py`, `app/grounded_sql_validator.py`, `app/grounded_sql_generator.py`,
+  `app/sql_datatype_validator.py`, `app/resources/business_schema_catalog.json`,
+  `app/resources/v1_query_capabilities.json`, `scripts/test_schema_grounding.py`,
+  `scripts/test_grounded_sql_validator.py`, `scripts/test_sql_datatype_validator.py`, `fix.md`, `progress.md`,
+  `CLAUDE.md`, `docs/V1_FREEZE_CRITERIA.md`, `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md`. No Oracle/Ollama access;
+  every check offline.
+- **Tests:** 10 core suites **293/293** (was 289 immediately after the new mechanism, before the review; +4
+  from the review's regression tests and one hardening test). `py_compile` clean throughout.

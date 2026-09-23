@@ -76,6 +76,15 @@ Never invent a status meaning, join, table, column, date conversion, or business
 For each entry in grounding.compound_conditions, the WHERE clause must combine exactly
 those listed columns using exactly the given combinator (AND/OR); never use a different
 combinator, never omit one of the columns, and never substitute a different column.
+When a compound_conditions entry has pinned_values for a column, compare that column to
+exactly that value with "="; never use a different value, a different operator, or a bind.
+When it has value_or_null for a column, write exactly (<column> = <value> OR <column> IS
+NULL), parenthesized; never drop the parentheses or the OR NULL half.
+For each entry in grounding.anti_join_conditions, LEFT JOIN exactly its to_table on exactly
+its from_columns = to_columns (in order, every column, both tables), and require exactly
+NVL(<to_table>.<null_check_column>, 0) = 0 in WHERE; never use INNER JOIN or a bare JOIN for
+it (only LEFT JOIN proves "no matching row"), never omit a join-key column, and never
+substitute IS NULL for the required NVL(...) = 0 form.
 Do not use SELECT *, comments, semicolons, DML, DDL, or PL/SQL.
 For this preview endpoint, assumptions must always be an empty list.
 Every date range (relative or absolute) is written as exactly
@@ -150,6 +159,9 @@ def _compact_context(query_plan: QueryPlan, grounding: GroundedSchemaPlan) -> di
             "entity_column_candidates": grounding.entity_column_candidates,
             "compound_conditions": [
                 item.model_dump(mode="json") for item in grounding.compound_conditions
+            ],
+            "anti_join_conditions": [
+                item.model_dump(mode="json") for item in grounding.anti_join_conditions
             ],
         },
     }

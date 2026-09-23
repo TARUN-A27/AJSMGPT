@@ -71,19 +71,50 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
   its own measured before/after eval pass like Step 3, not a same-session patch. Not attempted today.
 - **Where:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`'s operation guidance), not `v1_capabilities.py`.
 
-## 4. 🟡 Grounding: concept has no verified column (rate/cost closed; order-pending open)
+## 4. ✅ Grounding: concept has no verified column (rate/cost closed 2026-09-22; PO-pending + MRS-pending closed 2026-09-23)
 - **Count:** 3 × `GROUNDING_FAILURE` after Step 3 — rate, cost consumed, order pending.
 - **Reason:** `No verified V1 column supports this required concept.`
-- **Where:** `app/schema_grounding.py`, `app/resources/business_schema_catalog.json`
+- **Where:** `app/schema_grounding.py`, `app/grounded_sql_validator.py`, `app/grounded_sql_generator.py`, `app/sql_datatype_validator.py`, `app/resources/business_schema_catalog.json`, `app/resources/v1_query_capabilities.json`
 - **Closed 2026-09-22 (P3, commit `0a11c17`):** `purchase_rate` → `INVENTORY.PURCHASEORDER.RATE` and `consumption_rate` → `INVENTORY.ISSUE.ISSRATE`, both verified in `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` §6.1 + the live column profile; `cost consumed` / `consumption cost` / `consumed cost` added as aliases of the existing `consumption_value` (`ISSUE.ISSUEVALUE`). Capabilities updated. Tests: `test_purchase_rate_grounds_as_measure`, `test_cost_consumed_grounds_to_issue_value`.
-- **Still open — PO order pending:** the ERP computes PO-pending through the SO/IA/JMD approval ladder (study §6.1), not a single column. Needs value-pinned compound conditions (P6), not a catalog alias. Do not approximate it with `STATUS` — `PURCHASEORDER.STATUS` is constant 0 in the live data.
-- **MRS pending — verified 2026-09-23** (Tarun's own production query, not inferred; full definition in
-  `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` §6.1): `MRS_TEMP.RejectionStatus=0 AND StoresRejectionStatus=0 AND
-  ItemDelete=0 AND isDelete=0 AND MrsFlag=1 AND (MillCode=0 OR MillCode IS NULL)`, **plus** a `LEFT JOIN MRS ON
-  MrsNo/SlNo` with `NVL(MRS.OrderNo, 0) = 0`. The flag-AND part fits the existing `compound_condition` mechanism;
-  the anti-join to `MRS` does not — V1 has no "no matching row in a second table" grounding capability today.
-  Ready to implement with a small, new, catalog-declared anti-join fragment; not attempted (needs its own careful
-  design + tests, same reasoning as the PO ladder above — do not rush a new grounding mechanism unsupervised).
+- **Closed 2026-09-23 — PO order pending:** the ERP's SO/IA/JMD approval ladder (study §6.1, `FUNCTION
+  INVENTORY.GETORDERPENDINGSTATUS`) is now 5 catalogued concepts — `po_pending_at_so`, `po_pending_at_ia`,
+  `po_pending_at_jmd`, `po_approved`, `po_pending` (the last derived by negation: SO=0 OR IA=0 OR JMD=0) — via
+  **value-pinned compound conditions**, a new grounding mechanism (an AND/OR of column=literal-value fragments,
+  not a one-column catalog alias). `PURCHASEORDER.STATUS` is still correctly never used (constant 0 in the live
+  data). `purchase_orders` family in `app/resources/v1_query_capabilities.json` updated with the 5 concepts; its
+  stale limitations text corrected.
+- **Closed 2026-09-23 — MRS pending:** Tarun's own verified production query (not inferred; full definition in
+  `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` §6.1) is now the catalogued concept `mrs_pending`:
+  `MRS_TEMP.RejectionStatus=0 AND StoresRejectionStatus=0 AND ItemDelete=0 AND isDelete=0 AND MrsFlag=1 AND
+  (MillCode=0 OR MillCode IS NULL)`, **plus** a `LEFT JOIN MRS ON MrsNo/SlNo` with `NVL(MRS.OrderNo, 0) = 0`. The
+  flag-AND part used the existing `compound_condition` mechanism, extended with a new **value-or-null** variant
+  for `MillCode` (0 or NULL, not just 0); the anti-join to `MRS` needed a genuinely new grounding primitive — a
+  catalog-declared **anti-join fragment** (a join verified from ERP business logic, not a schema foreign key,
+  since none exists in `data/schema_relationships.json`). `mrs` family's limitations text in
+  `app/resources/v1_query_capabilities.json` corrected.
+- **New tests (2026-09-23):** `scripts/test_schema_grounding.py` (+6 tests),
+  `scripts/test_grounded_sql_validator.py` (`PoOrderPendingLadderTests`, `MrsPendingAntiJoinTests`, +13 tests),
+  `scripts/test_sql_datatype_validator.py` (+1 test — the offline datatype-category loader also had to learn
+  `compound_condition.value_or_null_columns`, `app/sql_datatype_validator.py`). 293/293 across the 10 core V1
+  suites.
+- **Independent review, same day, found and fixed 2 real gaps (both regression-tested):** (1) a duplicate of an
+  already-satisfied compound-condition fragment appended as `OR (<already-true thing>)` anywhere outside the
+  positions `_validate_compound_conditions` tracks was invisible to every check — Oracle precedence then reads
+  the whole WHERE as "the real condition OR that other thing", silently widening the answer; reproduced against
+  the pre-existing `mrs_approved` too, so this predated today's work. Closed by rejecting any WHERE-clause `OR`
+  outside a required OR-combinator gap or a value-or-null clause's own span. (2) the anti-join's `NVL(...)=0`
+  check resolved its column via any alias of the physical table, so a second, wrongly-shaped join (e.g. a plain
+  `JOIN` on a partial key) could supply the alias the NULL check reads from while an unrelated, correctly-shaped
+  `LEFT JOIN` under a different alias satisfied the composite-key check — passing validation on SQL that never
+  actually used the verified join. Closed by requiring the NULL check to use specifically the verified join's
+  own alias. 3 new regression tests (`test_appended_or_clause_cannot_widen_the_predicate`,
+  `test_left_join_alias_confusion_is_rejected`, `test_appended_or_of_an_already_required_column_is_rejected`).
+- **Not done yet — eval re-run:** the offline 47-question evaluation (`scripts/evaluate_v1_real_questions.py`,
+  needs Ollama) has not been re-run against this new capability. Some currently-recorded `UNSUPPORTED_EXPECTED`
+  results for "order pending"-style questions may now be reachable (`CAPABILITY_FAILURE`, `GROUNDING_FAILURE`, or
+  a real pass) instead of refused-by-design — the same way the stock/GRN catalog work earlier this session
+  flipped 10 of 13 such cases (fix.md #13). Re-running that eval is a follow-up, not done as part of
+  this change.
 
 ## 5. ✅ Zero end-to-end passes
 - **Closed 2026-09-22.** First passes on the Step 3 run (3), then 2 on the re-run after the Oracle-executability

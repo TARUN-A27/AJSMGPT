@@ -490,6 +490,87 @@ class SchemaGroundingTests(unittest.TestCase):
         result = ground_query_plan(self._entity_plan("mrs rejected"))
         self.assertTrue(result.is_grounded)
 
+    def _po_entity_plan(self, concept):
+        return plan(
+            "purchase", "purchase",
+            entities=[EntityReference(
+                concept=concept, original_value="1", selected_value="1",
+                confidence=0.9, status=EntityStatus.RESOLVED,
+            )],
+        )
+
+    def test_po_pending_at_so_pins_all_three_flags_to_zero(self):
+        result = ground_query_plan(self._po_entity_plan("pending at so"))
+        self.assert_grounded(result)
+        condition = result.compound_conditions[0]
+        self.assertEqual(condition.combinator, "AND")
+        self.assertEqual(condition.pinned_values, {
+            "INVENTORY.PURCHASEORDER.SOORDERAPPROVAL": 0,
+            "INVENTORY.PURCHASEORDER.IAORDERAPPROVAL": 0,
+            "INVENTORY.PURCHASEORDER.JMDORDERAPPROVAL": 0,
+        })
+
+    def test_po_pending_at_ia_deliberately_omits_jmd(self):
+        # docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1 states this row as
+        # SO=1,IA=0 only and never restates JMD -- pinning JMD would assert
+        # an unverified fact, so the catalog concept only has two columns.
+        result = ground_query_plan(self._po_entity_plan("pending at ia"))
+        self.assert_grounded(result)
+        condition = result.compound_conditions[0]
+        self.assertEqual(condition.pinned_values, {
+            "INVENTORY.PURCHASEORDER.SOORDERAPPROVAL": 1,
+            "INVENTORY.PURCHASEORDER.IAORDERAPPROVAL": 0,
+        })
+        self.assertNotIn("INVENTORY.PURCHASEORDER.JMDORDERAPPROVAL", condition.pinned_values)
+
+    def test_po_approved_pins_all_three_flags_to_one(self):
+        result = ground_query_plan(self._po_entity_plan("po approved"))
+        self.assert_grounded(result)
+        condition = result.compound_conditions[0]
+        self.assertEqual(condition.combinator, "AND")
+        self.assertEqual(set(condition.pinned_values.values()), {1})
+        self.assertEqual(len(condition.pinned_values), 3)
+
+    def test_po_pending_any_stage_is_an_or_of_zero_pins(self):
+        result = ground_query_plan(self._po_entity_plan("po pending"))
+        self.assert_grounded(result)
+        condition = result.compound_conditions[0]
+        self.assertEqual(condition.combinator, "OR")
+        self.assertEqual(set(condition.pinned_values.values()), {0})
+        self.assertEqual(len(condition.pinned_values), 3)
+
+    def test_po_approved_and_mrs_approved_do_not_collide_on_a_bare_alias(self):
+        # Both concepts could plausibly claim a bare "approved" alias;
+        # po_approved deliberately does not, so a purchase-domain plan asking
+        # for "po approved" is not at the mercy of concept array order.
+        result = ground_query_plan(self._po_entity_plan("approved"))
+        self.assertFalse(result.is_grounded)
+
+    def test_mrs_pending_grounds_flag_and_value_or_null_and_anti_join(self):
+        result = ground_query_plan(self._entity_plan("mrs pending"))
+        self.assert_grounded(result)
+        condition = result.compound_conditions[0]
+        self.assertEqual(condition.logical_concept, "mrs_pending")
+        self.assertEqual(condition.combinator, "AND")
+        self.assertEqual(condition.pinned_values, {
+            "INVENTORY.MRS_TEMP.REJECTIONSTATUS": 0,
+            "INVENTORY.MRS_TEMP.STORESREJECTIONSTATUS": 0,
+            "INVENTORY.MRS_TEMP.ITEMDELETE": 0,
+            "INVENTORY.MRS_TEMP.ISDELETE": 0,
+            "INVENTORY.MRS_TEMP.MRSFLAG": 1,
+        })
+        self.assertEqual(condition.value_or_null, {"INVENTORY.MRS_TEMP.MILLCODE": 0})
+
+        self.assertEqual(len(result.anti_join_conditions), 1)
+        anti_join = result.anti_join_conditions[0]
+        self.assertEqual(anti_join.logical_concept, "mrs_pending")
+        self.assertEqual(anti_join.from_table, "INVENTORY.MRS_TEMP")
+        self.assertEqual(anti_join.from_columns, ["MRSNO", "SLNO"])
+        self.assertEqual(anti_join.to_table, "INVENTORY.MRS")
+        self.assertEqual(anti_join.to_columns, ["MRSNO", "SLNO"])
+        self.assertEqual(anti_join.null_check_column, "ORDERNO")
+        self.assertIn("INVENTORY.MRS", {table.full_table_name for table in result.selected_tables})
+
 
 class CatalogDatatypeCategoryTests(unittest.TestCase):
     def test_catalog_datatype_categories_agree_with_metadata(self) -> None:

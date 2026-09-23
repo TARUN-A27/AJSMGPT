@@ -89,7 +89,7 @@ def _load_offline_column_categories() -> dict[tuple[str, str, str], str]:
         if compound:
             # Compound-condition columns have no per-column roles; a category
             # must be given explicitly, same as every other explicit case.
-            for col in compound.get("columns", []):
+            for col in compound.get("columns", []) + compound.get("value_or_null_columns", []):
                 _record(col, roles=set())
 
     return categories

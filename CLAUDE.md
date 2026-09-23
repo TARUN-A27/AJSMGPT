@@ -102,13 +102,30 @@ refused by design, now real, measurable model/catalog gaps. The same session als
 **live Oracle** for the first time (Step 6, fix.md #13): first-ever live `PASS_PIPELINE`, 4 rounds, 4 real gaps
 found and fixed same day.
 
+Later the same day: the PO-pending SO/IA/JMD approval ladder and the MRS-pending anti-join (both previously
+`UNSUPPORTED_EXPECTED`, fix.md #4) were catalogued and implemented — see `po_pending_at_so/ia/jmd`, `po_approved`,
+`po_pending`, and `mrs_pending` in `app/resources/business_schema_catalog.json`. This needed two new grounding/
+validation mechanisms (value-pinned and value-or-null compound conditions, and a catalog-declared anti-join not
+backed by a database FK) in `app/schema_grounding.py` / `app/grounded_sql_validator.py`. The table above still
+reflects the eval run *before* this change — some of the 13 `UNSUPPORTED_EXPECTED` questions about order-pending
+status may now be reachable; re-running the offline eval to measure that is a follow-up, not done yet.
+
+An independent review of that change (fresh-context agent, adversarial construction against the real validator,
+not just reasoning) found and confirmed two real §3-relevant gaps, both fixed same day: (1) a duplicate of an
+already-satisfied compound-condition fragment appended as `OR (...)` anywhere outside the tracked positions was
+invisible to every check — closed by rejecting any WHERE-clause `OR` outside a required OR-combinator gap or a
+value-or-null clause's own span; (2) the anti-join's `NVL(...)=0` check could bind to a different, wrongly-joined
+alias of the same physical table than the one verified as the correct composite-key `LEFT JOIN` — closed by
+requiring the NULL check to use specifically the verified join's own alias. Both had concrete adversarial SQL
+that passed validation before the fix; both now have named regression tests.
+
 ## 7. Test commands
 Tests are `unittest` scripts. Run the one for the component you changed:
 ```bash
 python scripts/test_<component>.py
 ```
 Core V1 suites: `test_text_correction`, `test_spacy_nlp`, `test_query_plan_extractor`, `test_query_plan_semantic_validator`, `test_schema_grounding`, `test_grounded_sql_generator`, `test_grounded_sql_validator`, `test_sql_datatype_validator`, `test_nlp_execution`, `test_v1_acceptance_matrix`.
-Baseline: 11 core suites 290/290 (2026-09-23).
+Baseline: 10 core suites 293/293 (2026-09-23, after the PO/MRS-pending catalog work and its independent review).
 
 ## 8. Evaluation commands
 ```bash

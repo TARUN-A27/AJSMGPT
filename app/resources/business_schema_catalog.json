@@ -231,6 +231,101 @@
         {"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.5, "evidence": "metadata"},
         {"table": "SCM.PARTYMASTER", "column": "PARTYNAME", "roles": ["grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.5, "evidence": "metadata"}
       ]
+    },
+    {
+      "name": "po_pending_at_so",
+      "aliases": ["pending at stores officer", "pending at so", "po pending at so", "awaiting stores officer"],
+      "confidence": 0.85,
+      "evidence": "ERP FUNCTION INVENTORY.GETORDERPENDINGSTATUS: SO/IA/JMD all 0 -> pending at 'SO' (stores officer), literally stated; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1",
+      "compound_condition": {
+        "combinator": "AND",
+        "columns": [
+          {"table": "INVENTORY.PURCHASEORDER", "column": "SOORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "IAORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "JMDORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0}
+        ]
+      }
+    },
+    {
+      "name": "po_pending_at_ia",
+      "aliases": ["pending at internal audit", "pending at ia", "po pending at ia", "awaiting internal audit"],
+      "confidence": 0.8,
+      "evidence": "ERP FUNCTION INVENTORY.GETORDERPENDINGSTATUS: SO=1,IA=0 -> pending at 'IA' (internal audit); docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1 -- JMD is deliberately NOT pinned here: the study states this row as SO=1,IA=0 only and never restates JMD's value, so pinning JMD would assert a fact the study does not literally give (see docs/ORACLE_SCHEMA_STUDY_2026-09-22.md discussion). SO=1 AND IA=0 alone is still a correct, complete answer to 'has this PO passed SO but not yet IA', regardless of JMD.",
+      "compound_condition": {
+        "combinator": "AND",
+        "columns": [
+          {"table": "INVENTORY.PURCHASEORDER", "column": "SOORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 1},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "IAORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0}
+        ]
+      }
+    },
+    {
+      "name": "po_pending_at_jmd",
+      "aliases": ["pending at jmd", "pending at joint managing director", "po pending at jmd", "awaiting jmd"],
+      "confidence": 0.85,
+      "evidence": "ERP FUNCTION INVENTORY.GETORDERPENDINGSTATUS: SO=1,IA=1,JMD=0 -> pending at 'JMD', literally stated; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1",
+      "compound_condition": {
+        "combinator": "AND",
+        "columns": [
+          {"table": "INVENTORY.PURCHASEORDER", "column": "SOORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 1},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "IAORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 1},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "JMDORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0}
+        ]
+      }
+    },
+    {
+      "name": "po_approved",
+      "aliases": ["po approved", "order approved", "purchase order approved", "fully approved"],
+      "confidence": 0.85,
+      "evidence": "ERP FUNCTION INVENTORY.GETORDERPENDINGSTATUS: SO=1,IA=1,JMD=1 -> approved, literally stated; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1",
+      "compound_condition": {
+        "combinator": "AND",
+        "columns": [
+          {"table": "INVENTORY.PURCHASEORDER", "column": "SOORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 1},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "IAORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 1},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "JMDORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 1}
+        ]
+      }
+    },
+    {
+      "name": "po_pending",
+      "aliases": ["po pending", "order pending", "purchase order pending", "pending approval", "not approved"],
+      "confidence": 0.85,
+      "evidence": "Derived by negation from the fully-verified approved state (SO=1 AND IA=1 AND JMD=1, literally stated): not approved means at least one flag is 0, i.e. SO=0 OR IA=0 OR JMD=0 (all three columns are used only as 0/1 flags throughout the ladder, per ERP FUNCTION INVENTORY.GETORDERPENDINGSTATUS). Does not distinguish which stage -- use po_pending_at_so/ia/jmd for that. docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1",
+      "compound_condition": {
+        "combinator": "OR",
+        "columns": [
+          {"table": "INVENTORY.PURCHASEORDER", "column": "SOORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "IAORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.PURCHASEORDER", "column": "JMDORDERAPPROVAL", "datatype_category": "NUMERIC", "value": 0}
+        ]
+      }
+    },
+    {
+      "name": "mrs_pending",
+      "aliases": ["mrs pending", "pending mrs", "mrs not yet ordered"],
+      "confidence": 0.85,
+      "evidence": "Tarun's own verified production query, 2026-09-23 (not inferred): MRS_TEMP row is pending when RejectionStatus=0 AND StoresRejectionStatus=0 AND ItemDelete=0 AND isDelete=0 AND MrsFlag=1 AND (MillCode=0 OR MillCode IS NULL) AND NVL(MRS.OrderNo,0)=0 on a LEFT JOIN MRS ON MRS.MrsNo=MRS_Temp.MrsNo AND MRS_Temp.SlNo=MRS.SlNo (catches both 'never approved into MRS at all' and 'approved but no PO cut yet'). docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1",
+      "compound_condition": {
+        "combinator": "AND",
+        "columns": [
+          {"table": "INVENTORY.MRS_TEMP", "column": "REJECTIONSTATUS", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.MRS_TEMP", "column": "STORESREJECTIONSTATUS", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.MRS_TEMP", "column": "ITEMDELETE", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.MRS_TEMP", "column": "ISDELETE", "datatype_category": "NUMERIC", "value": 0},
+          {"table": "INVENTORY.MRS_TEMP", "column": "MRSFLAG", "datatype_category": "NUMERIC", "value": 1}
+        ],
+        "value_or_null_columns": [
+          {"table": "INVENTORY.MRS_TEMP", "column": "MILLCODE", "datatype_category": "NUMERIC", "value": 0}
+        ]
+      },
+      "anti_join_condition": {
+        "from_table": "INVENTORY.MRS_TEMP",
+        "from_columns": ["MRSNO", "SLNO"],
+        "to_table": "INVENTORY.MRS",
+        "to_columns": ["MRSNO", "SLNO"],
+        "null_check_column": "ORDERNO"
+      }
     }
   ],
   "relationships": [

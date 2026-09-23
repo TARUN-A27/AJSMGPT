@@ -49,6 +49,16 @@ _THREE_PART_COLUMN_RE = re.compile(
     rf"\b({_IDENTIFIER})\.({_IDENTIFIER})\.({_IDENTIFIER})\b", re.IGNORECASE
 )
 _TWO_PART_COLUMN_RE = re.compile(rf"\b({_IDENTIFIER})\.({_IDENTIFIER})\b", re.IGNORECASE)
+# Anti-join conditions require the JOIN to be LEFT specifically (an INNER
+# JOIN would silently drop every "no match" row, making the NULL check
+# always false) -- unlike _TABLE_REF_RE, this only matches when LEFT
+# literally precedes JOIN.
+_LEFT_JOIN_RE = re.compile(
+    rf"\bLEFT\s+JOIN\s+({_IDENTIFIER}\.{_IDENTIFIER})(?:\s+(?:AS\s+)?({_IDENTIFIER}))?\s+ON\s+"
+    rf"(.*?)(?=\b(?:INNER|LEFT|RIGHT|FULL|CROSS)?\s*JOIN\b|\bWHERE\b|\bGROUP\s+BY\b|"
+    rf"\bORDER\s+BY\b|\bFETCH\b|\bOFFSET\b|$)",
+    re.IGNORECASE | re.DOTALL,
+)
 _BLOCKED_KEYWORDS = {
     "INSERT", "UPDATE", "DELETE", "MERGE", "DROP", "ALTER", "TRUNCATE", "CREATE",
     "REPLACE", "GRANT", "REVOKE", "COMMIT", "ROLLBACK", "SAVEPOINT", "EXEC",
@@ -66,6 +76,12 @@ _SQL_KEYWORDS = _ALIAS_STOP_WORDS | {
 }
 _ALLOWED_FUNCTIONS = {
     "AVG", "COUNT", "MAX", "MIN", "ROUND", "SUM",
+    # NVL is used only in the exact anti-join shape NVL(col, 0) = 0, required
+    # and checked verbatim by _validate_anti_join_conditions; allowing the
+    # function itself here does not loosen that -- every other check
+    # (grounded columns, no bare literals outside a verified fragment) still
+    # applies to whatever it is called with.
+    "NVL",
 }
 # Never added to _ALLOWED_FUNCTIONS: date boundaries are QueryPlan-derived and
 # must always reach SQL as named binds, never as a literal-conversion call.
@@ -294,6 +310,13 @@ def _validate_joins(masked_sql: str, grounding: GroundedSchemaPlan, references: 
     for path in grounding.allowed_relationship_paths:
         for left, right in zip(path.tables, path.tables[1:]):
             allowed_pairs.add(frozenset((left.upper(), right.upper())))
+    for anti_join in grounding.anti_join_conditions:
+        # This equality check is deliberately loose (any one column pair is
+        # enough) even for the anti-join's composite key -- that full
+        # strictness (every column present, and LEFT specifically) is
+        # _validate_anti_join_conditions' job, which always runs alongside
+        # this function.
+        allowed_pairs.add(frozenset((anti_join.from_table.upper(), anti_join.to_table.upper())))
     join_columns = {
         (column.full_table_name.upper(), column.column_name.upper())
         for column in grounding.selected_columns
@@ -712,9 +735,8 @@ def _predicate_matches(
     return outermost(all_occurrences), outermost(approved)
 
 
-def _is_compound_condition_concept(grounding: GroundedSchemaPlan, concept: str) -> bool:
-    """True when a QueryPlan concept phrase resolved (during grounding) to a
-    bounded compound condition rather than a single bindable column.
+def _matched_compound_condition(grounding: GroundedSchemaPlan, concept: str):
+    """The compound condition a QueryPlan concept phrase resolved to, if any.
 
     Uses `entity_column_candidates`, which grounding already populates with
     the literal plan phrase -> resolved column set for both ordinary and
@@ -724,9 +746,34 @@ def _is_compound_condition_concept(grounding: GroundedSchemaPlan, concept: str) 
     """
     candidates = grounding.entity_column_candidates.get(concept)
     if not candidates:
-        return False
+        return None
     candidate_set = set(candidates)
-    return any(set(condition.columns) == candidate_set for condition in grounding.compound_conditions)
+    return next(
+        (condition for condition in grounding.compound_conditions if set(condition.columns) == candidate_set),
+        None,
+    )
+
+
+def _is_compound_condition_concept(grounding: GroundedSchemaPlan, concept: str) -> bool:
+    """True when a QueryPlan concept phrase resolved (during grounding) to a
+    bounded compound condition rather than a single bindable column."""
+    return _matched_compound_condition(grounding, concept) is not None
+
+
+def _anti_join_conditions_for_concept(grounding: GroundedSchemaPlan, concept: str) -> list:
+    """Anti-join conditions attached to the same catalog concept a phrase's
+    compound condition (if any) resolved to. Correlated by `logical_concept`
+    name rather than `entity_column_candidates`, since one concept can
+    require both a compound condition and an anti-join at once (e.g.
+    mrs_pending) and the two are recorded in separate GroundedSchemaPlan
+    lists."""
+    condition = _matched_compound_condition(grounding, concept)
+    if condition is None:
+        return []
+    return [
+        item for item in grounding.anti_join_conditions
+        if item.logical_concept == condition.logical_concept
+    ]
 
 
 def _validate_filter_operators(
@@ -838,6 +885,21 @@ def _validate_entity_binds(
             or _columns_for_concept(grounding, concept)
         )
     }
+    # A compound condition's value-or-null columns and an attached anti-join's
+    # columns are real, required WHERE-clause references (checked in full by
+    # _validate_compound_conditions / _validate_anti_join_conditions) but are
+    # deliberately not part of entity_column_candidates (see
+    # _matched_compound_condition), so without this they would look like an
+    # "unrequested column" below.
+    for concept in filter_concepts:
+        condition = _matched_compound_condition(grounding, concept)
+        if condition is None:
+            continue
+        allowed_filter_columns.update(key.upper() for key in condition.value_or_null)
+        for anti_join in _anti_join_conditions_for_concept(grounding, concept):
+            allowed_filter_columns.add(f"{anti_join.to_table}.{anti_join.null_check_column}".upper())
+            allowed_filter_columns.update(f"{anti_join.from_table}.{col}".upper() for col in anti_join.from_columns)
+            allowed_filter_columns.update(f"{anti_join.to_table}.{col}".upper() for col in anti_join.to_columns)
     if has_date_filter:
         allowed_filter_columns.update(
             f"{column.full_table_name}.{column.column_name}".upper()
@@ -862,11 +924,31 @@ def _validate_entity_binds(
         # A compound condition's comparison values are fixed, catalog-declared
         # constants (e.g. flag = 1), not user-supplied values -- so unlike an
         # arbitrary literal, these do not need a bind. Only the exact
-        # required columns' own comparisons are exempted here.
+        # required columns' own comparisons are exempted here -- and, when a
+        # column is pinned to a specific value, only that exact value's
+        # digits (not any digit), so a wrong-value substitution still shows
+        # up as a bare literal here rather than being silently exempted.
         for full_column in condition.columns:
+            pinned_value = condition.pinned_values.get(full_column)
+            digit_pattern = re.escape(str(pinned_value)) if pinned_value is not None else r"\d+"
             for variant in _reference_variants(full_column, references.aliases, unqualified_for_scan):
                 pattern = _column_pattern(variant).pattern
-                numeric_scan = re.sub(rf"{pattern}\s*=\s*\d+", "", numeric_scan, flags=re.IGNORECASE)
+                numeric_scan = re.sub(rf"{pattern}\s*=\s*{digit_pattern}\b", "", numeric_scan, flags=re.IGNORECASE)
+        for full_column, value in condition.value_or_null.items():
+            for variant in _reference_variants(full_column, references.aliases, unqualified_for_scan):
+                pattern = _column_pattern(variant).pattern
+                numeric_scan = re.sub(
+                    rf"{pattern}\s*=\s*{re.escape(str(value))}\b", "", numeric_scan, flags=re.IGNORECASE
+                )
+    for anti_join in grounding.anti_join_conditions:
+        # Same rationale: NVL(col, 0) = 0 is the catalog-fixed anti-join
+        # shape, not a user-supplied literal.
+        null_check_full = f"{anti_join.to_table}.{anti_join.null_check_column}"
+        for variant in _reference_variants(null_check_full, references.aliases, unqualified_for_scan):
+            pattern = _column_pattern(variant).pattern
+            numeric_scan = re.sub(
+                rf"NVL\s*\(\s*{pattern}\s*,\s*0\s*\)\s*=\s*0", "", numeric_scan, flags=re.IGNORECASE
+            )
     if re.search(r"(?<![:A-Z0-9_$#])\d+(?:\.\d+)?(?![A-Z0-9_$#])", numeric_scan, re.IGNORECASE):
         raise GroundedSqlSemanticError("Filter literals must be represented by validated named binds.")
 
@@ -923,42 +1005,204 @@ def _validate_compound_conditions(
     (schema_grounding.py), so this only has to confirm the model reproduced
     that fixed structure, not that it invented something plausible-looking.
     Deliberately regex-based (not a full boolean-expression parser), matching
-    the rest of this module's style; it assumes the two columns of a given
-    condition are not independently reused elsewhere in the same WHERE
-    clause, which holds for the bounded MRS status conditions this supports.
+    the rest of this module's style; it assumes a given condition's columns
+    are not independently reused elsewhere in the same WHERE clause, which
+    holds for the bounded status conditions this supports.
+
+    Each required fragment (a plain/pinned column, or a value-or-null clause)
+    contributes one matched span; every *adjacent* pair of spans (by position
+    in the SQL, not declaration order) is checked independently for the
+    required combinator -- not just the outermost envelope -- so a condition
+    with 3+ fragments can't have a middle fragment's own contents (a
+    value-or-null clause is itself an OR) misread as the top-level joiner.
+
+    Finally, checks that WHERE has no OR anywhere outside a required
+    fragment's own gap or a value-or-null clause's own span. Without this, a
+    duplicate of an already-satisfied fragment (or any other grounded
+    predicate) appended anywhere else in WHERE -- e.g. "... AND <real
+    condition> OR (<already-true thing>)" -- is invisible to every check
+    above: they only look for required fragments being present and correctly
+    joined *to each other*, never at what precedes the first or follows the
+    last. Oracle operator precedence then reads that appended OR as "the
+    whole real condition OR this other thing", silently widening the answer.
+    V1 never legitimately combines filters with OR outside these two cases,
+    so this runs even for a plan with no compound conditions at all.
     """
-    if not grounded_schema_plan.compound_conditions:
+    where_part = _clause(masked_sql, "WHERE", r"\bGROUP\s+BY\b|\bORDER\s+BY\b|\bFETCH\b|\bOFFSET\b")
+    legitimate_or_spans: list[tuple[int, int]] = []
+
+    if grounded_schema_plan.compound_conditions:
+        unqualified_columns = _unqualified_column_map(grounded_schema_plan, references)
+        for condition in grounded_schema_plan.compound_conditions:
+            positions: list[tuple[int, int]] = []
+            value_or_null_spans: list[tuple[int, int]] = []
+            for full_column in condition.columns:
+                pinned_value = condition.pinned_values.get(full_column)
+                match = None
+                for variant in _reference_variants(full_column, references.aliases, unqualified_columns):
+                    base_pattern = _column_pattern(variant).pattern
+                    pattern = (
+                        re.compile(rf"{base_pattern}\s*=\s*{pinned_value}\b", re.IGNORECASE)
+                        if pinned_value is not None
+                        else _column_pattern(variant)
+                    )
+                    match = pattern.search(where_part)
+                    if match:
+                        break
+                if not match:
+                    reason = (
+                        f"Compound condition '{condition.logical_concept}' requires "
+                        f"{full_column} = {pinned_value}."
+                        if pinned_value is not None
+                        else f"Compound condition '{condition.logical_concept}' is missing required column {full_column}."
+                    )
+                    raise GroundedSqlSemanticError(reason)
+                positions.append((match.start(), match.end()))
+
+            for full_column, value in condition.value_or_null.items():
+                match = None
+                for variant in _reference_variants(full_column, references.aliases, unqualified_columns):
+                    base_pattern = _column_pattern(variant).pattern
+                    pattern = re.compile(
+                        rf"\(\s*{base_pattern}\s*=\s*{value}\s+OR\s+{base_pattern}\s+IS\s+NULL\s*\)"
+                        rf"|\(\s*{base_pattern}\s+IS\s+NULL\s+OR\s+{base_pattern}\s*=\s*{value}\s*\)",
+                        re.IGNORECASE,
+                    )
+                    match = pattern.search(where_part)
+                    if match:
+                        break
+                if not match:
+                    raise GroundedSqlSemanticError(
+                        f"Compound condition '{condition.logical_concept}' requires "
+                        f"({full_column} = {value} OR {full_column} IS NULL)."
+                    )
+                positions.append(match.span())
+                value_or_null_spans.append(match.span())
+
+            positions.sort()
+            required = condition.combinator.upper()
+            other = "AND" if required == "OR" else "OR"
+            for (_, gap_start), (gap_end, _) in zip(positions, positions[1:]):
+                gap = where_part[gap_start:gap_end]
+                if not re.search(rf"\b{required}\b", gap, re.IGNORECASE):
+                    raise GroundedSqlSemanticError(
+                        f"Compound condition '{condition.logical_concept}' requires its columns to be "
+                        f"combined with {required}."
+                    )
+                if re.search(rf"\b{other}\b", gap, re.IGNORECASE):
+                    raise GroundedSqlSemanticError(
+                        f"Compound condition '{condition.logical_concept}' must not mix {other} into "
+                        f"its required {required} combination."
+                    )
+                if required == "OR":
+                    legitimate_or_spans.append((gap_start, gap_end))
+            legitimate_or_spans.extend(value_or_null_spans)
+
+    for match in re.finditer(r"\bOR\b", where_part, re.IGNORECASE):
+        if not any(start <= match.start() and match.end() <= end for start, end in legitimate_or_spans):
+            raise GroundedSqlSemanticError(
+                "WHERE clause contains an OR outside a required compound condition; V1 filters "
+                "are otherwise always combined with AND, never OR."
+            )
+
+
+def _validate_anti_join_conditions(
+    masked_sql: str,
+    grounding: GroundedSchemaPlan,
+    references: _SqlReferences,
+) -> None:
+    """Bounded check for a catalog-declared "no matching row" requirement.
+
+    An ordinary verified-FK join is checked loosely by _validate_joins (one
+    matching equality out of the ON-clause is enough, since every existing
+    relationship is a single-column FK). An anti-join's correctness depends
+    on two things _validate_joins does not check at all: the join must be a
+    LEFT JOIN specifically, and -- because this catalog's first anti-join
+    uses a composite key -- *every* column of the join key must be present,
+    not just one. So this re-parses the ON-clause in full rather than
+    relying on that looser existing check.
+
+    Critically, the NULL check is required against the *same alias* as the
+    verified LEFT JOIN -- not any alias that happens to map to `to_table`.
+    Without that, a second, wrongly-shaped join to the same physical table
+    (e.g. a plain JOIN on a partial key) could supply the alias the NVL
+    check reads from, while a separate, correctly-shaped LEFT JOIN under a
+    different alias satisfies the composite-key check -- passing validation
+    while the SQL Oracle actually runs never uses the correct join at all.
+    """
+    if not grounding.anti_join_conditions:
         return
-    unqualified_columns = _unqualified_column_map(grounded_schema_plan, references)
+    unqualified_columns = _unqualified_column_map(grounding, references)
     where_part = _clause(masked_sql, "WHERE", r"\bGROUP\s+BY\b|\bORDER\s+BY\b|\bFETCH\b|\bOFFSET\b")
 
-    for condition in grounded_schema_plan.compound_conditions:
-        positions: list[tuple[int, int]] = []
-        for full_column in condition.columns:
-            match = None
-            for variant in _reference_variants(full_column, references.aliases, unqualified_columns):
-                match = _column_pattern(variant).search(where_part)
-                if match:
+    def _composite_key_satisfied(condition, condition_text: str) -> bool:
+        for from_col, to_col in zip(condition.from_columns, condition.to_columns):
+            required_pair = frozenset({
+                (condition.from_table.upper(), from_col.upper()),
+                (condition.to_table.upper(), to_col.upper()),
+            })
+            matched = False
+            for equality in re.finditer(
+                rf"\b({_IDENTIFIER}(?:\.{_IDENTIFIER}){{0,2}})\s*=\s*({_IDENTIFIER}(?:\.{_IDENTIFIER}){{0,2}})\b",
+                condition_text,
+                re.IGNORECASE,
+            ):
+                left = _resolve_column(equality.group(1), references.aliases, unqualified_columns)
+                right = _resolve_column(equality.group(2), references.aliases, unqualified_columns)
+                if left and right and frozenset({left, right}) == required_pair:
+                    matched = True
                     break
-            if not match:
-                raise GroundedSqlSemanticError(
-                    f"Compound condition '{condition.logical_concept}' is missing required column {full_column}."
-                )
-            positions.append((match.start(), match.end()))
+            if not matched:
+                return False
+        return True
 
-        positions.sort()
-        between_text = where_part[positions[0][1]:positions[-1][0]]
-        required = condition.combinator.upper()
-        other = "AND" if required == "OR" else "OR"
-        if not re.search(rf"\b{required}\b", between_text, re.IGNORECASE):
+    for condition in grounding.anti_join_conditions:
+        candidates = [
+            match for match in _LEFT_JOIN_RE.finditer(masked_sql)
+            if match.group(1).upper() == condition.to_table.upper()
+        ]
+        if not candidates:
             raise GroundedSqlSemanticError(
-                f"Compound condition '{condition.logical_concept}' requires its columns to be "
-                f"combined with {required}."
+                f"Anti-join condition '{condition.logical_concept}' requires a LEFT JOIN to "
+                f"{condition.to_table}."
             )
-        if re.search(rf"\b{other}\b", between_text, re.IGNORECASE):
+        verified_match = next(
+            (match for match in candidates if _composite_key_satisfied(condition, match.group(3))),
+            None,
+        )
+        if verified_match is None:
+            column_pairs = ", ".join(
+                f"{condition.from_table}.{from_col} = {condition.to_table}.{to_col}"
+                for from_col, to_col in zip(condition.from_columns, condition.to_columns)
+            )
             raise GroundedSqlSemanticError(
-                f"Compound condition '{condition.logical_concept}' must not mix {other} into "
-                f"its required {required} combination."
+                f"Anti-join condition '{condition.logical_concept}' requires a LEFT JOIN to "
+                f"{condition.to_table} whose ON-clause has every join-key pair: {column_pairs}."
+            )
+
+        join_alias = verified_match.group(2)
+        null_check_column = condition.null_check_column
+        if join_alias:
+            required_patterns = [_column_pattern(f"{join_alias}.{null_check_column}").pattern]
+        else:
+            # No alias on the verified join -- the only legitimate references
+            # to it are the bare or fully qualified table name, never a
+            # custom alias (which, if one exists in the SQL, belongs to some
+            # other, unverified join to the same physical table).
+            bare_table = condition.to_table.split(".", 1)[1]
+            required_patterns = [
+                _column_pattern(f"{condition.to_table}.{null_check_column}").pattern,
+                _column_pattern(f"{bare_table}.{null_check_column}").pattern,
+            ]
+        found = any(
+            re.search(rf"NVL\s*\(\s*{pattern}\s*,\s*0\s*\)\s*=\s*0", where_part, re.IGNORECASE)
+            for pattern in required_patterns
+        )
+        if not found:
+            reference = f"{join_alias}.{null_check_column}" if join_alias else f"{condition.to_table}.{null_check_column}"
+            raise GroundedSqlSemanticError(
+                f"Anti-join condition '{condition.logical_concept}' requires NVL({reference}, 0) = 0 "
+                f"in WHERE, using the same alias as the verified LEFT JOIN."
             )
 
 
@@ -974,6 +1218,7 @@ def validate_grounded_sql(sql: str, query_plan: QueryPlan, grounded_schema_plan:
     _validate_sort_limit_and_date(masked_sql, query_plan, grounded_schema_plan, references)
     _validate_entity_binds(sql, masked_sql, query_plan, grounded_schema_plan, references)
     _validate_compound_conditions(masked_sql, grounded_schema_plan, references)
+    _validate_anti_join_conditions(masked_sql, grounded_schema_plan, references)
 
 
 def collect_grounded_sql_violations(
@@ -1013,6 +1258,7 @@ def collect_grounded_sql_violations(
             sql, masked_sql, query_plan, grounded_schema_plan, references
         ),
         lambda: _validate_compound_conditions(masked_sql, grounded_schema_plan, references),
+        lambda: _validate_anti_join_conditions(masked_sql, grounded_schema_plan, references),
     )
     for check in checks:
         try:

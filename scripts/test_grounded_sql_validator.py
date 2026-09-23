@@ -636,6 +636,237 @@ WHERE m.MRSNO = :mrs_number AND (   m.REJECTIONSTATUS  =  1   OR   m.STORESREJEC
         with self.assertRaises(GroundedSqlSemanticError):
             validate_grounded_sql(sql, plan, grounding)
 
+    def test_appended_or_of_an_already_required_column_is_rejected(self):
+        # Independent-review finding: this predates value-pinning entirely --
+        # duplicating one already-required column into "OR (<that column> =
+        # <its own required value>)" outside the tracked AND-chain used to be
+        # invisible to every check, silently widening "approved" to just
+        # "APPROVALSTATUS = 1" regardless of READYFORAPPROVAL.
+        plan = self._plan("mrs approved")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MRSNO = :mrs_number "
+            "AND M.APPROVALSTATUS = 1 AND M.READYFORAPPROVAL = 1 OR (M.APPROVALSTATUS = 1)"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+
+class PoOrderPendingLadderTests(unittest.TestCase):
+    """Value-pinned compound conditions for the SO/IA/JMD approval ladder
+    (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1, fix.md #4)."""
+
+    def _plan(self, concept: str) -> QueryPlan:
+        return QueryPlan(
+            original_question="po pending ladder test",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            entities=[EntityReference(
+                concept=concept, original_value="1", selected_value="1",
+                confidence=0.9, status=EntityStatus.RESOLVED,
+            )],
+            confidence=0.9,
+        )
+
+    def test_pending_at_so_requires_all_three_flags_pinned_to_zero(self):
+        plan = self._plan("pending at so")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 0 AND PO.IAORDERAPPROVAL = 0 AND PO.JMDORDERAPPROVAL = 0"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_pending_at_so_with_a_wrong_pinned_value_is_rejected(self):
+        plan = self._plan("pending at so")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 1 AND PO.IAORDERAPPROVAL = 0 AND PO.JMDORDERAPPROVAL = 0"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_pending_at_so_missing_a_flag_is_rejected(self):
+        plan = self._plan("pending at so")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 0 AND PO.IAORDERAPPROVAL = 0"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_pending_at_ia_needs_only_so_and_ia_never_jmd(self):
+        # docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1 never restates JMD for
+        # this row -- the catalog concept has only two pinned columns, so
+        # SQL that never mentions JMD at all is correct, not incomplete.
+        plan = self._plan("pending at ia")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 1 AND PO.IAORDERAPPROVAL = 0"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_pending_at_jmd_requires_all_three_with_jmd_zero(self):
+        plan = self._plan("pending at jmd")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 1 AND PO.IAORDERAPPROVAL = 1 AND PO.JMDORDERAPPROVAL = 0"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_po_approved_requires_all_three_pinned_to_one(self):
+        plan = self._plan("po approved")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 1 AND PO.IAORDERAPPROVAL = 1 AND PO.JMDORDERAPPROVAL = 1"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_po_pending_any_stage_is_an_or_of_zero_pins(self):
+        plan = self._plan("po pending")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 0 OR PO.IAORDERAPPROVAL = 0 OR PO.JMDORDERAPPROVAL = 0"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_po_pending_any_stage_using_and_instead_of_or_is_rejected(self):
+        plan = self._plan("po pending")
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT PO.SOORDERAPPROVAL FROM INVENTORY.PURCHASEORDER PO WHERE "
+            "PO.SOORDERAPPROVAL = 0 AND PO.IAORDERAPPROVAL = 0 AND PO.JMDORDERAPPROVAL = 0"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+
+class MrsPendingAntiJoinTests(unittest.TestCase):
+    """The flag-AND, value-or-null, and anti-join pieces of mrs_pending
+    (Tarun's verified production query, 2026-09-23; fix.md #4)."""
+
+    def _plan(self) -> QueryPlan:
+        return QueryPlan(
+            original_question="mrs pending test",
+            domain="mrs",
+            operation="detail",
+            business_subject=BusinessSubject(concept="mrs"),
+            entities=[EntityReference(
+                concept="mrs pending", original_value="1", selected_value="1",
+                confidence=0.9, status=EntityStatus.RESOLVED,
+            )],
+            confidence=0.9,
+        )
+
+    _VALID_SQL = (
+        "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M "
+        "LEFT JOIN INVENTORY.MRS MR ON M.MRSNO = MR.MRSNO AND M.SLNO = MR.SLNO WHERE "
+        "M.REJECTIONSTATUS = 0 AND M.STORESREJECTIONSTATUS = 0 AND M.ITEMDELETE = 0 "
+        "AND M.ISDELETE = 0 AND M.MRSFLAG = 1 AND (M.MILLCODE = 0 OR M.MILLCODE IS NULL) "
+        "AND NVL(MR.ORDERNO, 0) = 0"
+    )
+
+    def test_verified_shape_is_valid(self):
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        validate_grounded_sql(self._VALID_SQL, plan, grounding)
+
+    def test_inner_join_instead_of_left_join_is_rejected(self):
+        # An INNER JOIN would silently drop every row with no matching MRS
+        # order, making NVL(...)=0 always false -- the opposite of pending.
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL.replace("LEFT JOIN", "JOIN")
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_partial_composite_join_key_is_rejected(self):
+        # MRSNO alone does not uniquely match a MRS_TEMP line; dropping SLNO
+        # from the join would silently change which rows count as matched.
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL.replace(" AND M.SLNO = MR.SLNO", "")
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_is_null_instead_of_nvl_shape_is_rejected(self):
+        # IS NULL on ORDERNO would be logically equivalent here, but only the
+        # exact verified query shape is accepted -- not an inferred rewrite.
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL.replace("NVL(MR.ORDERNO, 0) = 0", "MR.ORDERNO IS NULL")
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_missing_value_or_null_clause_is_rejected(self):
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL.replace("AND (M.MILLCODE = 0 OR M.MILLCODE IS NULL) ", "")
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_millcode_or_null_accepts_either_operand_order(self):
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL.replace(
+            "(M.MILLCODE = 0 OR M.MILLCODE IS NULL)", "(M.MILLCODE IS NULL OR M.MILLCODE = 0)"
+        )
+        validate_grounded_sql(sql, plan, grounding)
+
+    def test_wrong_pinned_flag_value_is_rejected(self):
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL.replace("M.MRSFLAG = 1", "M.MRSFLAG = 0")
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_wrong_value_or_null_value_is_rejected(self):
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL.replace(
+            "(M.MILLCODE = 0 OR M.MILLCODE IS NULL)", "(M.MILLCODE = 5 OR M.MILLCODE IS NULL)"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_appended_or_clause_cannot_widen_the_predicate(self):
+        # Independent-review finding: appending "OR (<already-true thing>)"
+        # after the last tracked fragment used to be invisible to every
+        # check -- Oracle precedence then reads the whole WHERE as "the real
+        # condition OR that other thing", matching far more rows than
+        # mrs_pending should.
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = self._VALID_SQL + " OR (M.REJECTIONSTATUS = 0)"
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
+    def test_left_join_alias_confusion_is_rejected(self):
+        # Independent-review finding: a second, wrongly-shaped join to the
+        # same physical table (here a plain JOIN on a partial key, alias X)
+        # must not be able to supply the alias the NVL check reads from,
+        # even when a separate, correctly-shaped LEFT JOIN (alias MR) also
+        # exists and would satisfy the composite-key check on its own.
+        plan = self._plan()
+        grounding = ground_query_plan(plan)
+        sql = (
+            "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M "
+            "JOIN INVENTORY.MRS X ON M.MRSNO = X.MRSNO "
+            "LEFT JOIN INVENTORY.MRS MR ON M.MRSNO = MR.MRSNO AND M.SLNO = MR.SLNO WHERE "
+            "M.REJECTIONSTATUS = 0 AND M.STORESREJECTIONSTATUS = 0 AND M.ITEMDELETE = 0 "
+            "AND M.ISDELETE = 0 AND M.MRSFLAG = 1 AND (M.MILLCODE = 0 OR M.MILLCODE IS NULL) "
+            "AND NVL(X.ORDERNO, 0) = 0"
+        )
+        with self.assertRaises(GroundedSqlSemanticError):
+            validate_grounded_sql(sql, plan, grounding)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

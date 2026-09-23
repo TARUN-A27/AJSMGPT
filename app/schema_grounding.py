@@ -66,11 +66,50 @@ class GroundedCompoundCondition(BaseModel):
     exact columns come from the catalog, never from the model: Qwen is told
     which columns/operator are required, but the boolean structure itself is
     fixed here and re-checked verbatim by the SQL validator.
+
+    `pinned_values` optionally fixes the exact required value for a column
+    (full "TABLE.COLUMN" -> int), for concepts where different fixed values
+    of the *same* columns mean different things (e.g. a multi-stage approval
+    ladder: SOFLAG=1 AND IAFLAG=0 is a different status than SOFLAG=1 AND
+    IAFLAG=1). A column absent from this mapping is checked only for
+    presence, exactly as before -- existing catalog entries that never
+    declare a value keep their current behaviour unchanged.
     """
 
     logical_concept: str
     combinator: str
     columns: list[str]
+    pinned_values: dict[str, int] = Field(default_factory=dict)
+    # full "TABLE.COLUMN" -> required value, meaning "col = value OR col IS
+    # NULL" -- for a legacy nullable flag column where NULL and the default
+    # value mean the same business thing (e.g. MILLCODE=0 OR MILLCODE IS
+    # NULL). Kept apart from pinned_values because it needs a different SQL
+    # shape (a parenthesized OR, not a bare equality) checked as its own
+    # required fragment.
+    value_or_null: dict[str, int] = Field(default_factory=dict)
+
+
+class AntiJoinCondition(BaseModel):
+    """A catalog-declared "no matching row in a second table" requirement.
+
+    Distinct from `allowed_relationship_paths`: every path there traces to a
+    real database foreign key in data/schema_relationships.json. This join
+    does not have one -- it is verified from the ERP's own business logic
+    (a cited production query), not a DDL constraint -- so it is kept in its
+    own field rather than weakening that invariant.
+
+    The SQL must LEFT JOIN `to_table` on `from_columns` = `to_columns`
+    (composite equality, same order, both tables) and then require
+    `NVL(to_table.null_check_column, 0) = 0` in WHERE -- the exact shape of
+    the verified query, not a logically-equivalent rewrite such as IS NULL.
+    """
+
+    logical_concept: str
+    from_table: str
+    from_columns: list[str]
+    to_table: str
+    to_columns: list[str]
+    null_check_column: str
 
 
 class GroundedSchemaPlan(BaseModel):
@@ -85,6 +124,7 @@ class GroundedSchemaPlan(BaseModel):
     ambiguities: list[GroundingAmbiguity] = Field(default_factory=list)
     reject_reasons: list[GroundingRejection] = Field(default_factory=list)
     compound_conditions: list[GroundedCompoundCondition] = Field(default_factory=list)
+    anti_join_conditions: list[AntiJoinCondition] = Field(default_factory=list)
 
     @property
     def is_grounded(self) -> bool:
@@ -120,9 +160,23 @@ def _catalog_is_verified(catalog: dict, metadata_columns: dict[str, set[str]], m
                 raise RuntimeError("Business schema catalog contains an unverified column.")
         compound = concept.get("compound_condition")
         if compound:
-            for column in compound["columns"]:
+            for column in compound["columns"] + compound.get("value_or_null_columns", []):
                 if column["table"] not in metadata_columns or column["column"] not in metadata_columns[column["table"]]:
                     raise RuntimeError("Business schema catalog contains an unverified compound-condition column.")
+        anti_join = concept.get("anti_join_condition")
+        if anti_join:
+            if len(anti_join["from_columns"]) != len(anti_join["to_columns"]):
+                raise RuntimeError(
+                    "Business schema catalog anti-join condition has mismatched composite-key lengths."
+                )
+            checks = (
+                [(anti_join["from_table"], column) for column in anti_join["from_columns"]]
+                + [(anti_join["to_table"], column) for column in anti_join["to_columns"]]
+                + [(anti_join["to_table"], anti_join["null_check_column"])]
+            )
+            for table, column in checks:
+                if table not in metadata_columns or column not in metadata_columns[table]:
+                    raise RuntimeError("Business schema catalog contains an unverified anti-join column.")
     for edge in catalog["relationships"]:
         record = (edge["from_table"], edge["from_column"], edge["to_table"], edge["to_column"], edge["constraint_name"])
         if record not in actual_edges:
@@ -174,6 +228,28 @@ def _matching_compound_concept(catalog: dict, phrase: str, role: str) -> dict | 
     for concept in catalog["concepts"]:
         compound = concept.get("compound_condition")
         if not compound:
+            continue
+        aliases = {_normalise(concept["name"]), *(_normalise(alias) for alias in concept["aliases"])}
+        if target in aliases:
+            return concept
+    return None
+
+
+def _matching_anti_join_concept(catalog: dict, phrase: str, role: str) -> dict | None:
+    """Bounded lookup for a concept requiring a "no matching row" anti-join.
+
+    Same shape and rationale as `_matching_compound_concept`: only ever
+    satisfies an entity/filter requirement, never a free-form match. A
+    concept may have both a `compound_condition` and an `anti_join_condition`
+    (e.g. mrs_pending is a flag-AND plus an anti-join) -- the two lookups are
+    independent so `ground_query_plan` can apply whichever pieces a concept
+    declares.
+    """
+    if role != "entity_filter":
+        return None
+    target = _normalise(phrase)
+    for concept in catalog["concepts"]:
+        if not concept.get("anti_join_condition"):
             continue
         aliases = {_normalise(concept["name"]), *(_normalise(alias) for alias in concept["aliases"])}
         if target in aliases:
@@ -272,6 +348,42 @@ def _add_join_identifiers(path: list[dict], selected_columns: list[GroundedColum
             ))
 
 
+def _apply_anti_join(
+    anti_join_concept: dict,
+    selected_tables: set[str],
+    selected_columns: list[GroundedColumn],
+    anti_join_conditions: list[AntiJoinCondition],
+) -> None:
+    """Add the join-identifier and null-check columns for one catalog-declared
+    anti-join, and record it on the plan. `from_table` is always the domain
+    anchor already in `selected_tables`; this only ever adds the far side."""
+    anti_join = anti_join_concept["anti_join_condition"]
+    selected_tables.add(anti_join["to_table"])
+    for column in anti_join["from_columns"]:
+        selected_columns.append(GroundedColumn(
+            full_table_name=anti_join["from_table"], column_name=column,
+            logical_concept=anti_join_concept["name"], role="join_identifier",
+            confidence=anti_join_concept.get("confidence", 0.8),
+        ))
+    for column in anti_join["to_columns"]:
+        selected_columns.append(GroundedColumn(
+            full_table_name=anti_join["to_table"], column_name=column,
+            logical_concept=anti_join_concept["name"], role="join_identifier",
+            confidence=anti_join_concept.get("confidence", 0.8),
+        ))
+    selected_columns.append(GroundedColumn(
+        full_table_name=anti_join["to_table"], column_name=anti_join["null_check_column"],
+        logical_concept=anti_join_concept["name"], role="entity_filter",
+        confidence=anti_join_concept.get("confidence", 0.8),
+    ))
+    anti_join_conditions.append(AntiJoinCondition(
+        logical_concept=anti_join_concept["name"],
+        from_table=anti_join["from_table"], from_columns=list(anti_join["from_columns"]),
+        to_table=anti_join["to_table"], to_columns=list(anti_join["to_columns"]),
+        null_check_column=anti_join["null_check_column"],
+    ))
+
+
 def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
     """Ground only V1 catalog concepts; never generate SQL or access external services."""
     catalog, metadata_columns, metadata_edges = _load_inputs()
@@ -283,7 +395,19 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
         | {
             column["table"].split(".", 1)[0]
             for concept in catalog["concepts"]
-            for column in concept.get("compound_condition", {}).get("columns", [])
+            for column in (
+                concept.get("compound_condition", {}).get("columns", [])
+                + concept.get("compound_condition", {}).get("value_or_null_columns", [])
+            )
+        }
+        | {
+            table.split(".", 1)[0]
+            for concept in catalog["concepts"]
+            for table in (
+                [concept["anti_join_condition"]["from_table"], concept["anti_join_condition"]["to_table"]]
+                if concept.get("anti_join_condition")
+                else []
+            )
         }
     )
     result = GroundedSchemaPlan(source_query_plan=_source_summary(query_plan), candidate_schemas=schemas, confidence=0.0)
@@ -298,6 +422,7 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
     confidences = [domain["confidence"]]
 
     compound_conditions: list[GroundedCompoundCondition] = []
+    anti_join_conditions: list[AntiJoinCondition] = []
 
     for requirement_type, phrase, role in _requirements(query_plan):
         candidates = _matching_columns(catalog, phrase, role)
@@ -321,10 +446,27 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
                         confidence=compound_concept.get("confidence", 0.8),
                     ))
                 compound_column_names = [f"{col['table']}.{col['column']}" for col in compound["columns"]]
+                pinned_values = {
+                    f"{col['table']}.{col['column']}": col["value"]
+                    for col in compound["columns"]
+                    if "value" in col
+                }
+                value_or_null_columns = compound.get("value_or_null_columns", [])
+                for col in value_or_null_columns:
+                    selected_columns.append(GroundedColumn(
+                        full_table_name=col["table"], column_name=col["column"],
+                        logical_concept=compound_concept["name"], role="entity_filter",
+                        confidence=compound_concept.get("confidence", 0.8),
+                    ))
+                value_or_null = {
+                    f"{col['table']}.{col['column']}": col["value"] for col in value_or_null_columns
+                }
                 compound_conditions.append(GroundedCompoundCondition(
                     logical_concept=compound_concept["name"],
                     combinator=compound["combinator"],
                     columns=compound_column_names,
+                    pinned_values=pinned_values,
+                    value_or_null=value_or_null,
                 ))
                 # Record under the literal plan phrase (not just the catalog's
                 # canonical name), so the SQL validator can recognise this
@@ -338,6 +480,24 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
                     confidence=compound_concept.get("confidence", 0.8),
                 ))
                 confidences.append(compound_concept.get("confidence", 0.8))
+                anti_join_concept = _matching_anti_join_concept(catalog, phrase, role)
+                if anti_join_concept is not None:
+                    # Only applied as an adjunct to a compound condition on the
+                    # same concept (e.g. mrs_pending's flag-AND plus its
+                    # anti-join to MRS) -- there is no verified concept today
+                    # that is an anti-join with no compound condition at all,
+                    # and the rest of the validator's bind-skipping logic
+                    # (_is_compound_condition_concept) is keyed off the
+                    # compound condition existing, so an anti-join-only
+                    # concept is deliberately not supported until one is
+                    # actually needed.
+                    if anti_join_concept["anti_join_condition"]["from_table"] not in anchors:
+                        result.reject_reasons.append(GroundingRejection(
+                            requirement=f"{requirement_type}:{phrase}",
+                            reason="Anti-join condition's base table is outside the V1 domain anchor.",
+                        ))
+                        continue
+                    _apply_anti_join(anti_join_concept, selected_tables, selected_columns, anti_join_conditions)
                 continue
             domain_aliases = {_normalise(domain["name"]), *(_normalise(alias) for alias in domain["aliases"])}
             if requirement_type == "business_subject" and _normalise(phrase) in domain_aliases:
@@ -383,6 +543,7 @@ def ground_query_plan(query_plan: QueryPlan) -> GroundedSchemaPlan:
     result.selected_columns = sorted(unique_columns.values(), key=lambda item: (item.full_table_name, item.column_name, item.role))
     result.allowed_relationship_paths = sorted(paths, key=lambda item: (item.constraint_names, item.tables))
     result.compound_conditions = sorted(compound_conditions, key=lambda item: item.logical_concept)
+    result.anti_join_conditions = sorted(anti_join_conditions, key=lambda item: item.logical_concept)
     table_roles = {table: "anchor" if table in anchors else "related" for table in selected_tables}
     result.selected_tables = [GroundedTable(full_table_name=table, role=table_roles[table], confidence=domain["confidence"] if table in anchors else 1.0) for table in sorted(selected_tables)]
     if result.reject_reasons or any(item.blocking for item in result.ambiguities):

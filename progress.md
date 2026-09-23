@@ -21,7 +21,7 @@ Current phase: **V1** (grounded, validated, read-only pipeline). Branch: `featur
 | 9 | Business report | `answer_formatter.py` | ✅ built · unverified on real results | — |
 | — | Acceptance matrix | `test_v1_acceptance_matrix.py` | ✅ 17 cases + 4 rejections (2026-09-23) | 2 (supported accept / unsupported reject) |
 
-Core V1 suites (11): 284/284 (2026-09-23, after fix.md #10/#12 and the Step 4/5 additions).
+Core V1 suites (10): 293/293 (2026-09-23, after Step 6 live eval, stock/GRN, PO/MRS-pending, and its review — fix.md #4/#13).
 
 ### API endpoints (`app/nlp_router.py`)
 | Endpoint | Status |
@@ -35,15 +35,16 @@ Core V1 suites (11): 284/284 (2026-09-23, after fix.md #10/#12 and the Step 4/5 
 ### Verified business coverage (`app/resources/v1_query_capabilities.json`)
 | Family | Domains | Operations | Concepts | Status |
 |---|---|---|---|---|
-| purchase_orders | purchase | detail, aggregate, ranking | 9 | ✅ supported |
-| mrs | mrs | detail, aggregate, ranking | 4 | ✅ supported (no `lookup`) |
+| purchase_orders | purchase | detail, aggregate, ranking | 14 | ✅ supported (2026-09-23 — PO-pending SO/IA/JMD ladder added, fix.md #4) |
+| mrs | mrs | detail, aggregate, ranking | 7 | ✅ supported (no `lookup`; 2026-09-23 — MRS-pending anti-join added, fix.md #4) |
 | consumption | consumption / issue | detail, aggregate, ranking | 6 | ✅ supported |
 | supplier_lookup | purchase, supplier_lookup | lookup | 3 | ✅ supported |
 | material_lookup | purchase, material_lookup | lookup | 3 | ✅ supported |
 | stock | stock, inventory | aggregate | 3 | ✅ supported (2026-09-23, aggregate-only by design — fix.md #13) |
-| grn | goods receipt | detail, aggregate, ranking | 9 | ✅ supported (2026-09-23 — fix.md #13; PO-pending ladder still open, fix.md #4) |
+| grn | goods receipt | detail, aggregate, ranking | 9 | ✅ supported (2026-09-23 — fix.md #13) |
 
-Catalog: 7 domains · 31 concepts · 6 relationships (stock + grn added 2026-09-23 from verified schema columns, fix.md #13).
+Catalog: 7 domains · 37 concepts · 6 relationships (stock + grn added 2026-09-23 from verified schema columns,
+fix.md #13; PO-pending + MRS-pending added 2026-09-23, fix.md #4).
 
 ### Real-question evaluation (47 questions)
 ```text
@@ -70,15 +71,18 @@ what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~97%   #7, #10, #12, #13 closed; fix.md #2/#3 remain (need real data
-                                                  or a scoped prompt task, not quick fixes)
+Deterministic layers (2, 4, 5, 7)         ~97%   #4, #7, #10, #12, #13 closed; fix.md #2/#3 remain (need real
+                                                  data or a scoped prompt task, not quick fixes)
 LLM layers (3, 6)                          ~75%   Step 4 done: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1
 Execution + report (8, 9)                  ~80%   Step 6 done: real Oracle, first live PASS_PIPELINE (fix.md #13)
 Coverage                                   7/7    stock + grn added 2026-09-23 (10 of 24 previously-refused
                                                   questions now genuinely reachable, not just refused)
 Live-question eval (14b, real Oracle)     1/47   first pass ever against real Oracle; 4 rounds, 4 real gaps
                                                   found and fixed same day (fix.md #13) -- see the eval detail
-Overall V1                                 ~85%   remaining: bigger question bank, freeze sign-off
+Overall V1                                 ~85%   fix.md #4 (PO-pending, MRS-pending) fully closed 2026-09-23 --
+                                                  coverage within existing families grew; number not re-derived
+                                                  pending the eval re-run; remaining: bigger question bank,
+                                                  freeze sign-off
 ```
 
 ---
@@ -269,3 +273,20 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   fixed, out of AJSMGPT's control): this Oracle instance has ~28,700 pre-existing PUBLIC object grants
   database-wide, ~26,500 beyond SELECT — confirmed none land on AJSMGPT's own 14 tables. Live-question eval
   against real Oracle is next.
+- 2026-09-23 — fix.md #4 fully closed: PO-pending SO/IA/JMD approval ladder (5 new catalog concepts —
+  `po_pending_at_so`, `po_pending_at_ia`, `po_pending_at_jmd`, `po_approved`, `po_pending`) and MRS-pending
+  (`mrs_pending`) implemented, pulled forward from the v1.1+ deferral in `docs/V1_FREEZE_CRITERIA.md` at Tarun's
+  explicit direction. Two new grounding mechanisms: value-pinned compound conditions + a value-or-null variant,
+  and a new catalog-declared anti-join primitive (verified from ERP business logic, no schema FK backs it).
+  `app/schema_grounding.py`, `app/grounded_sql_validator.py`, `app/grounded_sql_generator.py`,
+  `app/sql_datatype_validator.py`, `app/resources/business_schema_catalog.json`,
+  `app/resources/v1_query_capabilities.json` changed. New tests: `scripts/test_schema_grounding.py` (+6),
+  `scripts/test_grounded_sql_validator.py` (`PoOrderPendingLadderTests`, `MrsPendingAntiJoinTests`, +13),
+  `scripts/test_sql_datatype_validator.py` (+1). An independent review the same day found and fixed 2 real gaps
+  in the shared validator logic (both regression-tested, 3 new tests): a duplicate of an already-satisfied
+  compound-condition fragment appended as a trailing `OR (...)` was invisible to every check (predated this
+  session's work — also reproduced against the pre-existing `mrs_approved`); the anti-join's `NVL(...)=0` check
+  could bind to a different, wrongly-joined alias of the same physical table than the one verified as the
+  correct `LEFT JOIN`. Full detail: fix.md #4. 293/293 across the 10 core V1 suites. Not done: the offline
+  47-question eval has not been re-run against this, so any "order pending" `UNSUPPORTED_EXPECTED` flips (same pattern as the
+  stock/GRN flip, fix.md #13) are not yet measured.

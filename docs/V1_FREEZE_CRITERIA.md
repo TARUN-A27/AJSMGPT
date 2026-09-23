@@ -28,9 +28,13 @@ Live-verified against the real server: `check_schema_access.py` confirms `ajsmgp
 never had a read-only profiling pass (verified columns, verified joins, known row-shape gotchas);
 adding it now would be unplanned scope into a domain nobody has studied yet, not a quick addition.
 It needs its own study pass first, same shape as the original Oracle schema study, before it can
-be catalogued the way stock/GRN were. Everything else (the PO-pending SO/IA/JMD ladder, the
-MRS-pending anti-join, cross-family joins) stays deferred to v1.1+ per `progress.md`'s Post-V1
-roadmap, unchanged.
+be catalogued the way stock/GRN were. Everything else in that Post-V1 list was, as of this morning,
+deferred to v1.1+ per `progress.md`'s Post-V1 roadmap. **Update, same day:** two of those items — the
+PO-pending SO/IA/JMD ladder and the MRS-pending anti-join — were pulled forward and implemented on
+2026-09-23 at Tarun's explicit direction (fix.md #4; see `progress.md`'s coverage table and log). This
+is a reprioritization, not a reversal of the reasoning above — attendance still needs its own study
+pass for the reasons already given, and that reasoning is unaffected. Cross-family joins stays
+deferred to v1.1+, unchanged.
 
 **2. Depth: pass rate on a held-out set — bar confirmed: ≥75%, measured per family, not blended**
 Purchase/MRS/consumption already have real passes; stock/GRN were only added 2026-09-23 and are

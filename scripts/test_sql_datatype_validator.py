@@ -83,6 +83,16 @@ class OfflineDatatypeValidationTests(unittest.TestCase):
                 "SELECT po.NET FROM INVENTORY.PURCHASEORDER po WHERE po.ORDERDATE LIKE '2026%'"
             )
 
+    def test_value_or_null_compound_column_is_categorised_not_skipped(self) -> None:
+        # MILLCODE only ever appears in the catalog's mrs_pending
+        # value_or_null_columns (not the ordinary compound "columns" list) --
+        # confirms the offline loader reads that list too, so a stray LIKE
+        # on it fails closed instead of being silently skipped as unknown.
+        with self.assertRaisesRegex(ValueError, "LIKE"):
+            dv.validate_sql_datatypes(
+                "SELECT M.MRSNO FROM INVENTORY.MRS_TEMP M WHERE M.MILLCODE LIKE '0%'"
+            )
+
     def test_invalid_text_to_numeric_bind(self) -> None:
         with self.assertRaises(ValueError):
             dv.validate_sql_datatypes(QTY_SQL, {"qty": "not-a-number"})

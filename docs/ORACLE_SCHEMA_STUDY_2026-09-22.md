@@ -192,7 +192,7 @@ Dept creates MRS_TEMP  --approve/convert-->  MRS  --> ENQUIRY (quotes) --> COMPA
 The INVENTORY schema holds 64 procedures, 40 functions, 52 triggers, 14 types (246k chars of PL/SQL, read via
 `ALL_SOURCE`). These give exact, non-inferred meanings for concepts V1 has been rejecting as unverified:
 
-- **order pending approval stage** — `FUNCTION INVENTORY.GETORDERPENDINGSTATUS`: PURCHASEORDER row: SO/IA/JMD all 0 -> pending at 'SO' (stores officer); SO=1,IA=0 -> 'IA' (internal audit); SO=1,IA=1,JMD=0 -> 'JMD'; all 1 -> approved.
+- **order pending approval stage** — `FUNCTION INVENTORY.GETORDERPENDINGSTATUS`: PURCHASEORDER row: SO/IA/JMD all 0 -> pending at 'SO' (stores officer); SO=1,IA=0 -> 'IA' (internal audit); SO=1,IA=1,JMD=0 -> 'JMD'; all 1 -> approved. **Catalogued and implemented 2026-09-23** as five concepts — `po_pending_at_so`, `po_pending_at_ia`, `po_pending_at_jmd`, `po_approved`, `po_pending` (fix.md #4).
 - **grn status of order** — `FUNCTION INVENTORY.GETGRNSTATUS`: 1 if any PURCHASEORDER line of the ORDERNO has INVQTY > 0 (something received), else 0.
 - **total stock** — `FUNCTION INVENTORY.GETTOTALSTOCK / GETTOTALSTOCKNEW`: SUM(ITEMSTOCK.STOCK) WHERE ITEMCODE = item AND MILLCODE = mill [AND (HODCODE = owner OR HODCODE = 1)]; NULL -> 0.
 - **last issue date** — `FUNCTION INVENTORY.GETLASTISSUEDATE`: MAX(ISSUE.ISSUEDATE) WHERE CODE = item AND MILLCODE = mill; stored YYYYMMDD, displayed DD.MM.YYYY.
@@ -210,6 +210,8 @@ The INVENTORY schema holds 64 procedures, 40 functions, 52 triggers, 14 types (2
   in a second table," only same-domain AND/OR over columns already in scope. Implementing this needs a new,
   narrow grounding capability (a fixed, catalog-declared anti-join fragment), not attempted in this study or in
   the 2026-09-23 stock/GRN catalog work — recorded here complete and ready to implement, not guessed at.
+  **Catalogued and implemented 2026-09-23** (same day, later) as the concept `mrs_pending`, using exactly that
+  new catalog-declared anti-join primitive (fix.md #4).
 
 Other functions worth reading before cataloguing their concepts: `GETWORKORDERPENDINGSTATUS`, `GETADVREQUESTPENDINGSTATUS`
 (same SO/IA/JMD ladder on ADVREQUEST), `GETNONSTOCK`, `GETOTHERSTOCK`, `GETSERVICESTOCK`, `GETBUDGET`,
@@ -260,7 +262,9 @@ conventions and verified definitions above. No row data. Intended input for cata
   `LOCATIONTYPECODE`, `GOODSTYPECODE` 1/3, `MILLCODE` 3/4, `ORDERBLOCK`) — not in the dictionary; needs the app
   source or a business owner. Only `GOODSTYPECODE = 2` (supplier) is confirmed from a view definition.
 - What `INVITEMS.OPGQTY/RECQTY/ISSQTY` represent (running totals? per year?) vs `ITEMSTOCK.STOCK`.
-- Whether "PO pending" should mean `GRN` absent, `GRN.PENDING > 0`, or a `MRS_TEMP`/`MRS` state.
+- Whether "PO pending" should mean `GRN` absent, `GRN.PENDING > 0`, or a `MRS_TEMP`/`MRS` state -- a *goods-receipt*
+  reading, distinct from the SO/IA/JMD *approval* reading of "PO pending" in §6.1, which was catalogued 2026-09-23
+  (fix.md #4). This receipt-side question is still open.
 - `ORDERBLOCK`/`GRNBLOCK` semantics (0 = 91% of rows; 1–4 small) — likely unit/mill series.
 - `MRS_TEMP.DUEDATE` and several secondary date columns mix `YYYYMMDD`, `D/M/YYYY`, `DD.MM.YYYY`: any date filter on
   them must be regex-guarded.

@@ -82,6 +82,7 @@ from scripts.evaluate_v1_real_questions import (  # noqa: E402
     _ENTITY_UNRESOLVED_MARKER,
     _cause_is_connection_error,
     _expected_unsupported,
+    _is_genuine_multi_candidate_ambiguity,
     _select_questions,
 )
 
@@ -115,7 +116,13 @@ def _classify(question: str, exc: BaseException | None) -> dict:
                             "reason": f"domain={domain!r}: {reasons}"}
                 return {"classification": "CAPABILITY_FAILURE", "stage": "CAPABILITY",
                         "reason": f"domain={domain!r}: {reasons}"}
-            if any(_ENTITY_UNRESOLVED_MARKER in a for a in response.ambiguities):
+            entity_ambiguities = [a for a in response.ambiguities if _ENTITY_UNRESOLVED_MARKER in a]
+            if entity_ambiguities:
+                if len(entity_ambiguities) == len(response.ambiguities) and all(
+                    _is_genuine_multi_candidate_ambiguity(a) for a in entity_ambiguities
+                ):
+                    return {"classification": "ENTITY_AMBIGUOUS_DEFERRED", "stage": "ENTITY_RESOLUTION",
+                            "reason": reasons}
                 return {"classification": "ENTITY_RESOLUTION_REJECTION", "stage": "ENTITY_RESOLUTION",
                         "reason": reasons}
             return {"classification": "QUERY_PLAN_FAILURE", "stage": "QUERY_PLAN",

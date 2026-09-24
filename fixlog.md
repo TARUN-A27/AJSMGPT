@@ -711,3 +711,35 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   reproduced directly rather than guessed. Reporting the full backlog now (3 deferred findings + the
   supplier_lookup/mrs-hold scope gaps + the question-bank mistagging + the standing ambiguous-refusal
   methodology question) instead of continuing to push into progressively less-certain territory alone.
+
+### Implement the ambiguous-refusal decision (fix.md #19)
+- **Prompt:** Tarun asked what the multi-candidate-refusal question actually meant in plain terms; explained it
+  with the real "keyboard"/"yarn" examples from today's run. Tarun's answer: "its ok not an issue" -- confirming
+  a genuine multi-candidate refusal isn't a defect.
+- **Built the third bucket, not a reinterpretation:** `ENTITY_AMBIGUOUS_DEFERRED`, detected by parsing the
+  *exact* fixed-shape suffix `nlp_execution.py` already builds for each entity ambiguity (never free-form
+  text) for 2+ semicolon-separated candidates. Deliberately conservative: only when every ambiguity in the
+  rejection qualifies -- a stray low-confidence flag or a 0/1-candidate entity alongside it still counts as a
+  real failure, not deferred.
+- **Added a real test file for this evaluator (it had none) since the new logic is a genuine parser + branch,**
+  not the simple dict/list shuffling the rest of the file does -- 8 focused tests, including the two
+  deliberately-tricky cases (mixed with a confidence flag; two entities, only one genuinely ambiguous) that
+  exist specifically to make sure this doesn't over-credit.
+- **Caught my own bad assumption before reporting numbers:** first tried to recompute today's real 68-question
+  run using the already-captured `full_query_plan` field, on the assumption it held the post-resolution entity
+  state. Spot-checked one record before trusting the output and found `full_query_plan` is actually the
+  *pre*-resolution plan (captured right after extraction, before real verification runs) -- it showed a bogus
+  "resolved, 1 candidate" for a question that had actually failed with 6 real candidates. Redid the recompute
+  from the stored rejection `reason` text instead (the real, post-resolution signal), with an explicit
+  conservative guard for the string-join collision risk (only trusts `reason` as one clean ambiguity when it
+  names exactly one entity and carries no other flag).
+- **Real result, also survived a sandbox reset mid-task:** the scratchpad got wiped again (same as earlier
+  this session) while this recompute was in progress -- confirmed via `git log`/`git status` that nothing
+  actual was lost (all commits intact, my pending edits and new test file were untouched, since they live in
+  the real repo, not `/tmp`), just re-fetched the results file from the server instead of re-running the eval.
+  5 of today's 68 questions move from real failure to genuinely-deferred (purchase 3, grn 1, stock 1) --
+  purchase 5%->20%, grn 0%->14%, stock 0%->10%. Spot-checked the 5 individually; all genuinely clean (single
+  entity, multiple real named candidates, nothing else wrong with the plan).
+- **Files:** `scripts/evaluate_v1_real_questions.py`, `scripts/evaluate_v1_real_questions_live.py`,
+  `scripts/test_evaluate_v1_real_questions.py` (new), `fix.md`, `progress.md`.
+- **Tests:** 8 new. 11 core suites plus the new file: **338/338**.

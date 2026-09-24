@@ -407,3 +407,11 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   questions are mistagged, genuinely out-of-scope accounting questions, not real supplier_lookup failures).
   Stopping active fixing here to report the accumulated backlog rather than keep pushing into progressively
   less-verified territory alone.
+- 2026-09-24 — Tarun decided the standing methodology question: a genuine multi-candidate entity ambiguity
+  (real shorthand, real multiple matches, correct refusal) is not a depth-bar failure. Closed fix.md #19:
+  added a third classification (`ENTITY_AMBIGUOUS_DEFERRED`), deliberately narrow (only when *every* ambiguity
+  in the rejection is a clean 2+-candidate one -- a mixed or 0/1-candidate case still counts as a real failure).
+  Re-classified today's actual run: 5 of 68 questions move from failure to deferred (purchase 3, grn 1, stock
+  1) -- purchase 5%->20%, grn 0%->14%, stock 0%->10%. Real movement, nowhere near 75% on its own, exactly as
+  expected when this was proposed. 8 new tests in a new file (this evaluator had none before). 11 core suites
+  plus the new file: 338/338.

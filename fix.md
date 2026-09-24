@@ -592,6 +592,40 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - **Scope note carried over from the diagnosis, not re-litigated:** fix.md #13 already deliberately chose the
   quantity 3-way tie as "honest ambiguity"; that decision is correct and untouched here.
 
+## 19. ✅ Depth-bar eval: a genuine multi-candidate entity ambiguity is now classified separately, not blended into failure
+
+- **Decided by Tarun:** when a shorthand entity ("keyboard", "yarn") genuinely matches 2+ real catalog items and
+  the fuzzy fallback (fix.md #2) correctly refuses to guess, that is not a defect -- it's the same thing a
+  human given the same shorthand would also need to ask about. Confirmed: this should not count as a depth-bar
+  failure, but also shouldn't be silently credited as a plain pass, since the question still didn't get
+  answered.
+- **Implemented as a third bucket, not a reinterpretation of existing numbers:** new classification
+  `ENTITY_AMBIGUOUS_DEFERRED`, reported separately from both `PASS_PIPELINE` and `ENTITY_RESOLUTION_REJECTION`
+  -- same idea as `UNSUPPORTED_EXPECTED` already being excluded from the failure count for out-of-scope
+  refusals. Detection is deterministic, not a guess: `nlp_execution.py` builds each entity-ambiguity string in
+  one exact, fixed shape (`"Entity '<concept>' requires verified resolution before execution."` plus, only when
+  candidates exist, `" Candidates: <a>; <b>; ..."`) -- parsing that exact suffix for 2+ semicolon-separated
+  candidates is reading a structured signal through a string, not heuristic NLP.
+- **Deliberately narrow, to avoid over-crediting:** classified as deferred only when *every* ambiguity in the
+  rejection is an entity ambiguity with 2+ candidates -- one entity with 0 or 1 candidates (an extraction bug
+  like fix.md #16's, or a genuinely-not-found value) or a co-occurring low-confidence flag means the question
+  still doesn't have a clean answer even if the ambiguous part were resolved, so it stays a real rejection.
+  4 unit tests cover exactly this: pure multi-candidate (deferred), zero-candidate (rejection), mixed with a
+  confidence flag (rejection), and two entities where only one is genuinely ambiguous (rejection).
+- **Verified against today's real run, not just synthetic tests:** re-classified the existing
+  `v1_real_question_eval_results_live.json` using the stored rejection reason (not `full_query_plan`, which
+  turned out to be the *pre*-resolution plan -- caught by spot-checking one record before trusting it, not
+  assumed). 5 of 68 questions move from real failure to genuinely-deferred: purchase 3, grn 1, stock 1. Moves
+  purchase 5%->20%, grn 0%->14%, stock 0%->10% -- real movement, but nowhere near the 75% bar on its own, matching
+  the expectation set when this was proposed: most of what's failing is grounding/capability gaps this doesn't
+  touch.
+- **Where:** `scripts/evaluate_v1_real_questions.py` (`_classify()`, new `_is_genuine_multi_candidate_ambiguity`
+  helper), `scripts/evaluate_v1_real_questions_live.py` (imports and reuses the helper, duplicates the
+  `_classify()` branch to match, same maintenance pattern as the rest of that file).
+- **Tests:** 8 new in a new file, `scripts/test_evaluate_v1_real_questions.py` (this evaluator had none before
+  -- the classification logic was simple enough not to need one until this parser/branch was added). 11 core
+  suites plus this new file: **338/338**.
+
 - **Closed 2026-09-23 (same day, continued).** Traced the actual root cause by reading `app/entity_resolution.py`
   directly rather than guessing further: `resolve_entity` forces **any** entity concept outside the 5-token
   identity-verification whitelist (`supplier`/`supplier_name`/`supplier_identifier`/`material`/`item_identifier`)

@@ -203,6 +203,26 @@ CATALOG_LIMITATION_PHRASES = (
 # success of the safety architecture, not a model defect.
 _ENTITY_UNRESOLVED_MARKER = "requires verified resolution before execution"
 
+# nlp_execution.py builds each entity ambiguity string as exactly:
+# "Entity '<concept>' requires verified resolution before execution." plus,
+# only when the entity carries candidates, " Candidates: <a>; <b>; ...".
+# Parsing this exact, deterministically-constructed suffix (not free-form
+# text) distinguishes a genuinely safe refusal from a real failure: 2+
+# candidates means the fuzzy fallback (fix.md #2) found real, multiple
+# matches and correctly declined to guess -- the same thing a human given
+# the same shorthand would also need to ask about, not a defect. 0
+# candidates (nothing found, or a non-entity word like "pending" wrongly
+# tagged as one, fix.md #16's class of bug) or exactly 1 (an UNRESOLVED
+# hint) stay real rejections.
+_CANDIDATES_MARKER = " Candidates: "
+
+
+def _is_genuine_multi_candidate_ambiguity(ambiguity: str) -> bool:
+    if _ENTITY_UNRESOLVED_MARKER not in ambiguity or _CANDIDATES_MARKER not in ambiguity:
+        return False
+    candidates_text = ambiguity.split(_CANDIDATES_MARKER, 1)[1].rstrip(".")
+    return len(candidates_text.split("; ")) >= 2
+
 
 def _cause_is_connection_error(exc: BaseException) -> bool:
     cause = exc.__cause__
@@ -251,7 +271,21 @@ def _classify(question: str, exc: BaseException | None) -> dict:
                     "classification": "CAPABILITY_FAILURE", "stage": "CAPABILITY",
                     "reason": f"domain={domain!r}: {reasons}",
                 }
-            if any(_ENTITY_UNRESOLVED_MARKER in a for a in response.ambiguities):
+            entity_ambiguities = [a for a in response.ambiguities if _ENTITY_UNRESOLVED_MARKER in a]
+            if entity_ambiguities:
+                # Deferred only when EVERY ambiguity present is an entity
+                # rejection with 2+ real candidates -- a stray low-confidence
+                # flag, or even one entity with 0/1 candidates alongside it,
+                # means the question still doesn't have a clean answer even
+                # if the ambiguous entity were clarified, so it stays a real
+                # rejection rather than being credited as "safely deferred".
+                if len(entity_ambiguities) == len(response.ambiguities) and all(
+                    _is_genuine_multi_candidate_ambiguity(a) for a in entity_ambiguities
+                ):
+                    return {
+                        "classification": "ENTITY_AMBIGUOUS_DEFERRED", "stage": "ENTITY_RESOLUTION",
+                        "reason": reasons,
+                    }
                 return {
                     "classification": "ENTITY_RESOLUTION_REJECTION", "stage": "ENTITY_RESOLUTION",
                     "reason": reasons,

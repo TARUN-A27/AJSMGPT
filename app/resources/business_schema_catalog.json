@@ -91,7 +91,10 @@
     {
       "name": "material",
       "aliases": ["material", "item", "item name", "material name"],
-      "columns": [{"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["display", "grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.85, "evidence": "metadata and current business routers"}]
+      "columns": [
+        {"table": "INVENTORY.INVITEMS", "column": "ITEM_NAME", "roles": ["display", "grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.85, "evidence": "metadata and current business routers"},
+        {"table": "INVENTORY.MRS_TEMP", "column": "ITEM_NAME", "roles": ["display", "grouping", "entity_filter"], "datatype_category": "TEXT", "confidence": 0.8, "evidence": "metadata VARCHAR2(70) NULL; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md notes MRS_TEMP has ITEM_NAME denormalised -- avoids a join to INVITEMS when the domain anchor is already MRS_TEMP"}
+      ]
     },
     {
       "name": "item_identifier",
@@ -135,7 +138,7 @@
     },
     {
       "name": "mrs_ready_for_approval",
-      "aliases": ["ready for approval", "store officer pending"],
+      "aliases": ["ready for approval", "store officer pending", "pending at store officer"],
       "columns": [{"table": "INVENTORY.MRS_TEMP", "column": "READYFORAPPROVAL", "roles": ["entity_filter"], "datatype_category": "NUMERIC", "confidence": 0.8, "evidence": "metadata and purchase analytics router MRS_STATUS derivation"}]
     },
     {

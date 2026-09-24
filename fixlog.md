@@ -806,3 +806,25 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `app/resources/business_schema_catalog.json` (+1 concept), `scripts/test_schema_grounding.py`
   (+1 test), `data/labeled_queryplans_v1.json` (new, 10 pairs), `fix.md`, `progress.md`.
 - **Tests:** 1 new. 11 core suites plus the eval-classifier file: **339/339**.
+
+### Build a few-shot example, catch a real bug in an already-shipped fix (fix.md #22)
+- **Prompt:** "continue next plan" -- the next step was few-shot examples targeting stock's operation-choice
+  and mrs's entity-splitting, the two patterns that were fragile under pure prompt-wording earlier today.
+- **Habit that caught this:** before adding a few-shot example to the prompt, verified the example itself
+  against the real `ground_query_plan()` -- the same discipline used for the labeled dataset. The mrs example
+  (reusing fix.md #17's own verified-fused entity, "pending at store officer") failed to ground.
+- **What this means about fix.md #17:** it verified extraction produces one entity instead of two -- true,
+  and still true. It never verified that entity then grounds. It doesn't: the catalog's alias was "store
+  officer pending" (reversed word order) -- an exact-match miss against what the model actually outputs. A
+  fix.md entry marked "done" and verified was actually half-verified; the second half only surfaced because
+  a *different* task happened to re-run the same case through a check the first task skipped.
+- **Fixed both gaps found in the same pass:** added the real word-order alias (verified against the live
+  model in fix.md #17, not re-guessed here); separately found `material`-as-dimension also failed for this
+  same question (needs an unverified join from `mrs`'s domain anchor to INVITEMS) and fixed it by adding
+  MRS_TEMP's own denormalised `ITEM_NAME` as a second column -- confirmed real via the metadata file, not
+  assumed from the schema study's prose alone.
+- **Files:** `app/resources/business_schema_catalog.json` (2 additions), `scripts/test_schema_grounding.py`
+  (+2 tests), `fix.md`, `progress.md`.
+- **Tests:** 2 new. 11 core suites plus the eval-classifier file: **342/342**.
+- **Next:** the actual few-shot prompt work (stock + mrs examples) can now proceed with both examples
+  confirmed correct, not just plausible-looking.

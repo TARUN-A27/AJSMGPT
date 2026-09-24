@@ -442,3 +442,9 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   `data/labeled_queryplans_v1.json`, 10 pairs, all independently re-verified after writing the file (not just
   from the in-memory objects used to build it). Intended as a seed for few-shot prompt examples and/or future
   fine-tuning data. 1 new test, 11 core suites plus the eval-classifier file: 339/339.
+- 2026-09-24 — closed fix.md #22, found while building a few-shot example (verifying the example itself
+  before using it, which is what caught this): fix.md #17 verified the mrs entity-splitting fix produces one
+  fused entity, but never verified that entity actually *grounds* -- it didn't (catalog alias was the reverse
+  word order). Added the real word order as an alias, plus a second gap found the same pass (`material` as a
+  dimension needs MRS_TEMP's own denormalised `ITEM_NAME`, not a join to INVITEMS). Catalog-only, 2 new tests,
+  11 core suites plus the eval-test file: 342/342.

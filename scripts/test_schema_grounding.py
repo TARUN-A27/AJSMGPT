@@ -168,6 +168,40 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.MRS_TEMP", "MRSNO"), columns)
         self.assertEqual(columns[("INVENTORY.MRS_TEMP", "MRSNO")].logical_concept, "mrs_number")
 
+    def test_mrs_ready_for_approval_grounds_in_question_word_order(self):
+        # fix.md #22: fix.md #17 verified the model fuses "approval pending at
+        # Store officer" into one entity, concept="pending at store officer"
+        # -- but never verified that string actually grounds. It didn't: the
+        # catalog only had "store officer pending" (the reversed order), an
+        # exact-match miss. Verified the model's real output word order
+        # before adding this exact alias, not the reverse guess.
+        result = ground_query_plan(plan(
+            "mrs", "mrs",
+            entities=[EntityReference(
+                concept="pending at store officer", original_value="approval pending at Store officer",
+                status=EntityStatus.NOT_REQUIRED,
+            )],
+        ))
+        self.assert_grounded(result)
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "READYFORAPPROVAL"), columns)
+
+    def test_material_dimension_grounds_directly_on_mrs_temp(self):
+        # fix.md #22: "list out material approval pending at Store officer"
+        # also needs `material` as a listed dimension -- the catalog only had
+        # INVENTORY.INVITEMS.ITEM_NAME, which needs an (unverified) join from
+        # the mrs domain anchor (MRS_TEMP). MRS_TEMP carries its own
+        # denormalised ITEM_NAME (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md,
+        # confirmed against the raw metadata: VARCHAR2(70) NULL) -- added as
+        # a second column so this grounds without a join at all.
+        result = ground_query_plan(plan(
+            "mrs", "mrs",
+            dimensions=[Dimension(concept="material", grouping=False)],
+        ))
+        self.assert_grounded(result)
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.MRS_TEMP", "ITEM_NAME"), columns)
+
     def test_issue_number_grounds_without_join(self):
         # fix.md #21: found while hand-labeling real consumption questions for
         # a training/few-shot dataset -- "issue for issue number 737" named a

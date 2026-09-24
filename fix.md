@@ -725,6 +725,35 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - **Where:** `app/resources/business_schema_catalog.json` only.
 - **Tests:** 1 new in `test_schema_grounding.py`. 11 core suites plus the eval-classifier file: **339/339**.
 
+## 22. ✅ fix.md #17 verified the wrong thing -- the fused mrs entity never actually grounded
+
+- **Found by:** building a few-shot example for the "pending at store officer" pattern (the next step after
+  the labeled-QueryPlan seed dataset) and verifying the example itself against `ground_query_plan()` before
+  using it -- a habit that caught a real gap in a fix I'd already shipped and called done.
+- **What fix.md #17 actually verified:** that the model fuses "approval pending at Store officer" into ONE
+  entity instead of two, with `concept="pending at store officer"`. True and still true.
+- **What it never checked:** whether that exact string then *grounds*. It doesn't: the catalog's
+  `mrs_ready_for_approval` alias was `"store officer pending"` -- the reverse word order. Exact-alias matching
+  means "pending at store officer" ≠ "store officer pending"; the fused entity still failed to ground, just
+  with a single cleaner-looking rejection instead of two, which is presumably why this passed a quick visual
+  check without a full `ground_query_plan()` run.
+- **Fixed:** added `"pending at store officer"` as an additional alias on `mrs_ready_for_approval` -- the
+  exact real word order the model actually produces (verified against the live model in fix.md #17, not
+  guessed here), not a theoretical alternative.
+- **Second gap found in the same verification pass:** the same question also needs `material` as a listed
+  dimension (to show which items are pending). That failed too -- the catalog's `material` concept only had
+  `INVENTORY.INVITEMS.ITEM_NAME`, which needs an unverified join from the `mrs` domain anchor
+  (`INVENTORY.MRS_TEMP`). `MRS_TEMP` carries its own denormalised `ITEM_NAME` (schema study said so; confirmed
+  against the raw metadata file too -- `VARCHAR2(70)` nullable). Added it as a second column entry under the
+  existing `material` concept, the same multi-table pattern `item_identifier` already uses.
+- **Where:** `app/resources/business_schema_catalog.json` only (2 additions: 1 alias, 1 column). No code or
+  prompt changed.
+- **Tests:** 2 new in `test_schema_grounding.py`. 11 core suites plus the eval-classifier file: **342/342**.
+- **Lesson, stated plainly:** "the model now produces the right shape" and "the plan now grounds" are two
+  different claims, and only a full `ground_query_plan()` run proves the second one. Re-verifying an already-
+  shipped fix's example before reusing it (rather than assuming it still means what the fixlog said) is what
+  caught this -- worth doing before trusting any earlier "verified" claim that wasn't re-run end to end.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

@@ -355,3 +355,16 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   small-N alone (material_lookup 2, consumption 2) -- flagged in V1_FREEZE_CRITERIA.md, not a code defect.
   326/326 core suites. Still open: actually running `--split test` and reporting the per-family pass rate --
   the mechanism is done, the measurement run itself hasn't happened yet (needs Ollama, gated by CLAUDE.md §9).
+- 2026-09-24 — ran it, on the server against real Oracle + qwen3:14b (Tarun's go-ahead). **Real result: every
+  family is far below the 75% depth bar** on genuinely unseen phrasing (61 in-scope questions: only 3
+  PASS_PIPELINE -- purchase 1/20, mrs 1/10, consumption 1/2; stock/supplier_lookup/grn/material_lookup all
+  0). This is exactly what the freeze doc predicted the tuned 47-question set couldn't show. Root-caused into
+  clusters (stock: operation=detail vs the family's aggregate-only capability, one clean fix; grn: several
+  distinct grounding gaps; supplier_lookup: the tested questions are all a "who supplies item X" reverse
+  lookup, a different shape than the golden pairs' "is X a supplier" pattern, possibly unimplemented; 1
+  SQL_EXECUTION_FAILURE with no captured detail, needs a targeted re-run; mrs: mixed contract + grounding
+  gaps). Full detail and the open methodology question (does a correct, multi-candidate entity-ambiguity
+  refusal count as depth-bar "pass" or "fail"?): fixlog.md. Nothing fixed yet -- reporting for prioritization
+  before spending further effort. Own mistake during this task, disclosed immediately: a bad `sed` redaction
+  pattern let the real `ORACLE_PASSWORD` (read-only account) print in plaintext in chat; flagged to Tarun with
+  a rotation recommendation.

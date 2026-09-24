@@ -546,3 +546,44 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   `docs/V1_FREEZE_CRITERIA.md`, `progress.md`.
 - **Tests:** same as above -- no dedicated test file for either evaluator script; verified by direct invocation
   (split disjointness, generated-question exclusion, CLI smoke test). 11 core suites **326/326**, unaffected.
+
+### Run the depth-bar measurement itself (`--split test`, live Oracle, first real run)
+- **Prompt:** "complete it use sub agents if needed complete it thoroughly", in reply to being asked laptop-Ollama
+  vs. server for the `--split test` run. Ran it on the server against real Oracle + the server's qwen3:14b
+  (the more meaningful measurement, since material_lookup/supplier_lookup/stock/grn have never been depth-tested
+  on live data). `git pull`'d the server to `bc0c64a` first, sanity-checked the split locally on the server
+  (68 questions, matched the laptop count exactly) and confirmed the app's actual Ollama host
+  (`172.16.90.1:11434`, from `.env` -- not localhost) had `qwen3:14b` loaded before committing to the full run.
+- **Own mistake, disclosed immediately:** a `sed` redaction pattern meant to hide `.env` secrets while checking
+  `OLLAMA_URL`/`ORACLE_DSN` didn't match `PASSWORD=` (only bare `PASS=`), so the real `ORACLE_PASSWORD` for the
+  read-only `ajsmgpt_ro` account printed in plaintext into this session. Flagged to Tarun immediately with a
+  rotation recommendation (DBA action, not something to fix in code). No further `.env` reads this session.
+- **Result: every one of the 7 supported families is far below the 75% depth bar.** Of 61 in-scope questions
+  (out_of_scope_hr/admin excluded, correctly refused by design): only 3 `PASS_PIPELINE`
+  (purchase 1/20, mrs 1/10, consumption 1/2). stock 0/10, supplier_lookup 0/10, grn 0/7, material_lookup 0/2.
+  This is a real, structural result, not a fluke of one run -- the 47-question tuned set's better numbers were
+  exactly what the freeze doc warned about ("looked at too many times to trust"); genuinely unseen phrasing
+  exposes real gaps the tuned set never reached.
+- **Root-caused into clusters (not just raw counts) -- reported to Tarun for prioritization, nothing fixed yet:**
+  stock's failures are one pattern (model picks `operation=detail` for "what is the stock of X", capability
+  layer only allows `aggregate` for stock -- same shape as the fix.md #3 MRS lookup/detail prompt gap, looks
+  like a fast, high-confidence fix); grn has several distinct grounding gaps (ambiguous concept-to-column
+  mapping, missing concepts, domain misrouting on entity-first phrasing); supplier_lookup's failures are all
+  "who supplies item X" (reverse item-to-supplier lookup) -- a different query shape than the "is X a
+  registered supplier" pattern the golden pairs tested, possibly never actually implemented; one
+  `SQL_EXECUTION_FAILURE` (a query that passed every validator layer still broke on real Oracle) has no
+  captured detail (`sql_preview`/`cause` both `None` in the record -- `OracleExecutionError`'s message alone
+  doesn't carry the underlying Oracle error and no `__cause__` was chained), needs its own targeted re-run to
+  diagnose; mrs has a mix of genuine `QueryPlanValidationError`-shaped contract failures and grounding gaps for
+  concepts ("material approval pending", "indent number") that may not be cataloged at all.
+- **One genuine methodology question raised, not decided unilaterally:** a large share of `ENTITY_RESOLUTION_REJECTION`
+  failures are the fuzzy-fallback (fix.md #2) correctly surfacing real multi-candidate ambiguity for shorthand
+  entities ("keyboard", "monitor", "yarn") -- arguably a safe, by-design refusal, not a defect, per the freeze
+  doc's own "a refusal is acceptable" principle. But a few others are the model mis-treating a non-entity word
+  ("pending") as a resolvable entity -- a genuine extraction bug, not safety working correctly. Lumping all
+  entity rejections into one bucket either way would misrepresent the number either direction, so left this
+  as an open question for Tarun rather than picking an interpretation and reporting a single, cleaner-looking
+  percentage.
+- **Files:** none changed yet -- this entry records the measurement result; `progress.md` and
+  `docs/V1_FREEZE_CRITERIA.md` updated with the real numbers in the same commit.
+- **Tests:** N/A (a measurement run, not a code change). 11 core suites unaffected (nothing in `app/` touched).

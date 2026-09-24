@@ -47,10 +47,41 @@ each family as a test set never used to tune prompts or catalog~~ — ✅ mechan
 `"test"` / `"all"`. `"test"` is a deterministic hash of each question's own text (stable across runs,
 no persisted field to drift out of sync), **with every Claude-generated golden-pair question forced
 into `"train"`** — those were written with full visibility into what the catalog supports, so they
-can never count as blind held-out data. Run with `--split test`. **Not yet done: actually running
-it.** That's the next step, and two of the smaller pools end up thin on the test side purely from
-small-N: material_lookup (2 test / 1 train after dedup) and consumption (2 test / 10 train) — real
-per-family pass/fail will be noisy for those two until the bank grows more, not a code defect.
+can never count as blind held-out data. Two of the smaller pools are thin on the test side purely
+from small-N: material_lookup (2) and consumption (2) — real per-family pass/fail is noisy for
+those two until the bank grows more, not a code defect.
+
+**Measured 2026-09-24, on the server against real Oracle + qwen3:14b: every family fails the 75%
+bar.** 61 in-scope questions (out_of_scope_hr/admin correctly excluded, refused by design): 3
+`PASS_PIPELINE` total. purchase 1/20 (5%), mrs 1/10 (10%), consumption 1/2, material_lookup 0/2,
+stock 0/10, supplier_lookup 0/10, grn 0/7. This is the real signal the tuned 47-question set
+couldn't show — genuinely unseen phrasing lands on gaps the tuned set never reached. Root cause by
+family (diagnosed, not yet fixed):
+- **stock (0/10):** one pattern — the model picks `operation=detail` for "what is the stock of X",
+  but stock's capability only allows `aggregate` (ITEMSTOCK is 1–31 rows/item, aggregate-only by
+  design). Same shape as fix.md #3's MRS lookup/detail prompt gap; looks like a single fast fix.
+- **grn (0/7):** several distinct grounding gaps — ambiguous concept→column mapping ("qty
+  received", "GRN for supplier X" each match >1 catalog column), missing concepts ("received
+  material names", "for order X"), and domain misrouting on entity-first phrasing ("grn for yarn").
+- **supplier_lookup (0/10):** every failure is "who supplies item X" — a reverse item→supplier
+  lookup, structurally different from the golden pairs' "is X a registered supplier" pattern. May
+  simply not be implemented; needs scoping before it's a "fix."
+- **mrs (1/10):** mix of genuine QueryPlan-contract failures and grounding gaps for concepts that
+  may not be cataloged at all ("material approval pending", "material hold", "indent number X").
+- **purchase (1/20):** one `SQL_EXECUTION_FAILURE` — a query that passed every validator layer
+  still broke on real Oracle, but the record has no captured detail (`sql_preview`/`cause` both
+  `None`; `OracleExecutionError`'s message alone doesn't carry the underlying Oracle error and no
+  `__cause__` was chained) — needs a targeted re-run with better instrumentation before it's
+  diagnosable. The rest are `ENTITY_RESOLUTION_REJECTION` (see next point).
+
+**Open methodology question, not decided unilaterally:** a large share of the
+`ENTITY_RESOLUTION_REJECTION` failures across families are the fix.md #2 fuzzy fallback correctly
+surfacing real multi-candidate ambiguity for shorthand entities ("keyboard", "monitor", "yarn") —
+arguably a safe, by-design refusal per this doc's own "a refusal is acceptable" line, not a defect.
+A few others are the model mis-treating a non-entity word ("pending") as a resolvable entity — a
+genuine extraction bug, not safety working correctly. Whether ambiguous-with-real-candidates counts
+as depth-bar "pass" or "fail" changes several of the numbers above materially; left open for Tarun
+rather than picking an interpretation that produces a cleaner-looking percentage.
 
 **Non-negotiable regardless of the number: zero wrong answers — confirmed as-is, not loosened.**
 A refusal is acceptable — it's the system working as designed. A confidently wrong number is not,
@@ -88,7 +119,10 @@ in the held-out set blocks freeze regardless of the pass-rate number.
 - Zero wrong answers: **confirmed as-is**, not loosened.
 - Attendance: **deferred to v1.1**, not in v1.0 coverage.
 
-Nothing left to decide here. The question bank and the split mechanism are both done 2026-09-24;
-the only remaining step is actually running `--split test` (offline needs local Ollama, §9 — laptop
-run needs an explicit ask; the live-Oracle variant needs to run on the server) and reporting the
-per-family pass rate against the 75% bar.
+The question bank, split mechanism, and the measurement run are all done 2026-09-24 — see "Measured
+2026-09-24" above. **Freeze is not ready by the letter of this bar**: every family is far below
+75% on genuinely unseen phrasing. Two things now need Tarun's input before more effort goes in:
+(1) the ambiguous-entity-refusal methodology question above, which changes several numbers
+materially; (2) which of the five root-caused failure clusters to actually fix, and in what order
+— stock looks like one fast, high-confidence fix; supplier_lookup's gap may be a scope decision
+(is "who supplies item X" even meant to be in v1.0?) rather than a bug.

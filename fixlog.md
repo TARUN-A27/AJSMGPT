@@ -680,3 +680,34 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`), `scripts/test_query_plan_extractor.py` (+1 test),
   `fix.md`, `progress.md`.
 - **Tests:** 1 new. 11 core suites **328/328**.
+
+### grn cluster diagnosis lands, one clean fix shipped, three deliberately left open
+- **Prompt:** same authorization. The grn diagnostic agent (spawned in parallel with the mrs one) came back
+  with 5 findings. Didn't act on any of them without checking first -- one citation (claimed source
+  `scripts/v1_real_question_eval_results.json`, the *offline* evaluator's file) turned out to be the wrong
+  file for this session's actual `--split test` live run; re-verified the underlying claim against the real
+  `_live.json` file directly and it held up anyway, but worth remembering agent citations aren't free passes.
+- **Shipped: `grn_order_number` catalog concept (fix.md #18).** Confirmed `GRN.ORDERNO` is real (schema study +
+  raw metadata file, `NUMBER(22)`) before adding it. Verified end-to-end against the real model -- and found
+  the model extracts the entity as the bare word "order", not "order number", so had to add that as an alias
+  too (checked first that nothing else in the catalog already claims "order" -- clean, no new tie created).
+- **Investigated but deliberately did not fix, each for a real reason, not just running out of steam:**
+  - Measure-phrase fidelity ("qty received" etc. already has an unambiguous alias; the model just isn't
+    keeping the qualifying word) -- same class of fix as today's earlier two, but touches measure-extraction
+    broadly rather than one domain, so more surface area for the kind of side effect fix.md #15 took 3 rounds
+    to tame. Chose not to open that door again in the same session without checking in first.
+  - `business_subject` requiring an "identifier"-role column -- read `_requirements()`/`_matching_columns()`
+    myself rather than take the agent's "too strict" framing at face value. Found the actual QueryPlan for the
+    failing question and noticed "material" was *also* already a dimension and a requested-output field in the
+    same plan -- meaning this might really be an extraction problem (wrong business_subject choice) dressed up
+    as a grounding problem. Loosening grounding's role check would be the wrong fix if that's the real cause,
+    and touches every domain, not just grn. Genuinely a fork that needs more thought, not a coin flip.
+  - Generic "domain for entity, no verb" operation-choice gap ("grn for yarn") -- same shape as fix.md #15 but
+    not scoped to one family, so a wording change here has a much bigger surface than stock's did.
+- **Files:** `app/resources/business_schema_catalog.json` (+1 concept), `scripts/test_schema_grounding.py` (+1
+  test), `fix.md`, `progress.md`.
+- **Tests:** 1 new. 11 core suites **330/330**.
+- **Stopping point:** 4 real fixes shipped this stretch (fix.md #15-18), all verified against the real model or
+  reproduced directly rather than guessed. Reporting the full backlog now (3 deferred findings + the
+  supplier_lookup/mrs-hold scope gaps + the question-bank mistagging + the standing ambiguous-refusal
+  methodology question) instead of continuing to push into progressively less-certain territory alone.

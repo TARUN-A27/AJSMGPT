@@ -552,6 +552,46 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - **Tests:** 1 new (asserts the new sentence is present in `SYSTEM_PROMPT`; effectiveness verified live above).
   11 core suites **328/328**.
 
+## 18. ✅ "grn for order 800151" -- no catalog concept for GRN's own order-number filter
+
+- **Found by:** the grn cluster diagnosis (background agent), independently confirmed against
+  `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` (`GRN.ORDERNO`, `NUMBER(22)`, `GRN.ORDERNO = PURCHASEORDER.ORDERNO`)
+  and `data/multi_schema_metadata.json` before trusting it. Clean, additive, evidence-backed gap -- unlike the
+  agent's other findings this run, this one didn't need any risk/scope judgment call, so fixed it directly.
+- **Fixed:** new catalog concept `grn_order_number` on `INVENTORY.GRN.ORDERNO` (`roles: entity_filter,
+  identifier`, matching the existing `mrs_number` pattern). Verified against the real model that "grn for order
+  800151" now grounds with zero reject reasons -- but the model extracts the entity as the bare word `"order"`,
+  not "order number", so that bare word had to be in the alias list too (checked first that no other concept
+  already claims it -- it doesn't, no new ambiguity introduced).
+- **Where:** `app/resources/business_schema_catalog.json` only. No code changed.
+- **Tests:** 1 new in `test_schema_grounding.py`. 11 core suites **330/330**.
+- **Related, NOT fixed -- deliberately left for a decision, not attempted blind:**
+  - **Measure-phrase fidelity (grn's #1/#3 from the diagnosis):** `received_quantity`/`pending_receipt_quantity`/
+    `rejected_receipt_quantity` each already have a unique, unambiguous alias ("qty received", "pending qty",
+    "rejected qty" respectively) alongside the shared bare "quantity"/"qty" that fix.md #13 deliberately left
+    tied ("honest ambiguity" over silent guessing). "how many qty received in last one year?" fails because
+    the model drops "received" and extracts the bare, tied concept instead -- the question itself already had
+    the unambiguous word. A prompt-fidelity fix (teach the model to keep "received"/"pending"/"rejected" when
+    the question uses them) is the same *class* of fix as fix.md #15/#17, but broader in scope (measures in
+    general, not one domain) -- more surface area for the same kind of side effect fix.md #15 took 3 rounds to
+    tame. Not attempted this session; flagging the shape of the fix, not the wording.
+  - **`business_subject` role requirement (grn's #2):** "Today received material names and qty?" fails because
+    `business_subject.concept="material"` has no column with role `"identifier"` (only display/grouping/
+    entity_filter) -- `app/schema_grounding.py`'s `_requirements()` hardcodes that role for business_subject.
+    Checked the actual QueryPlan (not just the agent's characterization): "material" is *also* already present
+    as a `dimension` and in `requested_output.fields` in the same plan -- redundant as business_subject. This
+    could be fixed two different ways with different risk profiles: loosen the grounding role requirement
+    (touches every domain's business_subject check, not just grn) or teach extraction to prefer a domain-level
+    subject ("received"/"receipt", which already has a free-pass grounding rule for domain aliases) over an
+    entity-echoing one. Genuinely unclear which is right without more thought -- not a quick fix either way,
+    left open.
+  - **Bare "`<domain> for <entity>`" operation-choice (grn's #4, "grn for yarn"):** same shape as fix.md #15's
+    stock fix, but the pattern (a domain name immediately followed by a bare entity, no verb) is generic across
+    all domains, not scoped to one family -- higher blast radius for the same kind of prompt-wording
+    instability fix.md #15 hit. Not attempted this session.
+- **Scope note carried over from the diagnosis, not re-litigated:** fix.md #13 already deliberately chose the
+  quantity 3-way tie as "honest ambiguity"; that decision is correct and untouched here.
+
 - **Closed 2026-09-23 (same day, continued).** Traced the actual root cause by reading `app/entity_resolution.py`
   directly rather than guessing further: `resolve_entity` forces **any** entity concept outside the 5-token
   identity-verification whitelist (`supplier`/`supplier_name`/`supplier_identifier`/`material`/`item_identifier`)

@@ -391,3 +391,19 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   single flag, not tracked per approval stage. Left open pending a decision (does the data support "on hold at
   store officer" as distinct, or should the stage qualifier just be dropped for hold?) rather than iterating
   prompt wording further. 1 new test, 11 core suites 328/328.
+- 2026-09-24 — closed fix.md #18: grn's "grn for order 800151" had no catalog concept for GRN's own order-number
+  filter at all (`GRN.ORDERNO`, verified real and documented, `= PURCHASEORDER.ORDERNO`). One new catalog
+  concept, verified end-to-end against the real model. Clean and additive -- no code changed, no prompt risk.
+  Also documented, but deliberately NOT attempted this session (each needs a real decision, not a quick fix):
+  measure-phrase fidelity for grn's "received"/"pending"/"rejected" qualifiers (broader-scope version of fix.md
+  #15/#17's class of fix), whether `business_subject` grounding should accept non-identifier roles or whether
+  extraction should prefer a domain-level subject instead, and a generic "domain for entity" operation-choice
+  gap. 1 new test, 11 core suites 330/330.
+- **Status check-in, same day:** 4 fixes shipped (fix.md #15-#18), all verified against the real model or by
+  direct code/data reproduction, none guessed. 3 more findings diagnosed and deliberately left open, each
+  needing a real decision rather than another quick prompt edit. Plus 2 scope confirmations (supplier_lookup's
+  reverse item->supplier lookup has no capability at all; mrs's "hold at Store officer" has no catalog support
+  for a stage-qualified hold) and 1 data-quality finding (6 of the "supplier_lookup" family's 10 held-out
+  questions are mistagged, genuinely out-of-scope accounting questions, not real supplier_lookup failures).
+  Stopping active fixing here to report the accumulated backlog rather than keep pushing into progressively
+  less-verified territory alone.

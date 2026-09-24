@@ -168,6 +168,25 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.MRS_TEMP", "MRSNO"), columns)
         self.assertEqual(columns[("INVENTORY.MRS_TEMP", "MRSNO")].logical_concept, "mrs_number")
 
+    def test_grn_order_number_grounds_without_join(self):
+        # 2026-09-24 held-out eval, fix.md #18: "grn for order 800151" failed
+        # grounding entirely -- GRN.ORDERNO is real and documented
+        # (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md: GRN.ORDERNO =
+        # PURCHASEORDER.ORDERNO) but had no catalog concept at all. The real
+        # model extracts this as the bare entity concept "order" (not "order
+        # number"), so that bare word is included as an alias too.
+        result = ground_query_plan(plan(
+            "grn", "grn",
+            entities=[EntityReference(
+                concept="order", original_value="800151", selected_value="800151",
+                confidence=0.9, status=EntityStatus.RESOLVED,
+            )],
+        ))
+        self.assert_grounded(result)
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.GRN", "ORDERNO"), columns)
+        self.assertEqual(columns[("INVENTORY.GRN", "ORDERNO")].logical_concept, "grn_order_number")
+
     def test_mrs_due_date_grounds_without_join(self):
         result = ground_query_plan(plan(
             "mrs", "mrs",

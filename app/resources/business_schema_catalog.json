@@ -225,6 +225,11 @@
       "columns": [{"table": "INVENTORY.GRN", "column": "GRNDATE", "roles": ["date_filter", "grouping"], "datatype_category": "DATE_TEXT", "confidence": 0.85, "evidence": "metadata VARCHAR2(8); live profile 2026-09-22: GRNDATE 2008-04-03 to today, 100% YYYYMMDD strings"}]
     },
     {
+      "name": "grn_order_number",
+      "aliases": ["order number", "order no", "po number", "purchase order number", "order"],
+      "columns": [{"table": "INVENTORY.GRN", "column": "ORDERNO", "roles": ["entity_filter", "identifier"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(22); docs/ORACLE_SCHEMA_STUDY_2026-09-22.md GRN.ORDERNO = PURCHASEORDER.ORDERNO"}]
+    },
+    {
       "name": "name",
       "aliases": ["name"],
       "columns": [

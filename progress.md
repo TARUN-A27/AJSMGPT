@@ -407,6 +407,14 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   questions are mistagged, genuinely out-of-scope accounting questions, not real supplier_lookup failures).
   Stopping active fixing here to report the accumulated backlog rather than keep pushing into progressively
   less-verified territory alone.
+- 2026-09-24 — re-ran the full held-out eval after fix.md #15-19 landed (Tarun: "carry on with 2 and 3").
+  Surfaced a real, previously-latent crash: "grn for order 800151" (fix.md #18's own fix target) now reached
+  execution and crashed uncaught instead of failing closed cleanly -- a numeric-looking filter value
+  ("800151") extracted as `value_type="string"` was never converted before being bound against
+  `INVENTORY.GRN.ORDERNO` (a verified `NUMERIC` column). Closed as fix.md #20: deterministic coercion in
+  `build_bind_parameters()`, gated on the column's *verified* category (not the model's self-report), fails
+  closed on anything else. 1 new test reproducing the real captured plan. 11 core suites plus the eval-test
+  file: 339/339. Re-running the eval once more with this landed too, before reporting final numbers.
 - 2026-09-24 — Tarun decided the standing methodology question: a genuine multi-candidate entity ambiguity
   (real shorthand, real multiple matches, correct refusal) is not a depth-bar failure. Closed fix.md #19:
   added a third classification (`ENTITY_AMBIGUOUS_DEFERRED`), deliberately narrow (only when *every* ambiguity

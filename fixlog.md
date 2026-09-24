@@ -743,3 +743,30 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `scripts/evaluate_v1_real_questions.py`, `scripts/evaluate_v1_real_questions_live.py`,
   `scripts/test_evaluate_v1_real_questions.py` (new), `fix.md`, `progress.md`.
 - **Tests:** 8 new. 11 core suites plus the new file: **338/338**.
+
+### Re-run the eval, find and fix a real crash (fix.md #20)
+- **Prompt:** "1 forget this, carry on with 2 and 3" -- skip the two scope decisions for now, re-run the full
+  measurement with today's fixes in, act on what it shows. Synced the server, launched the same detached
+  nohup + separate wait-loop-watcher pattern as the first run (same SSH stdin-inheritance quirk as before --
+  expected this time, verified via `ps aux` rather than treating the launcher's own slow return as a problem).
+- **Found a real regression from my own earlier fix:** "grn for order 800151" (fix.md #18's target) went from
+  a clean `GROUNDING_FAILURE` to an uncaught `HARNESS_FAILURE` crash. Traced it to the actual captured
+  plan/SQL, not guessed: the model represents "800151" as both a `not_required` entity (no value) and a
+  `filter` with `value_type="string"` -- the filter drives the real bind, and nothing converts that string to
+  a number before checking it against `INVENTORY.GRN.ORDERNO`'s verified `NUMERIC` category. Confirmed this
+  specific mismatch genuinely couldn't have fired via the entity path before today (supplier/material/
+  item_identifier's verified columns are all `TEXT`) -- my own new catalog concept was the first `NUMERIC`
+  identifier a real question ever filtered by.
+- **Fixed the right layer, not the easy one:** could have loosened the datatype check to accept a numeric
+  string -- didn't, since that's exactly the kind of "loosen a validator to make a question pass" move this
+  project rules out. Instead added deterministic coercion gated on the column's own *verified* category
+  (reusing `sql_datatype_validator`'s existing offline metadata lookup, not a second source of truth), so it
+  only ever narrows a clean digit-string toward `int` and fails closed on everything else.
+- **Verification note, stated plainly rather than glossed over:** tried to confirm this live end-to-end, but
+  the model produced an unrelated `SELECT *` rejection on every retry (separate validator, ordinary
+  non-determinism). Didn't chase it further -- the unit test reproduces the actual captured real-world
+  plan/SQL from the crash itself, which is a faithful enough reproduction to trust.
+- **Files:** `app/nlp_execution.py`, `scripts/test_nlp_execution.py` (+1 test), `fix.md`, `progress.md`.
+- **Tests:** 1 new. 11 core suites plus the eval-test file: **339/339**.
+- **Next:** re-running the full eval once more with this fix in, to get a clean final number for today
+  (rather than reporting numbers that include one crashed record).

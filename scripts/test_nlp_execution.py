@@ -513,6 +513,31 @@ class NLPExecutionTests(unittest.TestCase):
             execute_nlp_query(plan.original_question, dependencies=dependencies(plan, sql, runner))
         self.assertEqual(runner.calls, [])
 
+    def test_numeric_filter_value_is_coerced_to_int_for_a_numeric_column(self) -> None:
+        # fix.md #20, found by re-running the held-out eval after fix.md #18
+        # added grn_order_number: the model extracted "order 800151" as
+        # value_type="string" against INVENTORY.GRN.ORDERNO, a verified
+        # NUMERIC column -- crashed uncaught in sql_datatype_validator (a
+        # NUMERIC bind must be a real int/float/Decimal, never text) rather
+        # than failing closed with a clean rejection. Oracle bind values must
+        # be real numbers, not just numeric-looking text.
+        plan = QueryPlan(
+            original_question="grn for order 800151",
+            domain="grn",
+            operation="detail",
+            business_subject=BusinessSubject(concept="grn"),
+            filters=[QueryFilter(
+                concept="order", operator=FilterOperator.EQUALS,
+                value="800151", value_type="string",
+            )],
+            requested_output=RequestedOutput(fields=["order"]),
+            confidence=0.85,
+        )
+        sql = "SELECT INVENTORY.GRN.ORDERNO FROM INVENTORY.GRN WHERE INVENTORY.GRN.ORDERNO = :order"
+        binds = build_bind_parameters(sql, plan, ground_query_plan(plan))
+        self.assertEqual(binds, {"order": 800151})
+        self.assertIsInstance(binds["order"], int)
+
     def test_material_filter_bypassing_entity_resolution_is_rejected(self) -> None:
         plan = QueryPlan(
             original_question="purchases of material Totally Fake Widget",

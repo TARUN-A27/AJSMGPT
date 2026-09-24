@@ -678,6 +678,38 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - **Tests:** 11 core suites (added `test_entity_resolution.py` to the tracked list — always part of the real
   V1 chain per CLAUDE.md §4, just not previously counted here) **318/318**.
 
+## 20. ✅ A numeric-looking filter value extracted as text crashed uncaught against a NUMERIC column
+
+- **Found by:** re-running the held-out eval end-to-end after fix.md #15-19 landed ("carry on with 2 and 3" --
+  measure again, act on what it shows). "grn for order 800151" -- the exact question fix.md #18 had just fixed
+  at the grounding layer -- now reached execution and **crashed** (`HARNESS_FAILURE`, an uncaught `ValueError`
+  from `sql_datatype_validator.py`), worse than the clean `GROUNDING_FAILURE` rejection it had before #18.
+- **Root cause, traced through the actual captured plan (not guessed):** the model represented "800151" as
+  **both** a `not_required` entity (no real value) **and** a `filter` with `value_type: "string"`. The filter
+  is what actually drives the bind -- `build_bind_parameters()`'s filter loop passes the raw string `"800151"`
+  through untouched, since `"order"` isn't one of the 5 always-verify concepts, and Oracle's `NUMERIC` bind
+  category requires a real `int`/`float`/`Decimal` (`_value_matches_category`), never a numeric-looking string.
+  Confirmed this couldn't have happened via the entity path: `supplier`/`material`/`item_identifier`'s verified
+  columns are all `TEXT` category, so a `RESOLVED` entity's value is never checked against `NUMERIC` today --
+  this specific mismatch was only reachable through a filter, and only once a NUMERIC-category identifier
+  concept (`grn_order_number`) existed for a real question to filter by.
+- **Fixed deterministically, not by loosening the datatype check:** `build_bind_parameters()`'s filter loop now
+  coerces a clean digit-string filter value to `int` when every column the concept actually grounded to is
+  verified `NUMERIC` (reusing `sql_datatype_validator`'s own offline metadata lookup as the source of truth --
+  not a second, divergent category source). Fails closed on anything else: non-digit text, mixed/unknown
+  categories, or a `CONTAINS`/`STARTS_WITH`-wrapped value (`"%800151%"` already fails the digit check on its
+  own, so LIKE-shaped filters are never touched). Matches "Qwen proposes, deterministic code verifies" --
+  correctness depends only on the verified column category, never on the model's self-reported `value_type`.
+- **Where:** `app/nlp_execution.py` (`_numeric_filter_values`, new; one call site in `build_bind_parameters`'s
+  filter loop).
+- **Tests:** 1 new in `test_nlp_execution.py`, reproducing the exact real plan/SQL captured from the actual
+  crash (not a synthetic stand-in) -- asserts the bind comes back as `int`, not the model's `str`. 11 core
+  suites plus the eval-classifier test file: **339/339**.
+- **Not independently live-verified end-to-end:** tried, but the model produced an unrelated `SELECT *`
+  rejection on every retry this time (separate, pre-existing validator, unrelated to this fix -- ordinary
+  model non-determinism, same class already documented in fix.md #14). The unit test reproduces the real
+  captured inputs faithfully enough to trust without chasing a live round-trip further.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

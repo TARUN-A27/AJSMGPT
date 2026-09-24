@@ -34,6 +34,7 @@ from app.query_plan import Aggregation, DateRange, DateRangeKind, EntityStatus, 
 from app.query_plan_extractor import extract_query_plan
 from app.schema_grounding import GroundedSchemaPlan, ground_query_plan
 from app.spacy_nlp import NLPAnalysis, analyze_question_with_spacy
+from app.sql_datatype_validator import NUMERIC, _column_datatype_category
 from app.sql_safety import add_oracle_row_limit
 from app.text_correction import TextCorrectionResult, correct_question_text
 from app.v1_capabilities import CapabilityDecision, evaluate_capability
@@ -410,6 +411,27 @@ def _filter_values(operator: FilterOperator, value: Any) -> list[Any]:
     return values
 
 
+def _numeric_filter_values(
+    concept: str, grounding: GroundedSchemaPlan, values: list[Any]
+) -> list[Any]:
+    """A filter's value_type is model-reported and not always trustworthy
+    (fix.md #20: "order 800151" extracted as value_type="string" against a
+    verified NUMERIC column, INVENTORY.GRN.ORDERNO -- Oracle bind values must
+    be real numbers, not just numeric-looking text). Coerce a clean digit
+    string to int only when every column this concept actually grounded to
+    is verified NUMERIC -- fail closed (leave the value untouched, so it
+    fails exactly as before) on any mismatch, ambiguity, or non-digit text;
+    a CONTAINS/STARTS_WITH-wrapped value ("%800151%") already fails the
+    digit check on its own, so LIKE-shaped filters are never touched."""
+    columns = _concept_columns(grounding, concept)
+    if not columns:
+        return values
+    categories = {_column_datatype_category(*full_name.split(".")) for full_name in columns}
+    if categories != {NUMERIC}:
+        return values
+    return [int(v) if isinstance(v, str) and re.fullmatch(r"-?\d+", v) else v for v in values]
+
+
 _NUMBER_WORDS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
     "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
@@ -523,7 +545,7 @@ def build_bind_parameters(
             sql,
             grounding,
             item.concept,
-            _filter_values(item.operator, item.value),
+            _numeric_filter_values(item.concept, grounding, _filter_values(item.operator, item.value)),
             result,
         )
 

@@ -1,6 +1,6 @@
 {
  "version": "1.0",
- "total": 197,
+ "total": 223,
  "note": "proposed_family is a review proposal, not a verdict",
  "questions": [
   {
@@ -1760,6 +1760,214 @@
    ],
    "occurrences": 3,
    "proposed_family": "unclassified"
+  },
+  {
+   "question": "is there an item called \"Sticker Label(Corrugated Box)\"?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "material_lookup"
+  },
+  {
+   "question": "is there an item called \"Spur Gear 46T-509119031-Lr 6/S\"?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "material_lookup"
+  },
+  {
+   "question": "is there an item called \"Spares Kit 8000 Hours Tbtdjm\"?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "material_lookup"
+  },
+  {
+   "question": "how much Sticker Label(Corrugated Box) did we consume in 2024?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "what was the consumption value of Sticker Label(Corrugated Box) in 2024?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "issue rate for Spur Gear 46T-509119031-Lr 6/S?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "when was Spur Gear 46T-509119031-Lr 6/S last issued?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "consumption"
+  },
+  {
+   "question": "how much Spares Kit 8000 Hours Tbtdjm have we received?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "how much Spares Kit 8000 Hours Tbtdjm is still pending receipt?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "has any Spares Kit 8000 Hours Tbtdjm been rejected on receipt?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "is material Mpcb 2.5 - 4 A, Model - Gv2Me08 received?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "when was Mpcb 2.5 - 4 A, Model - Gv2Me08 last received?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "grn"
+  },
+  {
+   "question": "what is the current stock of Nylon Endless Belt 850 X 20 - Dk 780?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "what is the current stock of Micro Sensor Coil For Pinter Spdl. Monitoring?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "what is the current stock of Package Sensor - 21A-E01-024 - For 21C A/C?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "stock"
+  },
+  {
+   "question": "how much Micro Sensor Coil For Pinter Spdl. Monitoring have we purchased?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "purchase value of Micro Sensor Coil For Pinter Spdl. Monitoring?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "last purchase rate of Micro Sensor Coil For Pinter Spdl. Monitoring?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "how many orders have we placed with Yuvanesh Agencies?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "how many purchase orders are pending at the stores officer stage?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "how many purchase orders are pending at internal audit?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "how many purchase orders are fully approved?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "purchase"
+  },
+  {
+   "question": "is \"Sri Vengatesvara Electrical & Tex Spares\" a registered supplier?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "is \"Star Plus Engineering Enterprises\" a registered supplier?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "supplier_lookup"
+  },
+  {
+   "question": "what is MRS number 830216?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "mrs"
+  },
+  {
+   "question": "how many MRS are pending (Tarun verified definition)?",
+   "sources": [
+    "claude_generated_verified_2026-09-24"
+   ],
+   "occurrences": 1,
+   "proposed_family": "mrs"
   }
  ]
 }

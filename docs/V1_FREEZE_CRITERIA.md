@@ -56,11 +56,22 @@ in the held-out set blocks freeze regardless of the pass-rate number.
 - ~~The branch pushed to `origin`~~ — ✅ done.
 - ~~Deploy + verify against live Oracle~~ — ✅ done: V1 running at `/home/ajsmgpt/AJSMGPT_v1` beside the
   legacy service; the live evaluator ran 47/47 questions against real Oracle with 0 crashes (fix.md #13).
-- The expanded question bank (consumption/GRN/material-lookup, ~40 more real questions) — still open.
-- 3 golden (question, verified-correct-answer) pairs per family, for the live spot-check
-  `progress.md`'s verification section calls for — still open; run 3/4 of the live eval produced
-  the first real `PASS_PIPELINE` (fix.md #13), so at least one golden pair is now possible; still
-  need 2 more per family.
+- ~~The expanded question bank~~ — ✅ largely done 2026-09-24: 16 already-real, already-logged
+  consumption/GRN/material-lookup questions found sitting unused in `data/question_bank_v1.json`
+  (never wired into the evaluator's selection), plus 26 new questions Claude generated, grounded
+  against real Oracle entities, and computed answers for directly (bypassing the V1/Qwen pipeline
+  entirely, so it's an independent check) — **all 26 confirmed correct by the client**. Both added
+  to `data/question_bank_v1.json` (now 223 questions). **Still open:** the evaluator's
+  `_select_questions()` (`scripts/evaluate_v1_real_questions.py`) reads from the smaller
+  `AutomateQuery/reports/question_bank.json`, not this richer file, and its per-family caps
+  (consumption 4, grn 5, no material_lookup bucket at all) predate this work — wiring it to draw
+  from `data/question_bank_v1.json` instead is what actually makes this count toward the depth-bar
+  measurement below, not just sit in a JSON file.
+- ~~3 golden (question, verified-correct-answer) pairs per family~~ — ✅ done 2026-09-24: 26 pairs
+  across all 7 families (material_lookup 3, consumption 4, grn 5, stock 3, purchase 7, supplier_lookup
+  2, mrs 2), client-verified. The verified **answers** (real business figures) are deliberately kept
+  out of git per §3 — they exist only in the hand-off document Tarun's client verified, not in the
+  tracked codebase. Only the **questions** (no answers) were added to `data/question_bank_v1.json`.
 
 ## Decided 2026-09-23 (Tarun)
 - Depth bar: **75%, per family** (not blended).

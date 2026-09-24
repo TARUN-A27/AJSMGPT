@@ -451,3 +451,35 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   `scripts/test_nlp_execution.py`, `fix.md`, `progress.md`.
 - **Tests:** 7 new in `test_entity_resolution.py`, 1 new in `test_nlp_execution.py`. Every existing test
   unchanged (`fuzzy_lookup` defaults to `None`). 11 core suites **326/326**.
+
+### Generate + verify golden question/answer pairs (V1_FREEZE_CRITERIA.md blockers)
+- **Prompt:** Tarun couldn't produce question+verified-answer pairs himself ("question with answer not
+  possible"); proposed instead that Claude generate layman questions, check them against the real database, and
+  answer them directly, for his client to verify/correct. Flagged one honest risk first (being both the exam-
+  writer and exam-grader) before agreeing; Tarun's plan already solved it -- an independent human does the actual
+  verification, Claude's answer is just a first draft.
+- **Done:** while looking for real questions, found the actual bigger unblock first: 16 already-real,
+  already-logged consumption/GRN/material-lookup questions were sitting unused in `data/question_bank_v1.json`
+  (197 questions, tagged `proposed_family`), never wired into the evaluator, which reads from a smaller, different
+  file (`AutomateQuery/reports/question_bank.json`) with much lower per-family caps -- that's the actual reason
+  those families have stayed thin, not a lack of real usage. Then built 26 new questions the same way: picked
+  real, active item/supplier codes from Oracle (cross-checked for activity across GRN/ISSUE/PURCHASEORDER/
+  ITEMSTOCK so one item supports several question types), phrased realistic layman questions around them, and
+  computed each answer with hand-written SQL run directly against Oracle -- never through the V1/Qwen pipeline,
+  so it's a genuine independent check, not V1 grading itself. Delivered as a markdown file (question, computed
+  answer, the exact SQL used, a blank verify/correct field) -- kept out of the git repo entirely since it has
+  real business figures in it (CLAUDE.md §3).
+- **Fixed a real bug in the first delivery:** the SQL used named bind placeholders (`:c`, `:s`) as written for
+  application code -- correct there, but the client hit `ORA-00911` trying to paste and run it directly in a
+  plain SQL client with no bind-variable prompt. Substituted literal values into the displayed SQL instead (safe
+  here since every value is fixed and chosen by the script, never user input), wrapped in fenced code blocks, and
+  redelivered.
+- **All 26 confirmed correct by the client.** Added the 26 questions (text only, no answer values) plus the 16
+  previously-unused real ones to `data/question_bank_v1.json` (197→223). The verified answers stay only in the
+  hand-off document, never committed.
+- **Mid-task correction, not from the user this time but from reality:** the sandbox environment reset mid-task
+  and wiped the scratchpad holding the generation script and first output. Nothing important was lost -- all
+  actual code/doc changes were already committed and pushed before this task started -- just rebuilt the
+  (already-designed) script from context and re-ran it.
+- **Files:** `data/question_bank_v1.json`, `docs/V1_FREEZE_CRITERIA.md`, `progress.md`. No app code changed.
+- **Tests:** none needed (question-bank data + docs only); JSON validity checked directly.

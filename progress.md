@@ -324,3 +324,14 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   (14b is also generally stronger), except the `mrs_number` case, isolated cleanly: same question/model, old
   prompt still fails, only the new prompt passes. `test_entity_resolution` added to the tracked core-suite list
   (always part of the real chain, just not previously counted). 318/318 across 11 core suites.
+- 2026-09-24 — fix.md #2 closed (fuzzy entity-resolution fallback, Tarun's sign-off), fix.md #3 closed (MRS
+  operation-choice prompt fix). See CLAUDE.md §6 for the combined final numbers.
+- 2026-09-24 — V1_FREEZE_CRITERIA.md's two "still open" blockers largely closed: found 16 already-real,
+  already-logged consumption/GRN/material-lookup questions sitting unused in `data/question_bank_v1.json` (never
+  wired into the evaluator); generated 26 more, grounded against real Oracle entities, with answers computed
+  directly (never through the V1/Qwen pipeline, so an independent check) — all 26 confirmed correct by Tarun's
+  client. Both sets' questions (no answer values) added to `data/question_bank_v1.json` (197→223). The verified
+  answers themselves are kept out of git per §3 -- they exist only in the hand-off document, never committed.
+  Still open: wire `scripts/evaluate_v1_real_questions.py`'s `_select_questions()` to actually draw from this
+  richer bank instead of the smaller `AutomateQuery/reports/question_bank.json` it currently reads -- otherwise
+  none of this counts toward the depth-bar measurement, it just sits in a JSON file.

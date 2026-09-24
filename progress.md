@@ -71,19 +71,21 @@ what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~97%   #4, #7, #10, #12, #13 closed; fix.md #2/#3 remain (need real
-                                                  data or a scoped prompt task, not quick fixes)
-LLM layers (3, 6)                          ~75%   Step 4 done: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1
+Deterministic layers (2, 4, 5, 7)         ~97%   #4, #7, #10, #12, #13 closed; #2 verified against real Oracle
+                                                  2026-09-24 (correct refusals, not a bug -- fuzzy matching is an
+                                                  open product question)
+LLM layers (3, 6)                          ~80%   Step 4: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1. fix.md #3
+                                                  closed 2026-09-24: MRS operation-choice prompt fix,
+                                                  CAPABILITY_FAILURE 11→6
 Execution + report (8, 9)                  ~80%   Step 6 done: real Oracle, first live PASS_PIPELINE (fix.md #13)
 Coverage                                   7/7    stock + grn added 2026-09-23 (10 of 24 previously-refused
                                                   questions now genuinely reachable, not just refused)
 Live-question eval (14b, real Oracle)     1/47   first pass ever against real Oracle; 4 rounds, 4 real gaps
                                                   found and fixed same day (fix.md #13) -- see the eval detail
-Overall V1                                 ~85%   fix.md #4 (PO-pending, MRS-pending) and #14 (entity-resolution
-                                                  status=not_required prompt gap) both closed 2026-09-23; number
-                                                  not re-derived, offline eval now uses 14b not 8b so it isn't a
-                                                  clean before/after basis; remaining: bigger question bank,
-                                                  freeze sign-off
+Overall V1                                 ~87%   fix.md #4, #14 (2026-09-23), #2 (verified), #3 (2026-09-24) all
+                                                  closed/verified; number not re-derived precisely, offline eval
+                                                  now uses 14b not 8b so it isn't a clean before/after basis;
+                                                  remaining: bigger question bank, freeze sign-off
 ```
 47-question offline eval, qwen3:14b + the fix.md #14 prompt fix (2026-09-23, reached over an SSH tunnel to the
 company server since 14b isn't pulled locally): `PASS_PIPELINE` 2→4, `ENTITY_RESOLUTION_REJECTION` 10→6,
@@ -91,6 +93,12 @@ company server since 14b isn't pulled locally): `PASS_PIPELINE` 2→4, `ENTITY_R
 also generally stronger) except for one cleanly isolated case: `"MRS details for MRS number 890330"` reaches
 `PASS_PIPELINE` only with the new prompt — same question, same model, old prompt still fails. Full detail:
 fix.md #14.
+
+2026-09-24: checked fix.md #2's assumption against real Oracle (3 of 4 checked values are genuine exact-match
+refusals, not a fixture gap -- open product question on fuzzy matching, not fixed). Then closed fix.md #3 (MRS
+operation-choice): `SYSTEM_PROMPT` never defined what `lookup` means or that a status/date question with no
+unique identifier is still `detail`. Full 47-question re-run isolating just this fix: `CAPABILITY_FAILURE` 11→6,
+`PASS_PIPELINE` 4→5. Full detail: fix.md #3.
 
 ---
 

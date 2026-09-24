@@ -87,14 +87,15 @@ Not now: RAG, Qdrant in runtime, 30B models, QueryPlan rewrite, architecture red
 Detail and fix plan per item: `fix.md`.
 47-question real evaluation (`scripts/v1_real_question_eval_results.json`):
 ```text
-UNSUPPORTED_EXPECTED         12   ← by design (attendance, camera_ip, dell system stock*)
-CAPABILITY_FAILURE           11   ← stock/grn now genuinely reachable (fix.md #13); model op-choice failures
+UNSUPPORTED_EXPECTED         13   ← by design (attendance, camera_ip, dell system stock*)
+ENTITY_RESOLUTION_REJECTION  10   ← correctly reaching this stage now (fix.md #3); some checked against real
+                                     Oracle 2026-09-24 and are genuine exact-match refusals (shorthand like
+                                     "mouse"/"dell" isn't the real full item/party name), not a data gap --
+                                     fuzzy matching is an open product question, fix.md #2
 GROUNDING_FAILURE              7   ← catalog gaps + real, diagnosable model output
-QUERY_PLAN_FAILURE             7   ← all model behaviour (low confidence, undeclared sort field)
-ENTITY_RESOLUTION_REJECTION    6   ← checked against real Oracle 2026-09-24: correct, working exact-match
-                                     refusals (shorthand like "mouse"/"dell" isn't the real full item/party
-                                     name) -- not a data gap; fuzzy matching is an open product question, fix.md #2
-PASS_PIPELINE                  4
+CAPABILITY_FAILURE             6   ← was 11 -- fix.md #3 (MRS operation-choice) closed 2026-09-24
+QUERY_PLAN_FAILURE             6   ← all model behaviour (low confidence, undeclared sort field)
+PASS_PIPELINE                  5
 SQL_VALIDATION_FAILURE         0
 SQL_GENERATION / ENVIRONMENT   0
 ```
@@ -133,6 +134,20 @@ value-or-null clause's own span; (2) the anti-join's `NVL(...)=0` check could bi
 alias of the same physical table than the one verified as the correct composite-key `LEFT JOIN` — closed by
 requiring the NULL check to use specifically the verified join's own alias. Both had concrete adversarial SQL
 that passed validation before the fix; both now have named regression tests.
+
+**2026-09-24:** checked fix.md #2's "recheck on real master data" assumption against real Oracle on the server —
+wrong for `dell`/`mouse`/`dell system` (still `UNRESOLVED`; `resolve_entity` is exact-match only by design, real
+users type shorthand); `yarn` correctly comes back `AMBIGUOUS` (2 real candidates). Not a bug; recorded as an open
+product question (add fuzzy matching?) for Tarun to decide. Then closed fix.md #3: the operations paragraph never
+defined what `lookup` means (the model read "asking for one field" as sounding like a lookup) nor that a
+status/date/reason question with no unique identifier is still `detail`, so MRS status/date questions fell back
+to `lookup` or the literal string `"unknown"`. Fixed `app/query_plan_extractor.py`'s `SYSTEM_PROMPT`; verified
+against qwen3:14b iteratively (one round-1 side effect — the model over-generalized `status="not_required"` from
+a status entity onto a co-occurring material entity — caught and fixed with a clarifying sentence before
+shipping). All 4 target questions now reach `operation: detail`; none are `CAPABILITY_FAILURE` any more, each
+failing (when it does) at a specific, later, diagnosable stage instead. Full 47-question re-run, isolating just
+this fix: `CAPABILITY_FAILURE` 11→6, `PASS_PIPELINE` 4→5. The table above is the final result of both today's
+fixes. Full detail: fix.md #2, #3.
 
 ## 7. Test commands
 Tests are `unittest` scripts. Run the one for the component you changed:

@@ -69,7 +69,7 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
   rationale) — needs Tarun's sign-off, not a unilateral fix. Until decided, this stays a correct, working, but
   user-unfriendly refusal — acceptable under the freeze criteria's "a refusal is fine" rule, not a wrong answer.
 
-## 3. ⬜ MRS `lookup`/`unknown` operation — re-diagnosed 2026-09-23, original framing was wrong
+## 3. ✅ MRS `lookup`/`unknown` operation — re-diagnosed 2026-09-23, fixed 2026-09-24
 - **Count (14b re-run):** 4 × `CAPABILITY_FAILURE`, all `domain=mrs`: `Mrs rejected reason?` (`operation=lookup`),
   `approved MRS for keyboard` / `MRS due for keyboard in 2026` / `MRS due in 2026` (`operation=unknown`, literally
   the string "unknown", not a missing enum value).
@@ -83,6 +83,40 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
 - **Real fix is model/prompt (query_plan_extractor.py's operation ontology), same category as fix.md #6** — needs
   its own measured before/after eval pass like Step 3, not a same-session patch. Not attempted today.
 - **Where:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`'s operation guidance), not `v1_capabilities.py`.
+- **Root cause, found 2026-09-24 by reading the prompt, not guessing:** `SYSTEM_PROMPT` presented `lookup` as a
+  flat item in the operations enum with no definition beyond the word itself. The model reasonably read "asking
+  for one field of a record" (a rejection reason, a due date) as sounding like a "lookup" in the everyday English
+  sense — but `lookup` is a narrow, specific term here (identifying a supplier/material's identity), never valid
+  for `mrs`'s actual operations (`detail`/`aggregate`/`ranking`). For the other 3 questions, nothing told the
+  model that a status/date/reason question with no single uniquely-identifying value is still `detail` (a
+  multi-row listing), so it fell back to the literal string `"unknown"` instead.
+- **Fix:** extended `SYSTEM_PROMPT`'s operations paragraph: `lookup` means identifying a supplier/material's
+  identity only, never a status/date/reason field (that's always `detail`); a status/date/field question is
+  `detail` whenever no single uniquely-identifying value narrows it to one row. Also clarified (needed once this
+  landed): a plan can name both a real supplier/material entity and an independent status/approval entity in the
+  same question (`"approved MRS for keyboard"`) — only the status one gets `status="not_required"`; a named
+  material still goes through real identity verification and never inherits `not_required` from a sibling entity
+  (round-1 probing on qwen3:14b showed the model over-generalizing this without the clarification).
+- **Verified against the real model (qwen3:14b, via the same SSH tunnel as fix.md #14), iteratively:** all 4
+  target questions now get `operation: detail` (was `lookup`/`unknown` on all 4). None are `CAPABILITY_FAILURE`
+  any more; each now fails, when it does, at a later, specific, diagnosable stage instead of an opaque
+  operation-choice failure: `"Mrs rejected reason?"` → low-confidence clarification (a real, separate model
+  imprecision: it also emits a spurious second entity, `concept="reason"`, not caught by this fix and not chased
+  further — lower severity, doesn't regress anything); `"approved MRS for keyboard"` → `GROUNDING_FAILURE` (no
+  verified MRS→INVITEMS join for material display — a genuine, separate, pre-existing catalog gap, not part of
+  this fix); `"MRS due for keyboard in 2026"` → `ENTITY_RESOLUTION_REJECTION` (`keyboard` correctly requires real
+  identity verification now); `"MRS due in 2026"` → `GROUNDING_FAILURE`. All four reaching a specific, real
+  failure instead of a generic operation-choice miss is the actual fix; none of the newly-surfaced downstream
+  gaps were introduced by it.
+- **Full 47-question re-run (14b), before vs after this fix only** (isolated from the fix.md #14 prompt, which
+  was already in place for both runs): `CAPABILITY_FAILURE` 11→6, `PASS_PIPELINE` 4→5, `QUERY_PLAN_FAILURE` 7→6,
+  `ENTITY_RESOLUTION_REJECTION` 6→10, `GROUNDING_FAILURE` 7→7 (same count, different specific questions),
+  `UNSUPPORTED_EXPECTED` 12→13. Coherent shift, not noise: the big `CAPABILITY_FAILURE` drop is exactly the
+  bucket this fix targeted, and the increases elsewhere are more *accurate* classification (questions now
+  reaching the failure stage that actually describes them), not new breakage — confirmed by tracing each changed
+  question by name, not just reading the aggregate counts.
+- **Files:** `app/query_plan_extractor.py`, `scripts/v1_real_question_eval_results.json`.
+- **Tests:** 11 core suites **318/318**, unaffected (prompt text only, no test fixture asserts on it verbatim).
 
 ## 4. ✅ Grounding: concept has no verified column (rate/cost closed 2026-09-22; PO-pending + MRS-pending closed 2026-09-23)
 - **Count:** 3 × `GROUNDING_FAILURE` after Step 3 — rate, cost consumed, order pending.

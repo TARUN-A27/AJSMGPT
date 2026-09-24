@@ -390,3 +390,35 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   criteria, just not the "will probably resolve fine" outcome originally assumed.
 - **Files:** `fix.md` (#2 updated), `CLAUDE.md` (§6 comment corrected). No code changes.
 - **Tests:** none needed (verification only, no code touched).
+
+### Close fix.md #3 — MRS operation-choice prompt fix
+- **Prompt:** continuing "do it then" from earlier — moved to the bigger leftover item, using the same
+  recover-classify-fix-remeasure method as fix.md #14.
+- **Done:** re-read fix.md #3's existing diagnosis (4 questions, all `domain=mrs`, `operation` either the literal
+  string `"lookup"` or `"unknown"`) before touching anything. Found the actual gap in `SYSTEM_PROMPT`:
+  `lookup` was listed in the operations enum with no definition, so the model reasonably read "asking for one
+  field of a record" as sounding like a lookup in plain English — but it's a narrow term here (supplier/material
+  identity only) the mrs family doesn't even support. Nothing told the model that a status/date/reason question
+  without a single uniquely-identifying value is still `detail`, so it fell back to `"unknown"` for the other 3.
+  Fixed by extending the operations paragraph in `app/query_plan_extractor.py`.
+- **Iterated against the real model before declaring it fixed, not after one shot:** re-opened yesterday's SSH
+  tunnel to the company server's qwen3:14b. Round 1 fixed the operation choice for all 4 (all now `detail`) but
+  surfaced a new side effect: the model over-generalized fix.md #14's `status="not_required"` instruction from a
+  status entity onto a co-occurring material entity in the same plan (`"approved MRS for keyboard"` tagged
+  `keyboard` as `not_required` too, which would have skipped its real identity verification). Added one
+  clarifying sentence — a plan can name both a real material and an independent status condition, only the
+  status one gets `not_required` — and re-probed: fixed, confirmed by checking `keyboard`'s status explicitly,
+  not just assuming the sentence worked.
+- **Measured the real aggregate effect, not just the 4 targeted questions:** full 47-question re-run through the
+  tunnel. `CAPABILITY_FAILURE` 11→6 (the exact bucket this targeted), `PASS_PIPELINE` 4→5. Traced every other
+  question that changed classification by name before calling the result coherent — the increases elsewhere
+  (`ENTITY_RESOLUTION_REJECTION` 6→10, `UNSUPPORTED_EXPECTED` 12→13) are more accurate classification (questions
+  now reaching the failure stage that actually describes them, like `keyboard` correctly needing identity
+  verification instead of stalling earlier), not new breakage. All 4 originally-targeted questions now fail (when
+  they still do) at a specific, later stage instead of the opaque operation-choice miss — including two genuinely
+  separate, pre-existing gaps this surfaced but didn't cause (no verified MRS→INVITEMS join for material display;
+  a spurious extra entity on "Mrs rejected reason?") — recorded honestly as separate, not folded into this fix's
+  credit.
+- **Files:** `app/query_plan_extractor.py`, `scripts/v1_real_question_eval_results.json`, `fix.md`, `progress.md`,
+  `CLAUDE.md`.
+- **Tests:** 11 core suites **318/318**, unaffected (prompt text only).

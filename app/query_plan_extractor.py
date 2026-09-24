@@ -51,6 +51,13 @@ their own approval/pending status.
 Operations are detail, aggregate, trend, ranking, comparison, lookup, and unknown. Select the closest operation without
 implying implementation details. Use unknown only when the intent genuinely cannot be determined, not merely because no
 operation feels like a perfect fit.
+lookup means identifying which supplier or material a name or code refers to (translating an identity) -- it is never
+the right operation for asking about a status, date, reason, or any other field of a record; that is always detail,
+even when the question sounds like it wants a single fact. A question asking for one field or status of matching
+records (a rejection reason, an approval state, a due date, whether something is pending) is detail whenever it could
+match more than one record -- i.e. whenever no single uniquely-identifying value (such as one specific MRS number)
+narrows it to exactly one row. Do not use unknown for this kind of question just because it asks for a status or a
+single field rather than a list.
 For "last/latest/recent N" or "first/earliest N" questions (records, not a calendar range), use operation=detail with a
 sorting entry on the relevant date concept (descending for last/latest/recent, ascending for first/earliest) and
 limit=N. For the same wording without an explicit N, use operation=detail with that same sorting entry and no limit.
@@ -74,6 +81,11 @@ item_identifier, set status to "not_required" -- never "unresolved" or "resolved
 guaranteed directly by the SQL condition generated for it, not by a separate identity lookup; keep the spoken value
 in original_value (or "true" if the concept word itself is the whole condition). Represent such a condition as
 exactly one entity, never also as a filter with the same meaning.
+A question can name both a real supplier/material AND a status/approval condition at once (e.g. "approved MRS for
+keyboard" names both "approved" and the material "keyboard") -- these are two independent entities. Only the
+status/approval/identifier entity gets status="not_required"; a named supplier or material is still exactly one of
+the five tokens above (never the status word), and never gets status="not_required" just because another entity in
+the same plan does.
 Return one JSON object only."""
 
 

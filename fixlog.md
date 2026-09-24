@@ -439,7 +439,14 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   ever appended `Candidates: ...` for `AMBIGUOUS` status, so a single fuzzy hit on an `UNRESOLVED` entity would
   have been silently invisible to the user — widened that condition to any status with candidates present.
 - **Verified against real Oracle on the server, not just mocks**, since the SQL shape itself (`LIKE`/`ESCAPE`/
-  string concatenation) was new and had never actually run against the live database. [continued after sync]
+  string concatenation) was new and had never actually run against the live database. Pushed, synced the server
+  to it, re-ran the exact same 4 values fix.md #2 confirmed `UNRESOLVED`/`AMBIGUOUS` on 2026-09-24 — this time
+  through the fuzzy-enabled path. Never printed a single candidate name (§3): checked correctness structurally
+  instead, confirming programmatically that every returned candidate actually contains the searched substring,
+  never by reading them myself. `dell` (supplier) still 0 candidates — genuinely no registered supplier name
+  contains it, a correct "not found," not a fallback bug. `mouse`/`dell system` (material) now surface 6 and 2
+  real, structurally-confirmed candidates instead of a dead refusal. `yarn` unchanged, confirming the fuzzy gate
+  correctly never fires once the exact match already succeeds.
 - **Files:** `app/entity_resolution.py`, `app/nlp_execution.py`, `scripts/test_entity_resolution.py`,
   `scripts/test_nlp_execution.py`, `fix.md`, `progress.md`.
 - **Tests:** 7 new in `test_entity_resolution.py`, 1 new in `test_nlp_execution.py`. Every existing test

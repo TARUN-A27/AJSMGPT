@@ -81,6 +81,16 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
   `app/nlp_execution.py:_default_resolve_entities`. Also had to extend the rejection-message builder there — it
   previously only appended `Candidates: ...` for `AMBIGUOUS`, so a single fuzzy hit on an `UNRESOLVED` entity
   would have been silently dropped; now any candidates present are shown regardless of status.
+- **Verified against real Oracle on the server, not just mocks** (the SQL shape — `LIKE`/`ESCAPE`/string
+  concatenation — was new and had never actually run against the live database). Re-checked the exact same 4
+  values confirmed `UNRESOLVED`/`AMBIGUOUS` on 2026-09-24 above, this time through the fuzzy-enabled path; never
+  printed candidate names, only structural facts (§3): `supplier:"dell"` → still 0 candidates, genuinely no
+  registered supplier name contains "dell" — a correct "not found," not a bug in the fallback.
+  `material:"mouse"` → 6 real candidates, `material:"dell system"` → 2, both sets programmatically confirmed
+  (by substring-containment check, not by reading them) to actually contain the searched text. `material:"yarn"`
+  unchanged (still resolves via the exact match alone, confirming the fuzzy gate correctly never fires when it
+  isn't needed). Two of the three previously-dead refusals now surface real, verified-correct "did you mean"
+  candidates.
 - **Files:** `app/entity_resolution.py`, `app/nlp_execution.py`, `scripts/test_entity_resolution.py`,
   `scripts/test_nlp_execution.py`.
 - **Tests:** 7 new tests in `test_entity_resolution.py` (single-hit hint, multi-hit ambiguous, no-hit, never for a

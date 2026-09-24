@@ -88,10 +88,11 @@ Detail and fix plan per item: `fix.md`.
 47-question real evaluation (`scripts/v1_real_question_eval_results.json`):
 ```text
 UNSUPPORTED_EXPECTED         13   ← by design (attendance, camera_ip, dell system stock*)
-ENTITY_RESOLUTION_REJECTION  10   ← correctly reaching this stage now (fix.md #3); some checked against real
-                                     Oracle 2026-09-24 and are genuine exact-match refusals (shorthand like
-                                     "mouse"/"dell" isn't the real full item/party name), not a data gap --
-                                     fuzzy matching is an open product question, fix.md #2
+ENTITY_RESOLUTION_REJECTION  10   ← correctly reaching this stage now (fix.md #3). fix.md #2's fuzzy fallback
+                                     (closed 2026-09-24) doesn't move this offline number -- the offline eval
+                                     swaps in a fixture lookup, never touching real Oracle -- but verified live on
+                                     the server it turns "mouse"/"dell system" from dead refusals into real,
+                                     structurally-confirmed "did you mean" candidates
 GROUNDING_FAILURE              7   ← catalog gaps + real, diagnosable model output
 CAPABILITY_FAILURE             6   ← was 11 -- fix.md #3 (MRS operation-choice) closed 2026-09-24
 QUERY_PLAN_FAILURE             6   ← all model behaviour (low confidence, undeclared sort field)

@@ -754,6 +754,36 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   shipped fix's example before reusing it (rather than assuming it still means what the fixlog said) is what
   caught this -- worth doing before trusting any earlier "verified" claim that wasn't re-run end to end.
 
+## 23. ✅ Two worked examples fixed what 3 rounds of declarative prompt-wording couldn't
+
+- **Prompt:** "continue next plan" -- the few-shot step of the recommended plan (real questions, verified
+  labels, few-shot before fine-tuning). Targeted the two patterns that were fragile under pure declarative
+  rules today: stock's operation-choice (fix.md #15 needed 3 wording rounds and never fixed "do we have yarn
+  in stock") and mrs's approval-stage entity-fusion (fix.md #17/#22).
+- **What was added:** two worked examples (real question -> the exact verified-correct QueryPlan JSON,
+  confirmed against the real grounding code before use -- see fix.md #22, found while doing exactly that) in
+  `SYSTEM_PROMPT`, right before "Return one JSON object only." Not new rules -- the existing declarative rules
+  were left exactly as they were.
+- **Verified against the real model, one pass, no whack-a-mole this time:**
+  - "do we have yarn in stock" -- the ONE stock case that survived all 3 declarative-wording rounds (fix.md
+    #15) -- **now grounds cleanly**, 2/2 repeats.
+  - All previously-working stock cases stayed correct (no over-anchoring on the example's exact wording).
+  - "list out material hold at Store officer?" (fix.md #17/#22's still-open case) **now fuses into one
+    entity** ("hold at store officer") without a second example ever mentioning "hold" -- the model
+    generalized the fusion *pattern* from the one "pending" example. Still correctly rejects at grounding
+    (no catalog data distinguishes "hold" per stage -- unchanged, still an open scope question, not resolved
+    here) but now with one honest rejection instead of a confusing two-entity split.
+  - Both real non-tiny `PASS_PIPELINE` cases (MRS-by-number, purchase-item-code) unaffected.
+- **One pre-existing failure found during this check, confirmed NOT a regression:** "issue for yarn" hits
+  `QueryPlanValidationError` 3/3 -- verified via `git stash` that this fails identically 3/3 *without* this
+  change too. Unrelated, pre-existing, not chased further here.
+- **Where:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT` only).
+- **Tests:** 1 new (asserts both examples are present in `SYSTEM_PROMPT`; effectiveness verified live above).
+  11 core suites plus the eval-classifier file: **343/343**.
+- **Takeaway, worth carrying forward:** for a pattern that resists declarative wording, a worked example is
+  worth trying before a third or fourth attempt at the sentence -- it fixed the case that resisted 3 rounds
+  of wording changes, on the first try, with no observed side effects.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

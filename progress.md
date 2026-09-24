@@ -448,3 +448,9 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   word order). Added the real word order as an alias, plus a second gap found the same pass (`material` as a
   dimension needs MRS_TEMP's own denormalised `ITEM_NAME`, not a join to INVITEMS). Catalog-only, 2 new tests,
   11 core suites plus the eval-test file: 342/342.
+- 2026-09-24 — closed fix.md #23: two worked examples (few-shot) in `SYSTEM_PROMPT`, not new rules, for the
+  two patterns that resisted pure declarative wording today. Fixed "do we have yarn in stock" (survived 3
+  rounds of fix.md #15's wording changes) on the first try, and generalized mrs's entity-fusion pattern to
+  "hold" without ever mentioning it in an example. No regressions on prior fixes or real `PASS_PIPELINE`
+  cases. Confirms the plan's own recommendation: try few-shot before another round of prompt wording, and
+  before fine-tuning. 1 new test, 11 core suites plus the eval-test file: 343/343.

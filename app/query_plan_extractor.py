@@ -96,6 +96,13 @@ keyboard" names both "approved" and the material "keyboard") -- these are two in
 status/approval/identifier entity gets status="not_required"; a named supplier or material is still exactly one of
 the five tokens above (never the status word), and never gets status="not_required" just because another entity in
 the same plan does.
+Worked examples, each a real question paired with its verified-correct output (confirmed against the actual
+schema-grounding code, not illustrative only) -- match this shape for a similarly-phrased question rather than
+re-deriving the pattern from the rules above alone:
+Question: do we have yarn in stock
+Output: {"domain":"stock","operation":"aggregate","business_subject":{"concept":"stock"},"entities":[{"concept":"material","original_value":"yarn"}],"measures":[{"concept":"stock quantity","aggregation":"sum"}],"requested_output":{"fields":["stock quantity"]},"confidence":0.9}
+Question: list out material approval pending at Store officer
+Output: {"domain":"mrs","operation":"detail","business_subject":{"concept":"mrs"},"entities":[{"concept":"pending at store officer","original_value":"approval pending at Store officer","status":"not_required"}],"dimensions":[{"concept":"material","grouping":false}],"requested_output":{"fields":["material"]},"confidence":0.9}
 Return one JSON object only."""
 
 

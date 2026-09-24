@@ -828,3 +828,16 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Tests:** 2 new. 11 core suites plus the eval-classifier file: **342/342**.
 - **Next:** the actual few-shot prompt work (stock + mrs examples) can now proceed with both examples
   confirmed correct, not just plausible-looking.
+
+### The actual few-shot addition (fix.md #23) -- confirms the plan's own bet
+- Added the two now-verified examples to `SYSTEM_PROMPT` (real question -> exact correct JSON), right before
+  the closing instruction. Verified against the real model: "do we have yarn in stock" -- the one case that
+  survived fix.md #15's 3 wording rounds -- grounds cleanly now, first try, no observed side effects on other
+  stock questions or the two real `PASS_PIPELINE` cases. Bonus, unasked-for generalization: "hold at Store
+  officer" now fuses into one entity too (the model generalized the *pattern* from the single "pending"
+  example) -- still correctly rejects at grounding since no catalog data supports it, but as one honest
+  rejection instead of a confusing split. Found one pre-existing, unrelated failure while checking
+  ("issue for yarn") and confirmed via `git stash` it fails identically without this change -- not chased.
+- **Files:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`), `scripts/test_query_plan_extractor.py` (+1
+  test), `fix.md`, `progress.md`.
+- **Tests:** 1 new. 11 core suites plus the eval-classifier file: **343/343**.

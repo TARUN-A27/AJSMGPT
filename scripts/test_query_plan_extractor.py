@@ -375,6 +375,17 @@ class QueryPlanExtractorTests(unittest.TestCase):
         flat = " ".join(SYSTEM_PROMPT.split())
         self.assertIn("is part of that same entity, not a separate one", flat)
 
+    def test_system_prompt_carries_worked_examples_for_the_fragile_patterns(self) -> None:
+        # fix.md #23: pure declarative rules took 3 rounds to fix stock
+        # (fix.md #15) and never fully fixed "do we have yarn in stock".
+        # Two worked examples (real questions, verified-correct output)
+        # fixed that exact case on the first try and generalized the mrs
+        # entity-fusion pattern to "hold" too, without a new sentence.
+        flat = " ".join(SYSTEM_PROMPT.split())
+        self.assertIn("Worked examples", flat)
+        self.assertIn('"domain":"stock","operation":"aggregate"', flat)
+        self.assertIn('"concept":"pending at store officer"', flat)
+
     def test_system_prompt_teaches_stock_quantity_is_aggregate_not_detail(self) -> None:
         # 2026-09-24 held-out eval: stock questions ("what is the stock of X")
         # were consistently extracted as operation=detail, which the stock

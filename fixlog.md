@@ -770,3 +770,18 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Tests:** 1 new. 11 core suites plus the eval-test file: **339/339**.
 - **Next:** re-running the full eval once more with this fix in, to get a clean final number for today
   (rather than reporting numbers that include one crashed record).
+
+### Confirmed: the crash is gone, final numbers for today
+- Third run, same server, same 68-question `--split test`: **0 `HARNESS_FAILURE`** (was 1). The fixed question
+  ("grn for order 800151") now cleanly passes datatype validation and reaches real Oracle execution -- it still
+  doesn't succeed there (`SQL_EXECUTION_FAILURE`, Oracle's own error deliberately discarded by design, same
+  pattern as fix.md #16's original finding). Not diagnosing that further today -- one question's remaining edge
+  case doesn't warrant a fourth investigation cycle in the same stretch.
+- Final per-family (pass + genuinely-deferred, out-of-scope excluded): consumption 50% (n=2), grn 14% (n=7),
+  material_lookup 0% (n=2), mrs 10% (n=10), purchase 15% (n=20), stock 30% (n=10), supplier_lookup 0% (n=10,
+  but 6 of those 10 are the mistagged out-of-scope questions from earlier -- real signal is thinner than the
+  raw number suggests). Every family is far below the 75% bar. The two largest failure categories by far are
+  `GROUNDING_FAILURE` (11) and `CAPABILITY_FAILURE` (11) -- catalog/capability coverage gaps, the same *kind*
+  of gap as today's grn cluster, not model-quality issues. Today's session found and fixed one clean example
+  of each of several gap types; the volume of remaining gaps suggests many more of the same kind exist,
+  unexamined, across the other families.

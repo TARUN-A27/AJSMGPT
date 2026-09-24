@@ -51,37 +51,37 @@ can never count as blind held-out data. Two of the smaller pools are thin on the
 from small-N: material_lookup (2) and consumption (2) — real per-family pass/fail is noisy for
 those two until the bank grows more, not a code defect.
 
-**Measured 2026-09-24, on the server against real Oracle + qwen3:14b: every family fails the 75%
-bar.** 61 in-scope questions (out_of_scope_hr/admin correctly excluded, refused by design): 3
-`PASS_PIPELINE` total. purchase 1/20 (5%), mrs 1/10 (10%), consumption 1/2, material_lookup 0/2,
-stock 0/10, supplier_lookup 0/10, grn 0/7. This is the real signal the tuned 47-question set
-couldn't show — genuinely unseen phrasing lands on gaps the tuned set never reached. Root cause by
-family (diagnosed, not yet fixed):
-- **stock (0/10):** one pattern — the model picks `operation=detail` for "what is the stock of X",
-  but stock's capability only allows `aggregate` (ITEMSTOCK is 1–31 rows/item, aggregate-only by
-  design). Same shape as fix.md #3's MRS lookup/detail prompt gap; looks like a single fast fix.
-- **grn (0/7):** several distinct grounding gaps — ambiguous concept→column mapping ("qty
-  received", "GRN for supplier X" each match >1 catalog column), missing concepts ("received
-  material names", "for order X"), and domain misrouting on entity-first phrasing ("grn for yarn").
-- **supplier_lookup (0/10):** every failure is "who supplies item X" — a reverse item→supplier
-  lookup, structurally different from the golden pairs' "is X a registered supplier" pattern. May
-  simply not be implemented; needs scoping before it's a "fix."
-- **mrs (1/10):** mix of genuine QueryPlan-contract failures and grounding gaps for concepts that
-  may not be cataloged at all ("material approval pending", "material hold", "indent number X").
-- **purchase (1/20):** one `SQL_EXECUTION_FAILURE` — a query that passed every validator layer
-  still broke on real Oracle, but the record has no captured detail (`sql_preview`/`cause` both
-  `None`; `OracleExecutionError`'s message alone doesn't carry the underlying Oracle error and no
-  `__cause__` was chained) — needs a targeted re-run with better instrumentation before it's
-  diagnosable. The rest are `ENTITY_RESOLUTION_REJECTION` (see next point).
+**Measured 2026-09-24, three times, on the server against real Oracle + qwen3:14b — every family
+still fails the 75% bar.** First run found the raw signal; fix.md #15–#20 closed six real issues
+(stock's operation-choice, a safety-stack gap in entity resolution, mrs's approval-stage splitting,
+a missing grn catalog concept, the depth-bar's ambiguous-refusal methodology, and a crash that
+concept exposed) between the second and third. Final, confirmed numbers (pass + genuinely-deferred
+ambiguity, out-of-scope excluded): **consumption 50% (n=2), stock 30% (n=10), purchase 15% (n=20),
+grn 14% (n=7), mrs 10% (n=10), material_lookup 0% (n=2), supplier_lookup 0% (n=10 — but 6 of those
+10 are mistagged out-of-scope questions, so the real signal is thinner than the number suggests)**.
 
-**Open methodology question, not decided unilaterally:** a large share of the
-`ENTITY_RESOLUTION_REJECTION` failures across families are the fix.md #2 fuzzy fallback correctly
-surfacing real multi-candidate ambiguity for shorthand entities ("keyboard", "monitor", "yarn") —
-arguably a safe, by-design refusal per this doc's own "a refusal is acceptable" line, not a defect.
-A few others are the model mis-treating a non-entity word ("pending") as a resolvable entity — a
-genuine extraction bug, not safety working correctly. Whether ambiguous-with-real-candidates counts
-as depth-bar "pass" or "fail" changes several of the numbers above materially; left open for Tarun
-rather than picking an interpretation that produces a cleaner-looking percentage.
+**This is not a "nearly there" state.** Of 68 questions, `GROUNDING_FAILURE` (11) and
+`CAPABILITY_FAILURE` (11) together are the largest share — catalog/capability coverage gaps, not
+model-quality issues. Today's session found and fixed one clean example of each gap *type*
+(operation-choice, entity-splitting, missing concept, unsafe type coercion) inside the families it
+dug into deeply (stock, mrs, grn); the volume remaining suggests more of the same kind exist,
+unexamined, in the families not yet gone through as carefully (purchase, supplier_lookup,
+material_lookup). Closing the gap to 75% everywhere looks like several more sessions of this same
+cluster-by-cluster diagnosis, not a final push before freeze.
+
+**Decided 2026-09-24 (Tarun):** the ambiguous-refusal methodology question — a genuine
+multi-candidate entity ambiguity (real shorthand, real multiple matches, correct refusal) is not a
+depth-bar failure. Implemented as a third classification, `ENTITY_AMBIGUOUS_DEFERRED` (fix.md #19),
+deliberately narrow: only when *every* ambiguity in a rejection is a clean 2+-candidate one.
+
+**Still open, confirmed as real scope decisions, not bugs:**
+- `supplier_lookup`'s "who supplies item X" (reverse item→supplier lookup) has no capability at all
+  — is this in scope for v1.0, or new work?
+- mrs's "hold at Store officer" — `HOLDINGSTATUS` isn't tracked per approval-stage in the data, so
+  there's nothing to ground even with perfect extraction, unless the business genuinely distinguishes it.
+- Several grn/purchase findings diagnosed but deliberately not attempted (measure-phrase fidelity,
+  `business_subject` grounding strictness vs. an extraction fix, a generic operation-choice gap) —
+  each needs a real decision, not a guess. Full detail: fix.md #18.
 
 **Non-negotiable regardless of the number: zero wrong answers — confirmed as-is, not loosened.**
 A refusal is acceptable — it's the system working as designed. A confidently wrong number is not,
@@ -119,10 +119,13 @@ in the held-out set blocks freeze regardless of the pass-rate number.
 - Zero wrong answers: **confirmed as-is**, not loosened.
 - Attendance: **deferred to v1.1**, not in v1.0 coverage.
 
-The question bank, split mechanism, and the measurement run are all done 2026-09-24 — see "Measured
-2026-09-24" above. **Freeze is not ready by the letter of this bar**: every family is far below
-75% on genuinely unseen phrasing. Two things now need Tarun's input before more effort goes in:
-(1) the ambiguous-entity-refusal methodology question above, which changes several numbers
-materially; (2) which of the five root-caused failure clusters to actually fix, and in what order
-— stock looks like one fast, high-confidence fix; supplier_lookup's gap may be a scope decision
-(is "who supplies item X" even meant to be in v1.0?) rather than a bug.
+The question bank, split mechanism, and the measurement itself are all done 2026-09-24 — see
+"Measured 2026-09-24" above for the final numbers. **Freeze is not ready by the letter of this
+bar, and this isn't close enough to call a final push**: every family is far below 75%, and the
+dominant failure mode (catalog/capability coverage gaps) appears to recur at similar volume across
+families that haven't been dug into as deeply as stock/mrs/grn were today. The realistic choices
+are: (1) continue the same cluster-by-cluster diagnosis-and-fix cycle for several more sessions
+before re-measuring, (2) freeze a subset of families now (e.g. purchase/mrs/consumption, which
+have real historical passes) and explicitly push the weaker ones to a fast-follow, or (3)
+renegotiate the bar or timeline itself. This is Tarun's call, not something to decide by continuing
+to fix clusters one at a time indefinitely.

@@ -423,3 +423,13 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   1) -- purchase 5%->20%, grn 0%->14%, stock 0%->10%. Real movement, nowhere near 75% on its own, exactly as
   expected when this was proposed. 8 new tests in a new file (this evaluator had none before). 11 core suites
   plus the new file: 338/338.
+- 2026-09-24 — **final numbers for today's session**, third live run, crash confirmed gone (0 `HARNESS_FAILURE`,
+  was 1). Every family still far below the 75% depth bar: consumption 50% (n=2), stock 30% (n=10), purchase 15%
+  (n=20), grn 14% (n=7), mrs 10% (n=10), material_lookup 0% (n=2), supplier_lookup 0% (n=10, real signal
+  thinner given the mistagging found earlier). `GROUNDING_FAILURE`+`CAPABILITY_FAILURE` (22 of 68) are the
+  dominant failure mode -- catalog/capability coverage gaps, not model quality. Today fixed one clean example
+  per gap type found (fix.md #15-#20); the remaining volume suggests many more of the same kind exist,
+  unexamined, across families not yet dug into as deeply as grn/mrs/stock were today. **This is not a "nearly
+  there" state** -- closing the gap to 75% everywhere looks like several more sessions of this same
+  cluster-by-cluster work, not a final push. Recommending Tarun get an honest read on this before assuming
+  freeze happens on the original schedule.

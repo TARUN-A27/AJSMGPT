@@ -1,0 +1,137 @@
+{
+  "version": "1",
+  "note": "Hand-labeled (question, correct QueryPlan) pairs. Questions are real, already-logged, previously-unlabeled phrasings from data/question_bank_v1.json's thinnest families (material_lookup, consumption) -- never Claude-generated text. Each query_plan was constructed by Claude directly (not extracted by the LLM pipeline) and verified by running it through the real ground_query_plan() + validate_query_plan_semantics() locally -- no Oracle, no Ollama. Intended as a seed for few-shot prompt examples and/or future fine-tuning data; excluded from the depth-bar held-out split the same way claude_generated_verified_2026-09-24 questions are, since the query_plan is Claude's own construction, not a blind extraction.",
+  "pairs": [
+    {
+      "question": "item master for item code A12001392",
+      "family": "material_lookup",
+      "query_plan": {
+        "domain": "material_lookup",
+        "operation": "lookup",
+        "business_subject": {"concept": "material"},
+        "entities": [{"concept": "item_identifier", "original_value": "A12001392"}],
+        "requested_output": {"fields": ["material", "item code"]},
+        "confidence": 0.9
+      }
+    },
+    {
+      "question": "item details for yarn",
+      "family": "material_lookup",
+      "query_plan": {
+        "domain": "material_lookup",
+        "operation": "lookup",
+        "business_subject": {"concept": "material"},
+        "entities": [{"concept": "material", "original_value": "yarn"}],
+        "requested_output": {"fields": ["material"]},
+        "confidence": 0.9
+      }
+    },
+    {
+      "question": "how much cost consumed last month?",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "aggregate",
+        "business_subject": {"concept": "consumption"},
+        "measures": [{"concept": "consumption value", "aggregation": "sum"}],
+        "date_range": {"kind": "relative", "original_text": "last month"},
+        "requested_output": {"fields": ["consumption value"]},
+        "confidence": 0.85
+      }
+    },
+    {
+      "question": "latest issue for yarn in 2024",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "detail",
+        "business_subject": {"concept": "consumption"},
+        "entities": [{"concept": "material", "original_value": "yarn"}],
+        "measures": [{"concept": "consumption quantity", "aggregation": "none"}],
+        "date_range": {"kind": "absolute", "start": "2024-01-01", "end": "2024-12-31"},
+        "sorting": [{"field_concept": "consumption date", "direction": "desc", "priority": 0}],
+        "limit": 1,
+        "requested_output": {"fields": ["consumption date", "consumption quantity"]},
+        "confidence": 0.85
+      }
+    },
+    {
+      "question": "issue for item code A12001392",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "detail",
+        "business_subject": {"concept": "consumption"},
+        "entities": [{"concept": "item_identifier", "original_value": "A12001392"}],
+        "measures": [{"concept": "consumption quantity", "aggregation": "none"}],
+        "requested_output": {"fields": ["consumption quantity", "consumption date"]},
+        "confidence": 0.9
+      }
+    },
+    {
+      "question": "issue for yarn",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "detail",
+        "business_subject": {"concept": "consumption"},
+        "entities": [{"concept": "material", "original_value": "yarn"}],
+        "measures": [{"concept": "consumption quantity", "aggregation": "none"}],
+        "requested_output": {"fields": ["consumption quantity", "consumption date"]},
+        "confidence": 0.85
+      }
+    },
+    {
+      "question": "issue for issue number 737",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "detail",
+        "business_subject": {"concept": "consumption"},
+        "entities": [{"concept": "issue number", "original_value": "737"}],
+        "measures": [{"concept": "consumption quantity", "aggregation": "none"}],
+        "requested_output": {"fields": ["consumption quantity"]},
+        "confidence": 0.9
+      }
+    },
+    {
+      "question": "what was issued for A12001392",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "detail",
+        "business_subject": {"concept": "consumption"},
+        "entities": [{"concept": "item_identifier", "original_value": "A12001392"}],
+        "measures": [{"concept": "consumption quantity", "aggregation": "none"}],
+        "requested_output": {"fields": ["consumption quantity", "consumption date"]},
+        "confidence": 0.85
+      }
+    },
+    {
+      "question": "what were the issues for yarn",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "detail",
+        "business_subject": {"concept": "consumption"},
+        "entities": [{"concept": "material", "original_value": "yarn"}],
+        "measures": [{"concept": "consumption quantity", "aggregation": "none"}],
+        "requested_output": {"fields": ["consumption quantity", "consumption date"]},
+        "confidence": 0.8
+      }
+    },
+    {
+      "question": "what was issued for yarn",
+      "family": "consumption",
+      "query_plan": {
+        "domain": "consumption",
+        "operation": "detail",
+        "business_subject": {"concept": "consumption"},
+        "entities": [{"concept": "material", "original_value": "yarn"}],
+        "measures": [{"concept": "consumption quantity", "aggregation": "none"}],
+        "requested_output": {"fields": ["consumption quantity", "consumption date"]},
+        "confidence": 0.8
+      }
+    }
+  ]
+}

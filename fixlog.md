@@ -785,3 +785,24 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   of gap as today's grn cluster, not model-quality issues. Today's session found and fixed one clean example
   of each of several gap types; the volume of remaining gaps suggests many more of the same kind exist,
   unexamined, across the other families.
+
+### Hand-label real questions for a training/few-shot seed dataset (fix.md #21)
+- **Prompt:** after discussing heavy training as a lever for option 2, Tarun asked how many labeled examples
+  are needed vs. available (answer: effectively 0 truly usable ones exist today), then proposed Claude
+  generate all the questions -- pushed back on that specifically (real question text should stay real, only
+  the label should be Claude's, to avoid training on and testing against the same self-generated phrasing).
+  Tarun's follow-up: do the recommended thing, then give the brief plan.
+- **Scoped down deliberately:** rather than attempt the full 150-250 estimated for a real fine-tune, labeled
+  just the 10 real, already-logged, previously-unlabeled questions in the two thinnest families
+  (material_lookup 2, consumption 8) -- small, bounded, and useful regardless of whether the eventual path is
+  few-shot prompting or real fine-tuning.
+- **Found one more real catalog gap while labeling, not go looking for one:** "issue for issue number 737"
+  had nothing to ground against. Verified `ISSUE.ISSUENO` is real and documented before adding it (fix.md
+  #21) -- same class of gap, same verification discipline as fix.md #18, just surfaced by hand-labeling
+  instead of a held-out eval run this time.
+- **Verified every label twice:** once against the in-memory QueryPlan objects while drafting, and again
+  after writing the actual JSON file -- re-parsed from disk and re-run through the real grounding and semantic
+  validator, since a hand-typed JSON file can silently diverge from what was tested in memory.
+- **Files:** `app/resources/business_schema_catalog.json` (+1 concept), `scripts/test_schema_grounding.py`
+  (+1 test), `data/labeled_queryplans_v1.json` (new, 10 pairs), `fix.md`, `progress.md`.
+- **Tests:** 1 new. 11 core suites plus the eval-classifier file: **339/339**.

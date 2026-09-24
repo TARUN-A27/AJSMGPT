@@ -710,6 +710,21 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   model non-determinism, same class already documented in fix.md #14). The unit test reproduces the real
   captured inputs faithfully enough to trust without chasing a live round-trip further.
 
+## 21. ✅ ISSUE.ISSUENO had no catalog concept -- found while hand-labeling training data
+
+- **Found by:** hand-labeling real consumption questions for a training/few-shot dataset (Tarun asked about
+  heavy training as a lever for option 2 of the freeze decision). "issue for issue number 737" is a real,
+  already-logged question with no catalog concept to ground it against -- same class of gap as fix.md #18's
+  `grn_order_number`, found the same way (checking the real schema study before assuming, not guessing).
+- **Verified before adding:** `docs/ORACLE_SCHEMA_STUDY_2026-09-22.md` documents `ISSUE.ISSUENO` directly
+  (177,627 distinct values, per-series document number); `data/multi_schema_metadata.json` confirms
+  `NUMBER(22) NOT NULL`.
+- **Fixed:** new catalog concept `issue_number` on `INVENTORY.ISSUE.ISSUENO` (`roles: entity_filter,
+  identifier`), matching the `mrs_number`/`grn_order_number` pattern exactly. Pure catalog addition, no code
+  or prompt changed.
+- **Where:** `app/resources/business_schema_catalog.json` only.
+- **Tests:** 1 new in `test_schema_grounding.py`. 11 core suites plus the eval-classifier file: **339/339**.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

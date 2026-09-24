@@ -433,3 +433,12 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   there" state** -- closing the gap to 75% everywhere looks like several more sessions of this same
   cluster-by-cluster work, not a final push. Recommending Tarun get an honest read on this before assuming
   freeze happens on the original schedule.
+- 2026-09-24 — started the recommended data-prep for option 2's fast-follow (real question text, Claude
+  generates/verifies the label, never Claude-generated question text mixed into the held-out split). Hand-
+  labeled the 10 real, previously-unlabeled questions in material_lookup/consumption -- the two thinnest
+  families -- with correct QueryPlan JSON, each verified by running it through the real `ground_query_plan()`
+  and `validate_query_plan_semantics()` (no Oracle/Ollama needed for this). Found and closed one more real
+  catalog gap along the way (fix.md #21: `ISSUE.ISSUENO`, same class as fix.md #18). Result:
+  `data/labeled_queryplans_v1.json`, 10 pairs, all independently re-verified after writing the file (not just
+  from the in-memory objects used to build it). Intended as a seed for few-shot prompt examples and/or future
+  fine-tuning data. 1 new test, 11 core suites plus the eval-classifier file: 339/339.

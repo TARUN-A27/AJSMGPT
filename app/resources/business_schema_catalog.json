@@ -200,6 +200,11 @@
       "columns": [{"table": "INVENTORY.ISSUE", "column": "STATUS", "roles": ["status"], "datatype_category": "NUMERIC", "confidence": 0.65, "evidence": "metadata; status values are not catalogued"}]
     },
     {
+      "name": "issue_number",
+      "aliases": ["issue number", "issue no"],
+      "columns": [{"table": "INVENTORY.ISSUE", "column": "ISSUENO", "roles": ["entity_filter", "identifier"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(22) NOT NULL; docs/ORACLE_SCHEMA_STUDY_2026-09-22.md ISSUE.ISSUENO, 177,627 distinct"}]
+    },
+    {
       "name": "stock_quantity",
       "aliases": ["stock quantity", "stock", "stock level", "stock balance", "quantity in stock", "available stock"],
       "columns": [{"table": "INVENTORY.ITEMSTOCK", "column": "STOCK", "roles": ["measure"], "datatype_category": "NUMERIC", "confidence": 0.85, "evidence": "metadata NUMBER(12,3); ERP FUNCTION GETTOTALSTOCK/GETTOTALSTOCKNEW sums this per item across mill/HOD rows (docs/ORACLE_SCHEMA_STUDY_2026-09-22.md §6.1) -- ITEMSTOCK carries 1-31 rows per item, never a single-row answer, which is why the stock capability (app/resources/v1_query_capabilities.json) allows aggregate only, not detail/ranking"}]

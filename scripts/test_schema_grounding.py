@@ -168,6 +168,24 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.MRS_TEMP", "MRSNO"), columns)
         self.assertEqual(columns[("INVENTORY.MRS_TEMP", "MRSNO")].logical_concept, "mrs_number")
 
+    def test_issue_number_grounds_without_join(self):
+        # fix.md #21: found while hand-labeling real consumption questions for
+        # a training/few-shot dataset -- "issue for issue number 737" named a
+        # real, documented, NOT NULL column (ISSUE.ISSUENO, 177,627 distinct,
+        # docs/ORACLE_SCHEMA_STUDY_2026-09-22.md) that had no catalog concept
+        # at all, same class of gap as fix.md #18's grn_order_number.
+        result = ground_query_plan(plan(
+            "consumption", "consumption",
+            entities=[EntityReference(
+                concept="issue number", original_value="737", selected_value="737",
+                confidence=0.9, status=EntityStatus.RESOLVED,
+            )],
+        ))
+        self.assert_grounded(result)
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.ISSUE", "ISSUENO"), columns)
+        self.assertEqual(columns[("INVENTORY.ISSUE", "ISSUENO")].logical_concept, "issue_number")
+
     def test_grn_order_number_grounds_without_join(self):
         # 2026-09-24 held-out eval, fix.md #18: "grn for order 800151" failed
         # grounding entirely -- GRN.ORDERNO is real and documented

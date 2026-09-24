@@ -80,9 +80,24 @@ _OFFLINE_ENTITY_LOOKUP = fake_lookup({**SUPPLIER_ROWS, **MATERIAL_ROWS})
 def _offline_resolve_entities(plan):
     return resolve_plan_entities(plan, _OFFLINE_ENTITY_LOOKUP)
 
-QUESTION_BANK = PROJECT_ROOT / "AutomateQuery" / "reports" / "question_bank.json"
-USER_QUESTIONS_TXT = PROJECT_ROOT / "data" / "user_purchase_mrs_questions.txt"
+QUESTION_BANK = PROJECT_ROOT / "data" / "question_bank_v1.json"
 RESULTS_PATH = PROJECT_ROOT / "scripts" / "v1_real_question_eval_results.json"
+
+# Per-family selection cap. Every one of the 7 v1.0 families (CLAUDE.md §6)
+# gets a real floor -- material_lookup and consumption/grn had none before
+# this (2026-09-24) beyond a keyword-matched slice of a smaller, uncategorized
+# bank. purchase keeps a higher cap since it's already the deepest-tested
+# family and the pool (84) would otherwise dominate the run.
+FAMILY_CAPS = {
+    "material_lookup": 10,
+    "consumption": 10,
+    "grn": 10,
+    "stock": 10,
+    "supplier_lookup": 10,
+    "mrs": 10,
+    "purchase": 20,
+}
+OUT_OF_SCOPE_CAP = 8
 
 KNOWN_UNSUPPORTED_DOMAINS: set[str] = set()
 # stock/grn/inventory/"goods receipt"(+" note") were here until 2026-09-23
@@ -103,83 +118,45 @@ def _quote_normalised(question: str) -> str:
 
 
 def _select_questions() -> list[dict]:
-    bank = json.loads(QUESTION_BANK.read_text(encoding="utf-8"))
+    # data/user_purchase_mrs_questions.txt used to be topped up here for extra
+    # phrasing variety; verified 2026-09-24 that all 24 of its lines are
+    # already present in this bank (it was one of the bank's own sources), so
+    # the top-up is now a no-op and was dropped.
+    bank = json.loads(QUESTION_BANK.read_text(encoding="utf-8"))["questions"]
 
-    def bucket(predicate, limit, allow_review=False):
+    def bucket(predicate, limit):
         seen = set()
         picked = []
-        candidates = [
-            q for q in bank
-            if predicate(q) and (allow_review or not q.get("needs_review"))
-        ]
-        candidates.sort(key=lambda q: -q.get("occurrence_count", 0))
+        candidates = [q for q in bank if predicate(q)]
+        candidates.sort(key=lambda q: -q.get("occurrences", 0))
         for q in candidates:
             key = _quote_normalised(q["question"])
             if key in seen:
                 continue
             seen.add(key)
-            picked.append(q)
+            picked.append({
+                "question": q["question"],
+                "category": q["proposed_family"],
+                "occurrence_count": q.get("occurrences", 0),
+            })
             if len(picked) >= limit:
                 break
         return picked
 
-    purchase = bucket(
-        lambda q: q["category"] in {"purchase_analytics", "supplier_purchase"}, 22,
+    selected = []
+    for family, limit in FAMILY_CAPS.items():
+        selected += bucket(lambda q, f=family: q.get("proposed_family") == f, limit)
+    selected += bucket(
+        lambda q: q.get("proposed_family", "").startswith("out_of_scope"), OUT_OF_SCOPE_CAP,
     )
-    mrs = bucket(lambda q: q["category"] == "mrs", 8)
-    consumption = bucket(
-        lambda q: q["category"] == "inventory_movement"
-        and ("issue" in q["question"].lower() or "consum" in q["question"].lower()),
-        4,
-    )
-    grn = bucket(
-        lambda q: q["category"] == "inventory_movement"
-        and any(word in q["question"].lower() for word in ("receiv", "receipt", "grn")),
-        5,
-    )
-    stock = bucket(
-        lambda q: q["category"] == "review_required" and "stock" in q["question"].lower(),
-        4, allow_review=True,
-    )
-    out_of_scope = bucket(
-        lambda q: q["category"] in {"attendance", "camera_ip", "vehicle", "document_party"},
-        4, allow_review=True,
-    )
-
-    selected = purchase + mrs + consumption + grn + stock + out_of_scope
-
-    # Top up from the raw layman-question text file for extra purchase/mrs
-    # phrasing variety if the bank-derived set is short of ~50.
-    if USER_QUESTIONS_TXT.exists():
-        seen_keys = {_quote_normalised(q["question"]) for q in selected}
-        extra_lines = [
-            line.strip() for line in USER_QUESTIONS_TXT.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
-        for line in extra_lines:
-            if len(selected) >= 50:
-                break
-            key = _quote_normalised(line)
-            if key in seen_keys:
-                continue
-            seen_keys.add(key)
-            selected.append({
-                "question": line, "category": "user_purchase_mrs_questions.txt",
-                "occurrence_count": 1, "needs_review": False,
-            })
-
-    return selected[:50]
+    return selected
 
 
 def _expected_unsupported(category: str, question: str) -> bool:
-    # "review_required"+stock and "inventory_movement"+receiv/receipt/grn
-    # were here until 2026-09-23 (fix.md #13): stock and grn are now
-    # supported families, so a question naming them is no longer expected
-    # to be refused by design -- whether it actually passes end to end is
-    # now a genuine measurement, not a foregone "working as intended."
-    if category in {"attendance", "camera_ip", "vehicle", "document_party"}:
-        return True
-    return False
+    # stock and grn are supported families (fix.md #13); a question naming
+    # them is no longer expected to be refused by design -- whether it
+    # actually passes end to end is now a genuine measurement.
+    return category.startswith("out_of_scope")
 
 
 CATALOG_LIMITATION_PHRASES = (

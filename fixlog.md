@@ -483,3 +483,37 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   (already-designed) script from context and re-ran it.
 - **Files:** `data/question_bank_v1.json`, `docs/V1_FREEZE_CRITERIA.md`, `progress.md`. No app code changed.
 - **Tests:** none needed (question-bank data + docs only); JSON validity checked directly.
+
+### Wire the evaluator to the richer question bank (the "still open" note above)
+- **Prompt:** mid-way through the previous task, Tarun reiterated the real goal is generalization
+  ("answer any sort of question for same theme"), not passing specific memorized pairs. Flagged in reply that
+  this is exactly what the freeze criteria's held-out depth bar measures, but that today's 26+16 questions don't
+  count toward it yet since the evaluator reads a different, smaller file. Offered to do the wiring now; Tarun
+  said "yes do it".
+- **Root cause, confirmed by reading the code (not assumed):** `scripts/evaluate_v1_real_questions.py`'s
+  `_select_questions()` read `AutomateQuery/reports/question_bank.json` (101 questions, generic `category` field,
+  keyword-matched into families) with hardcoded low caps (consumption 4, grn 5, no material_lookup bucket at all)
+  -- unrelated to how much real usage those families actually have.
+- **Fixed:** `_select_questions()` now reads `data/question_bank_v1.json` (223 questions) and buckets directly by
+  its `proposed_family` field -- no keyword-matching needed, the family is already tagged. Every one of the 7
+  v1.0 families gets a real cap: material_lookup/consumption/grn/stock/supplier_lookup/mrs 10, purchase 20
+  (kept higher since it's the deepest-tested family and its pool, 84, would otherwise dominate), out_of_scope 8.
+  Selection went 47→81, verified by direct invocation (`Counter` over the real returned list): all 7 families
+  present, zero duplicates. Dropped the `data/user_purchase_mrs_questions.txt` top-up step -- verified first
+  (not assumed) that all 24 of its lines already exist in the new bank, so it was dead code.
+- **One free win found and verified, not just assumed:** `scripts/evaluate_v1_real_questions_live.py` (the
+  live-Oracle variant run on the server for the real Step 6/7 measurement) imports `_select_questions()` from this
+  same module rather than duplicating it -- confirmed by importing it directly and calling `_select_questions()`,
+  which returned the same 81. The live evaluator picked up the fix with no separate edit.
+- **`_expected_unsupported()` updated to match:** the out-of-scope category vocabulary changed from
+  `{attendance, camera_ip, vehicle, document_party}` to the new bank's `out_of_scope_hr`/`out_of_scope_admin`
+  prefix -- a one-line `category.startswith("out_of_scope")` check.
+- **Files:** `scripts/evaluate_v1_real_questions.py`, `docs/V1_FREEZE_CRITERIA.md`, `progress.md`.
+  `scripts/evaluate_v1_real_questions_live.py` unchanged (inherits the fix by import).
+- **Tests:** no dedicated test file for this evaluator (not in CLAUDE.md §7's core-suite list; requires Ollama).
+  Verified instead by direct invocation of `_select_questions()`/`_expected_unsupported()` through the real
+  module (family counts, dedup, shape) and by importing the live sibling to confirm reuse. 11 core suites
+  **326/326**, unaffected (no shared code path was touched).
+- **Still open, unchanged by this fix:** the depth-bar's held-out-half methodology (partition each family so half
+  is never used to tune prompts/catalog) is a separate, not-yet-built step -- this fix makes the richer bank
+  reachable by the evaluator; it doesn't yet define or enforce a train/test split within it.

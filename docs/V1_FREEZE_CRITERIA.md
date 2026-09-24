@@ -61,12 +61,17 @@ in the held-out set blocks freeze regardless of the pass-rate number.
   (never wired into the evaluator's selection), plus 26 new questions Claude generated, grounded
   against real Oracle entities, and computed answers for directly (bypassing the V1/Qwen pipeline
   entirely, so it's an independent check) — **all 26 confirmed correct by the client**. Both added
-  to `data/question_bank_v1.json` (now 223 questions). **Still open:** the evaluator's
-  `_select_questions()` (`scripts/evaluate_v1_real_questions.py`) reads from the smaller
-  `AutomateQuery/reports/question_bank.json`, not this richer file, and its per-family caps
-  (consumption 4, grn 5, no material_lookup bucket at all) predate this work — wiring it to draw
-  from `data/question_bank_v1.json` instead is what actually makes this count toward the depth-bar
-  measurement below, not just sit in a JSON file.
+  to `data/question_bank_v1.json` (now 223 questions). ~~Still open: wire the evaluator to this
+  bank~~ — ✅ done 2026-09-24: `scripts/evaluate_v1_real_questions.py`'s `_select_questions()` now
+  reads `data/question_bank_v1.json` directly (was the smaller `AutomateQuery/reports/question_bank.json`)
+  and buckets by its `proposed_family` field instead of keyword-matching a generic `category`. Every
+  one of the 7 v1.0 families now has a real per-family cap (material_lookup/consumption/grn/stock/
+  supplier_lookup/mrs 10, purchase 20, out_of_scope 8) — material_lookup had no bucket at all before
+  today. Selection went 47→81 questions. `scripts/evaluate_v1_real_questions_live.py` (the live-Oracle
+  variant run on the server) imports `_select_questions()` from this module, so it picked up the fix
+  with no separate change needed. **Still open:** this only makes the bank *selectable* — the depth-bar's
+  held-out-half methodology (line below), partitioning each family so half is never used to tune
+  prompts/catalog, is a separate, not-yet-built step.
 - ~~3 golden (question, verified-correct-answer) pairs per family~~ — ✅ done 2026-09-24: 26 pairs
   across all 7 families (material_lookup 3, consumption 4, grn 5, stock 3, purchase 7, supplier_lookup
   2, mrs 2), client-verified. The verified **answers** (real business figures) are deliberately kept

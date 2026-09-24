@@ -335,3 +335,15 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   Still open: wire `scripts/evaluate_v1_real_questions.py`'s `_select_questions()` to actually draw from this
   richer bank instead of the smaller `AutomateQuery/reports/question_bank.json` it currently reads -- otherwise
   none of this counts toward the depth-bar measurement, it just sits in a JSON file.
+- 2026-09-24 — that "still open" wiring closed same day (Tarun's explicit go-ahead). `_select_questions()`
+  now reads `data/question_bank_v1.json` and buckets directly by its `proposed_family` field (no more
+  keyword-matching a generic `category`). Every one of the 7 v1.0 families gets a real per-family cap
+  (material_lookup/consumption/grn/stock/supplier_lookup/mrs 10, purchase 20, out_of_scope 8) --
+  material_lookup had zero bucket at all before today. Selection went 47→81. Dropped the
+  `data/user_purchase_mrs_questions.txt` top-up: verified all 24 of its lines are already present in the
+  new bank, so it was a no-op. `scripts/evaluate_v1_real_questions_live.py` imports `_select_questions()`
+  from this module, so the live-Oracle evaluator on the server picked up the fix with no separate edit.
+  326/326 across the 11 core suites (this script isn't one of them -- no dedicated test file; verified by
+  direct invocation instead). Still open, separately: the depth-bar's held-out-half methodology (partition
+  each family so half is never used to tune prompts/catalog) is not yet built -- selection is fixed, the
+  train/test split is a distinct next step.

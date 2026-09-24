@@ -364,6 +364,20 @@ class QueryPlanExtractorTests(unittest.TestCase):
         self.assertIn("Always set business_subject", flat)
         self.assertIn("A filtered entity is not also a dimension", flat)
 
+    def test_system_prompt_teaches_stock_quantity_is_aggregate_not_detail(self) -> None:
+        # 2026-09-24 held-out eval: stock questions ("what is the stock of X")
+        # were consistently extracted as operation=detail, which the stock
+        # family's capability never allows (aggregate-only by design --
+        # ITEMSTOCK is 1-31 rows/item). Verified against the real model
+        # (fixlog.md) that this sentence fixes 5/6 real failing stock
+        # questions without regressing the mrs/purchase PASS_PIPELINE cases.
+        flat = " ".join(SYSTEM_PROMPT.split())
+        self.assertIn("current quantity/amount", flat)
+        self.assertIn("is a running total across underlying records", flat)
+        # The carve-out that keeps an identifier-based detail lookup (e.g. a
+        # specific MRS number) from being pulled into that same rule.
+        self.assertIn("does not apply when the question names a record by its own unique identifier", flat)
+
     def test_unused_month_dimension_is_corrected(self) -> None:
         question = "Show purchase value in the last 6 months"
         invalid = plan_json(

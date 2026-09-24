@@ -438,6 +438,52 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - **Where:** `app/query_plan_extractor.py` (entity/filter concept recognition for pending/approval/hold), not
   `app/schema_grounding.py` or `app/grounded_sql_validator.py` (both unchanged by this eval run).
 
+## 15. ✅ Stock questions extracted as operation=detail, which stock's capability never allows
+
+- **Found by:** the first depth-bar held-out measurement (`--split test`, live Oracle + qwen3:14b, 2026-09-24).
+  stock scored 0/10 -- every failure was `CAPABILITY_FAILURE: domain='stock': Operation 'detail' is not supported
+  for the V1 stock family.` for real phrasings like "show stock for yarn", "stock availability for keyboard",
+  "do we have yarn in stock".
+- **Root cause:** `app/resources/v1_query_capabilities.json`'s stock family is deliberately `operations:
+  ["aggregate"]` only (ITEMSTOCK is 1-31 rows per item -- per-mill/HOD -- so a non-aggregated read of one row is
+  not a correct answer; only `SUM` per item matches the ERP's own `GETTOTALSTOCK`). That restriction is correct
+  and untouched. The bug is upstream: `query_plan_extractor.py`'s `SYSTEM_PROMPT` never told the model that a
+  current-quantity question is `aggregate` even when it names one item and sounds like "one fact" -- so it
+  consistently chose `detail`.
+- **Fixed:** added one sentence to `SYSTEM_PROMPT` -- "a question asking for a total or current quantity/amount
+  ... is operation=aggregate ... even when it names exactly one item ... because the quantity itself is a
+  running total across underlying records, not a value stored in any single one of them."
+- **Real prompt-tuning instability, verified not guessed (3 rounds, via an SSH tunnel to the server's real
+  qwen3:14b, temperature=0.0, 2-3 repeats per question to separate signal from the model-serving noise already
+  documented in fix.md #14):**
+  - Round 1 (bare sentence above): fixed 6/6 real failing stock questions, but flipped
+    `"what is MRS number 830216"` (structurally identical to the real `PASS_PIPELINE` case "MRS details for MRS
+    number 890330") from `detail` to `lookup` -- a regression against one of only 3 real passes in the whole run.
+  - Round 2 (added a carve-out: "this does not apply when the question names a record by its own unique
+    identifier, such as one specific MRS number"): fixed the MRS regression and kept 5/6 stock fixes, but
+    flipped a self-invented probe question ("last purchase rate of item code A12203362") into a
+    `QueryPlanValidationError` (`item_identifier` dimension not affecting output). Narrowing the carve-out's
+    example list did not change this.
+  - Round 3 (dropped the general rule for a stock-domain-named version): fixed all 6/6 stock questions and the
+    round-2 probe regression, but flipped **both** real non-tiny `PASS_PIPELINE` cases (mrs-by-number *and*
+    "purchase order for item code C02000094", the actual eval question) from `detail` to `lookup` -- unacceptable.
+  - **Shipped round 2's wording.** It is the only one of the three that fixes 5 of 6 real stock failures while
+    leaving both real, non-tiny `PASS_PIPELINE` cases from this run untouched. Its only known casualty is the
+    self-invented probe question above, which is not part of any tracked question bank. `"do we have yarn in
+    stock"` stays unfixed (now `lookup` instead of `detail` -- still a `CAPABILITY_FAILURE`, just a different
+    one; not a regression, since it was already failing).
+- **Not chased further:** a 4th wording round, on the theory that two consecutive rounds each trading one
+  regression for another (fix.md #14's own threshold for "stop tweaking, reconsider") means the model's
+  detail/lookup boundary for identifier-and-code-bearing questions is genuinely fuzzy at the prompt-wording
+  level, not something a 5th sentence reliably resolves. If this needs to be more robust, the next step is
+  probably deterministic (grounding-layer correction for the stock family specifically), not another prompt
+  sentence -- flagged, not attempted, since it would touch more of the pipeline than this fix's scope.
+- **Where:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT` only). `app/v1_capabilities.py` and
+  `app/resources/v1_query_capabilities.json` unchanged -- confirmed correct as designed, not the bug.
+- **Tests:** 1 new in `test_query_plan_extractor.py` (asserts the new sentence and its carve-out are present in
+  `SYSTEM_PROMPT`, matching the existing prompt-content-assertion pattern -- prompt effectiveness itself is
+  model-verified above, not unit-testable). 11 core suites **327/327**.
+
 - **Closed 2026-09-23 (same day, continued).** Traced the actual root cause by reading `app/entity_resolution.py`
   directly rather than guessing further: `resolve_entity` forces **any** entity concept outside the 5-token
   identity-verification whitelist (`supplier`/`supplier_name`/`supplier_identifier`/`material`/`item_identifier`)

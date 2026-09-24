@@ -368,3 +368,9 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   before spending further effort. Own mistake during this task, disclosed immediately: a bad `sed` redaction
   pattern let the real `ORACLE_PASSWORD` (read-only account) print in plaintext in chat; flagged to Tarun with
   a rotation recommendation.
+- 2026-09-24 — closed fix.md #15: stock's 0/10 was one root cause (model extracts `operation=detail` for
+  "what is the stock of X"; stock's capability is deliberately aggregate-only). One `SYSTEM_PROMPT` sentence,
+  verified against the server's real qwen3:14b (not assumed) through 3 wording rounds -- the first two each
+  fixed the target but regressed a real `PASS_PIPELINE` case, so neither shipped. Round 2's wording shipped:
+  fixes 5/6 real failing stock questions, zero regression on either real non-tiny `PASS_PIPELINE` case from
+  today's run. Full round-by-round detail in fix.md #15. 1 new test, 11 core suites 327/327.

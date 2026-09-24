@@ -587,3 +587,37 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** none changed yet -- this entry records the measurement result; `progress.md` and
   `docs/V1_FREEZE_CRITERIA.md` updated with the real numbers in the same commit.
 - **Tests:** N/A (a measurement run, not a code change). 11 core suites unaffected (nothing in `app/` touched).
+
+### Fix the stock cluster (fix.md #15) -- first of the diagnosed clusters
+- **Prompt:** same "complete it ... thoroughly" authorization; started with stock since it was the one cluster
+  already diagnosed as one clean root cause, independent of the open ambiguous-refusal methodology question.
+- **Diagnosis confirmed by reading code, not assumed:** `app/v1_capabilities.py`'s `_OTHER_UNSUPPORTED_DOMAINS`
+  name reads misleadingly (sounds like "these domains are unsupported"), but it's only a routing guard for the
+  lookup-shortcut, not a rejection list -- stock/grn ARE properly routed to their own families a few lines
+  down. Checked `v1_query_capabilities.json` directly: stock really is `operations: ["aggregate"]` only, by
+  design, already reasoned through and documented (ITEMSTOCK 1-31 rows/item, matches ERP's `GETTOTALSTOCK`) --
+  not the bug. The bug is `query_plan_extractor.py` never teaching the model that a current-quantity question
+  is `aggregate` even for one named item.
+- **Verified against the real model, not just contract tests:** the existing test suite mocks the model's JSON
+  response, so it can't catch a prompt-wording regression at all -- opened an SSH tunnel to the server's real
+  Ollama (`172.16.90.1:11434`, reached through the app server -- learned the hard way today that the server's
+  own `localhost:11434` is a different, decoy instance with no qwen3:14b) and ran the actual failing questions
+  from today's eval against the live model directly.
+- **Real prompt instability, not glossed over:** first wording fixed all 6 tested stock questions but broke a
+  real `PASS_PIPELINE` case (an MRS-by-number question flipped `detail`->`lookup`) -- confirmed as a genuine,
+  reproducible regression (3/3 vs 3/3 across repeats, temperature=0.0) before reacting to it, not assumed from
+  one run. Added a carve-out, which fixed the MRS case but broke a different, self-invented probe question.
+  Tried a third variant (stock-domain-named instead of a general quantity rule) which fixed everything tested
+  so far but then broke **both** real non-tiny `PASS_PIPELINE` cases at once -- worse, not better. Stopped
+  iterating at that point (matches fix.md #14's own "two rounds of refinement" threshold for reconsidering
+  rather than continuing to tweak blindly) and shipped the second variant: the only one of the three that
+  doesn't touch either real `PASS_PIPELINE` case, at the cost of one untracked, self-invented probe question
+  staying broken.
+- **Result:** 5 of 6 real failing stock questions now correctly extract `operation=aggregate`. One
+  ("do we have yarn in stock") stays wrong -- differently wrong (`lookup` instead of `detail`), not a new
+  regression, since it was already a `CAPABILITY_FAILURE` either way.
+- **Files:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`), `scripts/test_query_plan_extractor.py` (+1 test),
+  `fix.md`, `progress.md`.
+- **Tests:** 1 new (asserts the new sentence and carve-out are present in `SYSTEM_PROMPT` -- prompt
+  *effectiveness* is verified above against the real model, not something a mocked unit test can check). 11
+  core suites **327/327**.

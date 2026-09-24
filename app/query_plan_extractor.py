@@ -58,6 +58,12 @@ records (a rejection reason, an approval state, a due date, whether something is
 match more than one record -- i.e. whenever no single uniquely-identifying value (such as one specific MRS number)
 narrows it to exactly one row. Do not use unknown for this kind of question just because it asks for a status or a
 single field rather than a list.
+A question asking for a total or current quantity/amount (how much, how many, current stock, balance, available
+quantity) is different from asking for one field of a record: it is operation=aggregate with that measure's
+aggregation set to sum, even when it names exactly one item and sounds like it wants a single fact -- never
+detail -- because the quantity itself is a running total across underlying records, not a value stored in any
+single one of them. This does not apply when the question names a record by its own unique identifier (such as
+one specific MRS number): that is still detail regardless of phrasing, exactly as above.
 For "last/latest/recent N" or "first/earliest N" questions (records, not a calendar range), use operation=detail with a
 sorting entry on the relevant date concept (descending for last/latest/recent, ascending for first/earliest) and
 limit=N. For the same wording without an explicit N, use operation=detail with that same sorting entry and no limit.

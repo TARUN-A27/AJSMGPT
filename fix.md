@@ -44,7 +44,7 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
 
 47-question totals after Step 3: **PASS_PIPELINE 3** (was 0) · UNSUPPORTED_EXPECTED 24 · ENTITY_RESOLUTION_REJECTION 8 · CAPABILITY_FAILURE 6 · QUERY_PLAN_FAILURE 3 (was 20) · GROUNDING_FAILURE 3. All 3 passes have a grounded join, one entity bind, `FETCH FIRST N ROWS ONLY`. Remaining QPF are all model behaviour (low confidence; undeclared sort field; missing business_subject) — genuine Step 4 evidence now, not validator noise.
 
-## 2. 🟡 Entity resolution rejections (master-data scoping closed; concept vocabulary open)
+## 2. ✅ Entity resolution rejections (master-data scoping closed; concept vocabulary open; fuzzy fallback added 2026-09-24)
 - **Count after Step 3:** 8 × `ENTITY_RESOLUTION_REJECTION`. The prompt vocabulary fix worked: all 8 now use a canonical concept (`material`/`supplier`/`supplier_name`); none use `item`/`vendor` any more. 7 are values absent from the 6-row offline fixture (`mouse`, `dell`, `dell system`, `printer toner`, `yarn`) → recheck on real master data (Step 8). 1 is a model error: `mouse last purchased supplier name?` → `supplier_name: mouse` (mouse is the material).
 - **Original count:** 9 (purchase_analytics 7, supplier_purchase 2)
 - **Reasons:** `Entity '<concept>' requires verified resolution before execution.` on all 9; two also carry dimension/date-justification rejections.
@@ -68,6 +68,27 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
   That's a deliberate change to an intentionally-designed "no fuzzy matching" module (see its own docstring
   rationale) — needs Tarun's sign-off, not a unilateral fix. Until decided, this stays a correct, working, but
   user-unfriendly refusal — acceptable under the freeze criteria's "a refusal is fine" rule, not a wrong answer.
+- **Closed 2026-09-24 — Tarun signed off ("do the fuzzy matching thing").** Added exactly the design flagged
+  above, nothing more: `resolve_entity` now takes an optional `fuzzy_lookup`, tried only when the exact match
+  finds zero rows **and** the source is text-shaped (a code is either right or wrong — no shorthand version of
+  one exists, so codes never get a fuzzy fallback). The fallback still never produces `RESOLVED` by itself, by
+  design: one partial match stays `UNRESOLVED`, just with that match surfaced in `candidates` as a hint instead
+  of a dead end; two or more become `AMBIGUOUS`, identical to two exact matches. New `oracle_entity_lookup_fuzzy`
+  in `app/entity_resolution.py`: same bind-parameterized shape as the exact lookup, `LIKE '%' || :value || '%'
+  ESCAPE '\'` with `%`/`_`/`\` in the searched text escaped first (so a real name containing those characters
+  isn't misread as wildcards), capped at 10 candidates in Python (a "did you mean" list only makes sense short;
+  `run_safe_select`'s own row cap is 100). Wired as the production default in
+  `app/nlp_execution.py:_default_resolve_entities`. Also had to extend the rejection-message builder there — it
+  previously only appended `Candidates: ...` for `AMBIGUOUS`, so a single fuzzy hit on an `UNRESOLVED` entity
+  would have been silently dropped; now any candidates present are shown regardless of status.
+- **Files:** `app/entity_resolution.py`, `app/nlp_execution.py`, `scripts/test_entity_resolution.py`,
+  `scripts/test_nlp_execution.py`.
+- **Tests:** 7 new tests in `test_entity_resolution.py` (single-hit hint, multi-hit ambiguous, no-hit, never for a
+  code-shaped source, never invoked once the exact match already succeeded, skipped entirely when no
+  `fuzzy_lookup` is passed, and `oracle_entity_lookup_fuzzy`'s own escaping/capping), 1 new test in
+  `test_nlp_execution.py` (the rejection message names a fuzzy hint). Every existing test still passes unchanged
+  (`fuzzy_lookup` defaults to `None`, so every 2-argument call site keeps today's exact-match-only behaviour with
+  no code changes) — 11 core suites **326/326**.
 
 ## 3. ✅ MRS `lookup`/`unknown` operation — re-diagnosed 2026-09-23, fixed 2026-09-24
 - **Count (14b re-run):** 4 × `CAPABILITY_FAILURE`, all `domain=mrs`: `Mrs rejected reason?` (`operation=lookup`),

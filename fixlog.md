@@ -422,3 +422,25 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `app/query_plan_extractor.py`, `scripts/v1_real_question_eval_results.json`, `fix.md`, `progress.md`,
   `CLAUDE.md`.
 - **Tests:** 11 core suites **318/318**, unaffected (prompt text only).
+
+### Add fuzzy entity-resolution fallback (fix.md #2) — Tarun's sign-off
+- **Prompt:** "do the fuzzing match thing" — explicit sign-off on the exact open product question fix.md #2
+  recorded yesterday: should an exact-match miss fall back to a CONTAINS search, still never auto-selecting a
+  guess?
+- **Done:** built exactly the design already flagged, nothing more. `resolve_entity` gained an optional
+  `fuzzy_lookup`, tried only when the exact match finds zero rows **and** the source is text-shaped (a code has
+  no shorthand version, so codes never get one). It still never produces `RESOLVED` on its own: one partial match
+  stays `UNRESOLVED` with that match surfaced in `candidates` as a hint; two or more become `AMBIGUOUS`, exactly
+  like two exact matches. New `oracle_entity_lookup_fuzzy` (`app/entity_resolution.py`): bind-parameterized
+  `LIKE '%' || :value || '%' ESCAPE '\'`, with `%`/`_`/`\` in the searched text escaped first so a real name
+  containing those characters isn't misread as wildcards, capped at 10 results in Python. Wired as the
+  production default in `_default_resolve_entities`. Caught and fixed one thing along the way by actually
+  reading the consuming code rather than assuming: the rejection-message builder in `app/nlp_execution.py` only
+  ever appended `Candidates: ...` for `AMBIGUOUS` status, so a single fuzzy hit on an `UNRESOLVED` entity would
+  have been silently invisible to the user — widened that condition to any status with candidates present.
+- **Verified against real Oracle on the server, not just mocks**, since the SQL shape itself (`LIKE`/`ESCAPE`/
+  string concatenation) was new and had never actually run against the live database. [continued after sync]
+- **Files:** `app/entity_resolution.py`, `app/nlp_execution.py`, `scripts/test_entity_resolution.py`,
+  `scripts/test_nlp_execution.py`, `fix.md`, `progress.md`.
+- **Tests:** 7 new in `test_entity_resolution.py`, 1 new in `test_nlp_execution.py`. Every existing test
+  unchanged (`fuzzy_lookup` defaults to `None`). 11 core suites **326/326**.

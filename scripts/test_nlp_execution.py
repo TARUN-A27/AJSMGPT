@@ -379,6 +379,26 @@ class NLPExecutionTests(unittest.TestCase):
         # P4: the clarification names the verified candidates so the user can pick.
         self.assertIn("Candidates: ABC Textiles; ABC Trading Co.", "; ".join(ctx.exception.response.ambiguities))
 
+    def test_unresolved_entity_with_a_fuzzy_hint_still_names_the_candidate(self) -> None:
+        # fix.md #2: a single fuzzy-fallback match stays UNRESOLVED (never
+        # auto-picked) but should still make the refusal actionable instead
+        # of a dead end, the same as AMBIGUOUS's candidates already do.
+        plan = self._one_entity_plan()
+        runner = RecordingRunner()
+        resolve_entities = lambda p: p.model_copy(update={"entities": [
+            EntityReference(
+                concept="supplier", original_value="galaxy", status=EntityStatus.UNRESOLVED,
+                candidates=["THE GALAXY [800968]"],
+            ),
+        ]})
+        with self.assertRaises(ExecutionRejectedError) as ctx:
+            execute_nlp_query(
+                plan.original_question,
+                dependencies=dependencies(plan, "SELECT 1 FROM DUAL", runner, resolve_entities=resolve_entities),
+            )
+        self.assertEqual(runner.calls, [])
+        self.assertIn("Candidates: THE GALAXY [800968].", "; ".join(ctx.exception.response.ambiguities))
+
     def test_resolver_output_overrides_a_model_claimed_resolved_entity(self) -> None:
         # extract_plan hands back an entity the model itself already marked
         # RESOLVED with a fabricated value; the resolver stub represents what

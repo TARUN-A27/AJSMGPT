@@ -16,7 +16,12 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.entity_resolution import oracle_entity_lookup, resolvable_concepts, resolve_plan_entities
+from app.entity_resolution import (
+    oracle_entity_lookup,
+    oracle_entity_lookup_fuzzy,
+    resolvable_concepts,
+    resolve_plan_entities,
+)
 from app.grounded_sql_generator import GroundedSqlResult, generate_grounded_sql
 from app.grounded_sql_validator import GroundedSqlValidationError, validate_grounded_sql
 from app.oracle_client import (
@@ -162,11 +167,12 @@ def _default_resolve_entities(plan: QueryPlan) -> QueryPlan:
 
     This is an identity-verification read, entirely separate from the
     business-execution `runner()` call below: it goes through
-    `oracle_entity_lookup` -> `run_safe_select` directly, never through
+    `oracle_entity_lookup` (and, only when that finds nothing,
+    `oracle_entity_lookup_fuzzy`) -> `run_safe_select` directly, never through
     `deps.runner`, so it can never be counted as, or substitute for, the
     single business-execution call.
     """
-    return resolve_plan_entities(plan, oracle_entity_lookup)
+    return resolve_plan_entities(plan, oracle_entity_lookup, oracle_entity_lookup_fuzzy)
 
 
 @dataclass(frozen=True)
@@ -741,7 +747,9 @@ def execute_nlp_query(
     ambiguities = [item.reason for item in plan.ambiguities if item.blocking]
     unresolved = [
         f"Entity '{item.concept}' requires verified resolution before execution."
-        + (f" Candidates: {'; '.join(item.candidates)}." if item.status is EntityStatus.AMBIGUOUS and item.candidates else "")
+        # A fuzzy-fallback hit can leave a single candidate on an otherwise
+        # UNRESOLVED entity (fix.md #2) -- surface it too, not just AMBIGUOUS's.
+        + (f" Candidates: {'; '.join(item.candidates)}." if item.candidates else "")
         for item in plan.entities
         if item.status in {EntityStatus.UNRESOLVED, EntityStatus.AMBIGUOUS}
     ]

@@ -40,6 +40,21 @@ def fake_lookup(table_rows: dict[tuple[str, str], list[tuple[str, str]]]):
     return lookup
 
 
+def fake_fuzzy_lookup(table_rows: dict[tuple[str, str], list[tuple[str, str]]]):
+    """Same shape as fake_lookup, but CONTAINS instead of exact-equality --
+    the offline stand-in for `oracle_entity_lookup_fuzzy`'s LIKE search."""
+
+    def _normalize(value: str) -> str:
+        return " ".join(value.split()).upper()
+
+    def lookup(source: VerifiedEntitySource, normalized_value: str):
+        rows = table_rows.get((source.table, source.column), [])
+        index = 0 if source.value_shape == "code" else 1
+        return [row for row in rows if normalized_value in _normalize(row[index])]
+
+    return lookup
+
+
 SUPPLIER_ROWS = {
     ("SCM.PARTYMASTER", "PARTYNAME"): [
         ("800967", "Prime Compu Systems"),
@@ -252,6 +267,79 @@ class EntityResolutionTests(unittest.TestCase):
             resolvable_concepts(),
             {"supplier", "supplier_name", "supplier_identifier", "material", "item_identifier"},
         )
+
+    # -- fuzzy fallback (fix.md #2: shorthand real users type, not a bug) ----
+
+    def test_fuzzy_fallback_single_match_stays_unresolved_with_a_hint(self) -> None:
+        # "GALAXY" alone never exact-matches the stored "THE GALAXY" -- the
+        # fuzzy fallback finds it, but a partial match still never becomes
+        # RESOLVED; it only makes the refusal name a real candidate.
+        resolved = resolve_entity(
+            entity("supplier_name", "GALAXY"), fake_lookup(SUPPLIER_ROWS), fake_fuzzy_lookup(SUPPLIER_ROWS)
+        )
+        self.assertEqual(resolved.status, EntityStatus.UNRESOLVED)
+        self.assertIsNone(resolved.selected_value)
+        self.assertEqual(resolved.candidates, ["THE GALAXY [800968]"])
+
+    def test_fuzzy_fallback_multiple_matches_is_ambiguous(self) -> None:
+        # Two real suppliers both contain "PRIME COMPU" -- exactly the same
+        # outcome as two exact matches, just reached via the fuzzy fallback.
+        resolved = resolve_entity(
+            entity("supplier_name", "PRIME COMPU"), fake_lookup(SUPPLIER_ROWS), fake_fuzzy_lookup(SUPPLIER_ROWS)
+        )
+        self.assertEqual(resolved.status, EntityStatus.AMBIGUOUS)
+        self.assertCountEqual(
+            resolved.candidates, ["Prime Compu Systems [800967]", "Prime Compu System Pvt Ltd [800969]"]
+        )
+
+    def test_fuzzy_fallback_no_matches_stays_unresolved_with_no_candidates(self) -> None:
+        resolved = resolve_entity(
+            entity("supplier_name", "NONEXISTENT"), fake_lookup(SUPPLIER_ROWS), fake_fuzzy_lookup(SUPPLIER_ROWS)
+        )
+        self.assertEqual(resolved.status, EntityStatus.UNRESOLVED)
+        self.assertEqual(resolved.candidates, [])
+
+    def test_fuzzy_fallback_never_used_for_a_code_shaped_source(self) -> None:
+        # A code is either right or wrong -- there is no shorthand version of
+        # one, so the fuzzy fallback must not even run for supplier_identifier
+        # / item_identifier, regardless of what it would have found.
+        resolved = resolve_entity(
+            entity("supplier_identifier", "800"), fake_lookup(SUPPLIER_ROWS), fake_fuzzy_lookup(SUPPLIER_ROWS)
+        )
+        self.assertEqual(resolved.status, EntityStatus.UNRESOLVED)
+        self.assertEqual(resolved.candidates, [])
+
+    def test_fuzzy_fallback_not_invoked_when_the_exact_match_already_succeeded(self) -> None:
+        def exploding_fuzzy_lookup(source, normalized_value):
+            raise AssertionError("fuzzy_lookup must not be called when the exact match already succeeded")
+
+        resolved = resolve_entity(
+            entity("supplier_name", "Prime Compu Systems"), fake_lookup(SUPPLIER_ROWS), exploding_fuzzy_lookup
+        )
+        self.assertEqual(resolved.status, EntityStatus.RESOLVED)
+
+    def test_fuzzy_fallback_skipped_entirely_when_not_provided(self) -> None:
+        # Backward compatible: every existing 2-argument call site keeps
+        # today's exact-match-only behaviour with no code changes.
+        resolved = resolve_entity(entity("supplier_name", "GALAXY"), fake_lookup(SUPPLIER_ROWS))
+        self.assertEqual(resolved.status, EntityStatus.UNRESOLVED)
+        self.assertEqual(resolved.candidates, [])
+
+    def test_oracle_entity_lookup_fuzzy_escapes_wildcards_and_caps_results(self) -> None:
+        from unittest.mock import patch
+        from app.entity_resolution import _VERIFIED_SOURCES, _FUZZY_CANDIDATE_LIMIT, oracle_entity_lookup_fuzzy
+        captured = {}
+
+        def fake_run_safe_select(sql, binds):
+            captured["sql"], captured["binds"] = sql, binds
+            return {"rows": [(str(i), f"ITEM {i}") for i in range(_FUZZY_CANDIDATE_LIMIT + 5)]}
+
+        with patch("app.oracle_client.run_safe_select", fake_run_safe_select):
+            rows = oracle_entity_lookup_fuzzy(_VERIFIED_SOURCES["supplier_name"][0], "50% OFF_LOT")
+        self.assertIn("LIKE '%' || :normalized_value || '%' ESCAPE '\\'", captured["sql"])
+        self.assertIn("AND GOODSTYPECODE = 2", captured["sql"])
+        self.assertEqual(captured["binds"], {"normalized_value": "50\\% OFF\\_LOT"})
+        self.assertEqual(len(rows), _FUZZY_CANDIDATE_LIMIT)
 
     # -- multi-entity plan-level resolution -----------------------------------
 

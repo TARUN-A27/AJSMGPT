@@ -19,17 +19,26 @@ must never be confused:
      report query, exactly zero times on failed resolution, exactly once on
      success. This module has no opinion on and no access to that call.
 
-Resolution algorithm (no fuzzy matching, no edit distance, no "closest"
-selection -- see the module docstring rationale in the design notes):
+Resolution algorithm (exact match only decides RESOLVED; no edit distance,
+no "closest" selection ever auto-picks a result):
   - Fetch every verified row whose column value is case/whitespace-normalized
     equal to the (equally normalized) query value.
-  - Zero rows  -> UNRESOLVED (not found; there is no separate NOT_FOUND
-    status -- UNRESOLVED already fails execution closed, see
-    app/query_plan.py's EntityStatus and app/nlp_execution.py's gate).
   - One row    -> RESOLVED, `selected_value` set to the row's own verified
     value (never the user's raw text).
   - >1 rows    -> AMBIGUOUS, `candidates` set to the distinct verified
     values found; execution must still refuse to pick one.
+  - Zero rows  -> for a text-shaped source only (fix.md #2: a code is either
+    right or wrong, there is no shorthand version of one), fall back to one
+    CONTAINS search (`oracle_entity_lookup_fuzzy`) so a refusal can name real
+    candidates instead of being a dead end -- real users type shorthand
+    ("mouse" for a longer real item name) that an exact match correctly
+    never finds. This fallback still never produces RESOLVED by itself: one
+    partial match stays UNRESOLVED with that match surfaced in `candidates`
+    as a hint, two or more become AMBIGUOUS exactly like two exact matches
+    would. Zero fuzzy rows either -> UNRESOLVED with no candidates (not
+    found; there is no separate NOT_FOUND status -- UNRESOLVED already fails
+    execution closed, see app/query_plan.py's EntityStatus and
+    app/nlp_execution.py's gate).
 """
 
 from __future__ import annotations
@@ -127,12 +136,43 @@ Production wiring backs this with one bind-parameterized, read-only SELECT
 """
 
 
-def resolve_entity(entity: EntityReference, lookup: EntityLookup) -> EntityReference:
+def _dedupe_by_code(rows: Sequence[tuple]) -> dict[str, tuple[str, object]]:
+    """One verified row per CODE: two items sharing one name are two
+    materials (407 duplicated ITEM_NAMEs in the live master), so the name
+    alone cannot pick one of them."""
+    by_code: dict[str, tuple[str, object]] = {}
+    for row in rows:
+        code, display = str(row[0]), str(row[1])
+        detail = row[2] if len(row) > 2 else None
+        by_code.setdefault(code, (display, detail))
+    return by_code
+
+
+def _candidate_labels(by_code: dict[str, tuple[str, object]]) -> list[str]:
+    return [
+        f"{display} [{code}]" + (" (obsolete)" if str(detail) == "1" else "")
+        for code, (display, detail) in by_code.items()
+    ]
+
+
+def resolve_entity(
+    entity: EntityReference,
+    lookup: EntityLookup,
+    fuzzy_lookup: EntityLookup | None = None,
+) -> EntityReference:
     """Return a NEW EntityReference with `status`/`selected_value`/`candidates`
     set from a verified lookup -- never from whatever the model already put there.
 
     Any `status`/`selected_value` the model supplied is discarded before
     this runs; only this function may produce RESOLVED or AMBIGUOUS.
+
+    `fuzzy_lookup`, when given, is tried only after the exact match finds
+    nothing, and only for a text-shaped source (a code is either right or
+    wrong; there is no "shorthand" version of one). It never produces
+    RESOLVED by itself: even a single partial match stays UNRESOLVED, just
+    with that match surfaced in `candidates` as a hint, and two or more
+    become AMBIGUOUS exactly like two exact matches would (fix.md #2) --
+    this only turns a dead-end refusal into an actionable one.
     """
     if entity.status is EntityStatus.NOT_REQUIRED:
         return entity
@@ -149,15 +189,20 @@ def resolve_entity(entity: EntityReference, lookup: EntityLookup) -> EntityRefer
     except Exception as exc:
         raise EntityLookupError(f"Verified lookup failed for concept '{entity.concept}'.") from exc
 
-    # One verified row per CODE: two items sharing one name are two
-    # materials (407 duplicated ITEM_NAMEs in the live master), so the name
-    # alone cannot pick one of them.
-    by_code: dict[str, tuple[str, object]] = {}
-    for row in rows:
-        code, display = str(row[0]), str(row[1])
-        detail = row[2] if len(row) > 2 else None
-        by_code.setdefault(code, (display, detail))
+    by_code = _dedupe_by_code(rows)
     if not by_code:
+        if fuzzy_lookup is not None and source.value_shape == "text":
+            try:
+                fuzzy_rows = fuzzy_lookup(source, normalized)
+            except Exception as exc:
+                raise EntityLookupError(f"Verified fuzzy lookup failed for concept '{entity.concept}'.") from exc
+            fuzzy_by_code = _dedupe_by_code(fuzzy_rows)
+            if fuzzy_by_code:
+                return entity.model_copy(update={
+                    "status": EntityStatus.AMBIGUOUS if len(fuzzy_by_code) > 1 else EntityStatus.UNRESOLVED,
+                    "selected_value": None,
+                    "candidates": _candidate_labels(fuzzy_by_code),
+                })
         return entity.model_copy(update={"status": EntityStatus.UNRESOLVED, "selected_value": None, "candidates": []})
     if len(by_code) == 1:
         (display, _detail), = by_code.values()
@@ -170,19 +215,20 @@ def resolve_entity(entity: EntityReference, lookup: EntityLookup) -> EntityRefer
     return entity.model_copy(update={
         "status": EntityStatus.AMBIGUOUS,
         "selected_value": None,
-        "candidates": [
-            f"{display} [{code}]" + (" (obsolete)" if str(detail) == "1" else "")
-            for code, (display, detail) in by_code.items()
-        ],
+        "candidates": _candidate_labels(by_code),
     })
 
 
-def resolve_plan_entities(plan: QueryPlan, lookup: EntityLookup) -> QueryPlan:
+def resolve_plan_entities(
+    plan: QueryPlan,
+    lookup: EntityLookup,
+    fuzzy_lookup: EntityLookup | None = None,
+) -> QueryPlan:
     """Resolve every entity in the plan independently. A plan with no
     entities is returned unchanged (identity, not just an equal copy)."""
     if not plan.entities:
         return plan
-    resolved = [resolve_entity(entity, lookup) for entity in plan.entities]
+    resolved = [resolve_entity(entity, lookup, fuzzy_lookup) for entity in plan.entities]
     return plan.model_copy(update={"entities": resolved})
 
 
@@ -211,3 +257,39 @@ def oracle_entity_lookup(source: VerifiedEntitySource, normalized_value: str) ->
     )
     result = run_safe_select(sql, {"normalized_value": normalized_value})
     return [tuple(str(value) if value is not None else None for value in row) for row in result["rows"]]
+
+
+_FUZZY_CANDIDATE_LIMIT = 10
+
+
+def oracle_entity_lookup_fuzzy(source: VerifiedEntitySource, normalized_value: str) -> list[tuple[str, str]]:
+    """Fallback CONTAINS search, used only when `oracle_entity_lookup`'s exact
+    match finds nothing. Still never lets `resolve_entity` auto-select a
+    result on its own -- see that function's docstring -- this only makes a
+    refusal actionable instead of a dead end when the user typed shorthand
+    (fix.md #2).
+
+    Bind-parameterized exactly like the exact lookup; only the comparison
+    operator differs. Literal '%'/'_' in the searched-for text are escaped so
+    they are not misread as wildcards. Capped at `_FUZZY_CANDIDATE_LIMIT`
+    results in Python -- a "did you mean" list only makes sense short;
+    `run_safe_select`'s own row limit (up to 100) is too wide to present as
+    candidates.
+    """
+    from app.oracle_client import run_safe_select  # local import: no Oracle dependency for offline tests
+
+    identifier_column = "PARTYCODE" if source.table == "SCM.PARTYMASTER" else "ITEM_CODE"
+    display_column = source.column if source.column != identifier_column else f"{source.column} AS DISPLAY_VALUE"
+    select_list = f"{identifier_column}, {display_column}" + (f", {source.detail_column}" if source.detail_column else "")
+    escaped_value = (
+        normalized_value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    )
+    sql = (
+        f"SELECT {select_list} FROM {source.table} "
+        f"WHERE UPPER(TRIM(REGEXP_REPLACE({source.column}, '[[:space:]]+', ' '))) "
+        f"LIKE '%' || :normalized_value || '%' ESCAPE '\\'"
+        + (f" AND {source.scope}" if source.scope else "")
+    )
+    result = run_safe_select(sql, {"normalized_value": escaped_value})
+    rows = [tuple(str(value) if value is not None else None for value in row) for row in result["rows"]]
+    return rows[:_FUZZY_CANDIDATE_LIMIT]

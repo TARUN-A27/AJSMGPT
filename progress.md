@@ -71,9 +71,9 @@ what Step 4 (8b vs 14b) is for.
 
 ### Rough V1 completion
 ```text
-Deterministic layers (2, 4, 5, 7)         ~97%   #4, #7, #10, #12, #13 closed; #2 verified against real Oracle
-                                                  2026-09-24 (correct refusals, not a bug -- fuzzy matching is an
-                                                  open product question)
+Deterministic layers (2, 4, 5, 7)         ~98%   #2, #4, #7, #10, #12, #13 all closed 2026-09-24: #2's fuzzy
+                                                  fallback (Tarun's sign-off) turns a dead-end exact-match refusal
+                                                  into a "did you mean" hint, never auto-selecting a guess
 LLM layers (3, 6)                          ~80%   Step 4: 14b lifts in-scope PASS_PIPELINE 2→5, QPF 4→1. fix.md #3
                                                   closed 2026-09-24: MRS operation-choice prompt fix,
                                                   CAPABILITY_FAILURE 11→6

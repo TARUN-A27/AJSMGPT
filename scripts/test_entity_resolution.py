@@ -238,6 +238,26 @@ class EntityResolutionTests(unittest.TestCase):
         self.assertEqual(resolved.status, EntityStatus.NOT_REQUIRED)
         self.assertEqual(resolved.original_value, "1")
 
+    def test_resolvable_concept_ignores_a_claimed_not_required(self) -> None:
+        # Found via the 2026-09-24 held-out eval ("Last 5 purchase qty of
+        # \"BARCODE SCANNER\""): the model tagged a `material` entity
+        # status=not_required (a violation of its own SYSTEM_PROMPT contract,
+        # which reserves not_required for status/condition concepts, never
+        # supplier/material/item_identifier). The old `is EntityStatus.
+        # NOT_REQUIRED: return entity` short-circuit trusted that claim
+        # anyway, skipping verification entirely -- the entity kept its
+        # unverified original_value with no selected_value and no candidates,
+        # so grounding/SQL generation had nothing to filter on and produced a
+        # query with NO WHERE clause at all: an unfiltered full-table sort of
+        # INVENTORY.PURCHASEORDER that then failed at Oracle execution. This
+        # module's own docstring already promised "any status the model
+        # already put in its JSON is discarded and re-verified from scratch"
+        # -- this concept is exactly the case that promise didn't hold for.
+        claimed_not_required = entity("material", "BARCODE SCANNER", status=EntityStatus.NOT_REQUIRED)
+        resolved = resolve_entity(claimed_not_required, fake_lookup(MATERIAL_ROWS))
+        self.assertEqual(resolved.status, EntityStatus.RESOLVED)
+        self.assertEqual(resolved.selected_value, "BARCODE SCANNER")
+
     def test_compound_condition_concept_without_not_required_fails_closed(self) -> None:
         # mrs_pending/po_pending/mrs_rejected/mrs_approved are never in
         # _VERIFIED_SOURCES (their correctness comes from the catalog's

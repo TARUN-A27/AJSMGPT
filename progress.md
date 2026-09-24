@@ -374,3 +374,11 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   fixed the target but regressed a real `PASS_PIPELINE` case, so neither shipped. Round 2's wording shipped:
   fixes 5/6 real failing stock questions, zero regression on either real non-tiny `PASS_PIPELINE` case from
   today's run. Full round-by-round detail in fix.md #15. 1 new test, 11 core suites 327/327.
+- 2026-09-24 — closed fix.md #16, diagnosing the run's one `SQL_EXECUTION_FAILURE`. Real finding, not a data
+  fluke: a `material` entity the model incorrectly tagged `status=not_required` skipped verification entirely
+  (`entity_resolution.py` trusted the model's self-report, contradicting its own documented contract), so the
+  generated SQL had **no WHERE clause at all** -- an unfiltered read of `INVENTORY.PURCHASEORDER` that then
+  failed at Oracle. The execution-gate that should catch this (`nlp_execution.py:748-758`) was already correct;
+  it just never got the entity, since resolution was skipped upstream. One-line deterministic fix (no prompt
+  change, no live-model verification needed) plus 1 regression test using the exact real question's entity
+  value. 11 core suites 328/328.

@@ -621,3 +621,35 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Tests:** 1 new (asserts the new sentence and carve-out are present in `SYSTEM_PROMPT` -- prompt
   *effectiveness* is verified above against the real model, not something a mocked unit test can check). 11
   core suites **327/327**.
+
+### Diagnose and fix the SQL_EXECUTION_FAILURE (fix.md #16) -- more serious than it looked
+- **Prompt:** same authorization; this was the one item explicitly flagged as "needs a targeted re-run" in the
+  measurement report. Turned out not to need a re-run at all -- the harness's own captured structural fields
+  (`full_query_plan`/`full_sql_result`, never rows/columns/summary, per §3) already had enough to root-cause it
+  without touching Oracle again.
+- **What the generated SQL actually was, and why that's alarming:** `SELECT ... FROM INVENTORY.PURCHASEORDER
+  LEFT JOIN INVENTORY.INVITEMS ... ORDER BY ORDERDATE DESC` -- with `applied_filters: []`. No WHERE clause.
+  The question ("Last 5 purchase qty of \"BARCODE SCANNER\"") clearly names one item; a query that ignores it
+  entirely and sorts the whole table is not a data-shape issue, it's a filter that silently never got applied.
+- **Traced to the real cause, not the Oracle error text (which is deliberately discarded --
+  `_safe_database_error` raises `from None` by design, confirmed by reading `app/oracle_client.py`, not
+  assumed):** the QueryPlan's `material` entity had `status: "not_required"`. Per `query_plan_extractor.py`'s
+  own `SYSTEM_PROMPT`, that status is reserved for status/condition concepts and explicitly forbidden for
+  `material`/`supplier`/`item_identifier` -- the model broke its own contract. `entity_resolution.py`'s
+  `resolve_entity` trusted the claim anyway and returned the entity untouched, no lookup attempted -- directly
+  contradicting its own docstring's promise ("any status the model already put in its JSON is discarded and
+  re-verified from scratch"). Confirmed the downstream fail-closed gate (`nlp_execution.py:748-758`, rejects any
+  `UNRESOLVED`/`AMBIGUOUS` entity) was already correct and would have caught this -- it just never got the
+  chance, because resolution was skipped before reaching it.
+- **This is a real safety-stack gap, not a usability one** -- unlike most of today's other findings (refusals
+  when it should have answered), this let an ungrounded query all the way to Oracle execution undetected.
+  Worth being direct about that distinction when reporting back rather than filing it next to the others.
+- **Fixed with one line**, not a prompt change: `resolve_entity` now only honors `not_required` for concepts
+  outside the 5-item always-verify whitelist (`resolvable_concepts()`). Deterministic, so no live-model
+  verification needed this time -- the unit test alone fully proves it, since correctness depends only on
+  `entity.concept`, never on model wording.
+- **Files:** `app/entity_resolution.py` (1 line), `scripts/test_entity_resolution.py` (+1 test), `fix.md`,
+  `progress.md`.
+- **Tests:** 1 new, using the exact real question's entity value ("BARCODE SCANNER", already in the
+  `MATERIAL_ROWS` fixture) so the regression test reproduces the actual reported case, not a synthetic stand-in.
+  11 core suites **328/328**.

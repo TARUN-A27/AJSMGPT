@@ -174,7 +174,7 @@ def resolve_entity(
     become AMBIGUOUS exactly like two exact matches would (fix.md #2) --
     this only turns a dead-end refusal into an actionable one.
     """
-    if entity.status is EntityStatus.NOT_REQUIRED:
+    if entity.status is EntityStatus.NOT_REQUIRED and entity.concept not in resolvable_concepts():
         return entity
     if not entity.original_value or not entity.original_value.strip():
         return entity.model_copy(update={"status": EntityStatus.UNRESOLVED, "selected_value": None, "candidates": []})

@@ -484,6 +484,40 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   `SYSTEM_PROMPT`, matching the existing prompt-content-assertion pattern -- prompt effectiveness itself is
   model-verified above, not unit-testable). 11 core suites **327/327**.
 
+## 16. ✅ A `material`/`supplier`/`item_identifier` entity tagged `status=not_required` skipped verification entirely
+
+- **Found by:** diagnosing the one `SQL_EXECUTION_FAILURE` from the same held-out run ("Last 5 purchase qty of
+  \"BARCODE SCANNER\""), which the harness recorded with no usable detail (`app/oracle_client.py`'s
+  `_safe_database_error` deliberately raises `from None`, discarding the real Oracle error -- by design, not a
+  harness bug). The captured `full_query_plan`/`full_sql_result` (never printed to chat -- only structural
+  fields, no ERP rows, per §3) showed the real story: the entity `{"concept": "material", "original_value":
+  "BARCODE SCANNER", "status": "not_required"}` produced a generated SQL with **`applied_filters: []` and no
+  WHERE clause at all** -- an unfiltered, date-sorted read of the entire `INVENTORY.PURCHASEORDER` table, which
+  then failed at Oracle execution (most plausibly a timeout on the full sort; the wrapping wasn't preserved
+  enough to be certain, and isn't worth reproducing against production just to confirm a symptom whose cause is
+  already clear).
+- **Root cause:** `query_plan_extractor.py`'s `SYSTEM_PROMPT` explicitly reserves `status=not_required` for
+  status/condition concepts and says the five identity concepts (`supplier`, `supplier_name`,
+  `supplier_identifier`, `material`, `item_identifier`) must never use it -- the model violated its own
+  contract here. `app/entity_resolution.py`'s `resolve_entity` (`if entity.status is EntityStatus.NOT_REQUIRED:
+  return entity`) trusted that self-report unconditionally, contradicting its **own module and function
+  docstrings**, which already promise "any status the model already put in its JSON is discarded and
+  re-verified from scratch." This is the load-bearing fail-closed layer for exactly this kind of thing
+  (`app/nlp_execution.py`'s execution gate rejects any `UNRESOLVED`/`AMBIGUOUS` entity, :748-758) -- it just
+  never got the chance to run, because resolution was skipped, not because it would have failed to catch it.
+- **Fixed:** one line -- `resolve_entity` now only honors a claimed `not_required` when
+  `entity.concept not in resolvable_concepts()`. For the 5 always-verify concepts, the model's self-reported
+  status is now discarded and real resolution always runs, exactly as already documented. Deterministic code
+  fix, not a prompt change -- no live-model verification needed (unlike fix.md #15), since correctness here
+  depends only on `entity.concept`, not on model wording.
+- **Where:** `app/entity_resolution.py` (`resolve_entity`, one line). Nothing else changed --
+  `app/nlp_execution.py`'s gate was already correct; it just needed this entity to actually reach it.
+- **Tests:** 1 new in `test_entity_resolution.py` -- a `material` entity claiming `not_required` with the exact
+  real-world value ("BARCODE SCANNER", already in the `MATERIAL_ROWS` fixture) is now forced through real
+  resolution and comes back `RESOLVED`, not silently passed through unverified. 11 core suites **328/328**.
+- **Not done:** confirming what the real Oracle error actually was (timeout vs. something else) -- not needed
+  to fix or test this; the gap was upstream of execution and is now closed there instead.
+
 - **Closed 2026-09-23 (same day, continued).** Traced the actual root cause by reading `app/entity_resolution.py`
   directly rather than guessing further: `resolve_entity` forces **any** entity concept outside the 5-token
   identity-verification whitelist (`supplier`/`supplier_name`/`supplier_identifier`/`material`/`item_identifier`)

@@ -22,6 +22,8 @@ env vars set before this script runs, e.g. from the shell).
 
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
 import os
 import re
@@ -117,12 +119,39 @@ def _quote_normalised(question: str) -> str:
     return re.sub(r'"[^"]*"', '"X"', question).strip().lower()
 
 
-def _select_questions() -> list[dict]:
+# V1_FREEZE_CRITERIA.md's depth bar requires measuring against a held-out
+# half "never used to tune prompts or catalog." Claude-generated questions
+# (tagged with this exact source, fix.md's golden-pairs task) can't ever be
+# that -- they were written with full visibility into what the catalog
+# supports, so of course they pass. They're reference examples, not blind
+# test data: eligible for "train", never for "test".
+_GENERATED_REFERENCE_SOURCE = ["claude_generated_verified_2026-09-24"]
+
+
+def _is_generated_reference(q: dict) -> bool:
+    return q.get("sources") == _GENERATED_REFERENCE_SOURCE
+
+
+def _held_out_split(question: str) -> str:
+    """Deterministic train/test side for one question, independent of bank
+    size/order/run -- a hash of the question is the single source of truth,
+    so nothing can drift out of sync as the bank grows. Not persisted."""
+    digest = hashlib.sha256(question.strip().lower().encode()).hexdigest()
+    return "test" if int(digest[:2], 16) < 128 else "train"
+
+
+def _select_questions(split: str = "all") -> list[dict]:
     # data/user_purchase_mrs_questions.txt used to be topped up here for extra
     # phrasing variety; verified 2026-09-24 that all 24 of its lines are
     # already present in this bank (it was one of the bank's own sources), so
     # the top-up is now a no-op and was dropped.
     bank = json.loads(QUESTION_BANK.read_text(encoding="utf-8"))["questions"]
+    if split == "test":
+        bank = [q for q in bank if not _is_generated_reference(q) and _held_out_split(q["question"]) == "test"]
+    elif split == "train":
+        bank = [q for q in bank if _is_generated_reference(q) or _held_out_split(q["question"]) == "train"]
+    elif split != "all":
+        raise ValueError(f"unknown split {split!r}, expected 'all', 'train', or 'test'")
 
     def bucket(predicate, limit):
         seen = set()
@@ -347,10 +376,19 @@ def _run_one(question: str) -> dict:
 
 
 def main() -> None:
-    questions = _select_questions()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--split", choices=("all", "train", "test"), default="all",
+        help="'test' = the held-out half for the depth-bar measurement "
+             "(never used to tune prompts/catalog); 'train' = everything "
+             "else; 'all' = today's default, no split applied.",
+    )
+    args = parser.parse_args()
+
+    questions = _select_questions(args.split)
     results = []
-    print(f"Selected {len(questions)} real questions. Ollama: {os.environ['OLLAMA_URL']} "
-          f"model={os.environ['OLLAMA_CHAT_MODEL']}")
+    print(f"Selected {len(questions)} real questions (split={args.split}). "
+          f"Ollama: {os.environ['OLLAMA_URL']} model={os.environ['OLLAMA_CHAT_MODEL']}")
 
     for index, item in enumerate(questions, start=1):
         question = item["question"]

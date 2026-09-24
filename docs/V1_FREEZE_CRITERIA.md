@@ -41,9 +41,16 @@ Purchase/MRS/consumption already have real passes; stock/GRN were only added 202
 unproven on live data beyond the gap-finding that same session did. Blending all families into one
 aggregate number would let a strong established family hide a weak new one, so the bar applies
 **per family** — flag any single family that falls far below 75% rather than averaging it away.
-Still needs a bigger question bank first (`data/question_bank_v1.json` is short ~40 questions
-across consumption/GRN/material-lookup). Once enough exist, hold back roughly half of each family
-as a test set never used to tune prompts or catalog, and measure against *that* half.
+~~Still needs a bigger question bank first~~ — ✅ done (line below). ~~Hold back roughly half of
+each family as a test set never used to tune prompts or catalog~~ — ✅ mechanism built 2026-09-24:
+`scripts/evaluate_v1_real_questions.py`'s `_select_questions(split=...)` now supports `"train"` /
+`"test"` / `"all"`. `"test"` is a deterministic hash of each question's own text (stable across runs,
+no persisted field to drift out of sync), **with every Claude-generated golden-pair question forced
+into `"train"`** — those were written with full visibility into what the catalog supports, so they
+can never count as blind held-out data. Run with `--split test`. **Not yet done: actually running
+it.** That's the next step, and two of the smaller pools end up thin on the test side purely from
+small-N: material_lookup (2 test / 1 train after dedup) and consumption (2 test / 10 train) — real
+per-family pass/fail will be noisy for those two until the bank grows more, not a code defect.
 
 **Non-negotiable regardless of the number: zero wrong answers — confirmed as-is, not loosened.**
 A refusal is acceptable — it's the system working as designed. A confidently wrong number is not,
@@ -69,9 +76,7 @@ in the held-out set blocks freeze regardless of the pass-rate number.
   supplier_lookup/mrs 10, purchase 20, out_of_scope 8) — material_lookup had no bucket at all before
   today. Selection went 47→81 questions. `scripts/evaluate_v1_real_questions_live.py` (the live-Oracle
   variant run on the server) imports `_select_questions()` from this module, so it picked up the fix
-  with no separate change needed. **Still open:** this only makes the bank *selectable* — the depth-bar's
-  held-out-half methodology (line below), partitioning each family so half is never used to tune
-  prompts/catalog, is a separate, not-yet-built step.
+  with no separate change needed. The held-out train/test split (line below) was built the same day.
 - ~~3 golden (question, verified-correct-answer) pairs per family~~ — ✅ done 2026-09-24: 26 pairs
   across all 7 families (material_lookup 3, consumption 4, grn 5, stock 3, purchase 7, supplier_lookup
   2, mrs 2), client-verified. The verified **answers** (real business figures) are deliberately kept
@@ -83,5 +88,7 @@ in the held-out set blocks freeze regardless of the pass-rate number.
 - Zero wrong answers: **confirmed as-is**, not loosened.
 - Attendance: **deferred to v1.1**, not in v1.0 coverage.
 
-Nothing left to decide here — the remaining work is the question bank (mechanical, on Tarun) and
-then the measurement itself (on Claude, once the bank exists).
+Nothing left to decide here. The question bank and the split mechanism are both done 2026-09-24;
+the only remaining step is actually running `--split test` (offline needs local Ollama, §9 — laptop
+run needs an explicit ask; the live-Oracle variant needs to run on the server) and reporting the
+per-family pass rate against the 75% bar.

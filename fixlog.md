@@ -517,3 +517,32 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Still open, unchanged by this fix:** the depth-bar's held-out-half methodology (partition each family so half
   is never used to tune prompts/catalog) is a separate, not-yet-built step -- this fix makes the richer bank
   reachable by the evaluator; it doesn't yet define or enforce a train/test split within it.
+
+### Build the held-out train/test split (continuing the same freeze-criteria work)
+- **Prompt:** "yea continue working" -- no new task named, so picked up the most directly-connected open item:
+  the previous fixlog entry's own "still open" line, and V1_FREEZE_CRITERIA.md's closing sentence that the
+  measurement mechanism (not the ERP-semantics decisions in fix.md #9, which are Tarun's, and correctly still
+  blocked) is "on Claude." Checked `fix.md` directly first rather than trusting the pre-compaction summary --
+  confirmed every numbered item there is already ✅ except #9's remainder, which explicitly needs a decision or
+  server access, so nothing else was actionable right now without asking.
+- **Built:** `_select_questions(split="all"|"train"|"test")` in `scripts/evaluate_v1_real_questions.py`.
+  `"test"` membership is `hashlib.sha256` of the question's own normalized text (stable across runs and bank
+  growth, nothing persisted to go stale) with one explicit judgment call: every question sourced only from
+  `claude_generated_verified_2026-09-24` (the 26 golden-pair questions) is forced into `"train"`, never `"test"`
+  -- they were written with full visibility into what the catalog supports, so letting them count as blind
+  held-out data would be measuring nothing. Flagging this call explicitly in case Tarun wants it done differently.
+  `split="all"` is the existing default, unchanged, so nothing that already runs today changed behavior.
+  Added a `--split` CLI flag to both `evaluate_v1_real_questions.py` and `evaluate_v1_real_questions_live.py`.
+- **Verified, not assumed:** direct invocation of all three split values -- 0 question overlap between train and
+  test, 0 of the 26 generated questions leaked into test, `--help` exits cleanly without touching Ollama. Checked
+  the actual per-family counts: two families are thin on the test side from small-N coin-flip variance alone
+  (material_lookup 2, consumption 2 of their small non-generated pools) -- recorded as a real limitation in
+  V1_FREEZE_CRITERIA.md, not silently hidden.
+- **Deliberately not done:** actually running `--split test`. That needs a local Ollama call (CLAUDE.md §9: "do
+  not run Ollama unless explicitly asked") for the offline variant, or the server + real Oracle for the live
+  variant -- a live measurement result is what decides freeze readiness, so running it deserves an explicit
+  go-ahead rather than a proactive laptop run.
+- **Files:** `scripts/evaluate_v1_real_questions.py`, `scripts/evaluate_v1_real_questions_live.py`,
+  `docs/V1_FREEZE_CRITERIA.md`, `progress.md`.
+- **Tests:** same as above -- no dedicated test file for either evaluator script; verified by direct invocation
+  (split disjointness, generated-question exclusion, CLI smoke test). 11 core suites **326/326**, unaffected.

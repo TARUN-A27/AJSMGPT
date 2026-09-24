@@ -33,6 +33,7 @@ app.oracle_client reads it).
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -213,9 +214,18 @@ def _run_one(question: str) -> dict:
 
 
 def main() -> None:
-    questions = _select_questions()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--split", choices=("all", "train", "test"), default="all",
+        help="'test' = the held-out half for the depth-bar measurement "
+             "(never used to tune prompts/catalog); 'train' = everything "
+             "else; 'all' = today's default, no split applied.",
+    )
+    args = parser.parse_args()
+
+    questions = _select_questions(args.split)
     results = []
-    print(f"LIVE ORACLE RUN. Selected {len(questions)} real questions. "
+    print(f"LIVE ORACLE RUN. Selected {len(questions)} real questions (split={args.split}). "
           f"Ollama: {os.environ['OLLAMA_URL']} model={os.environ['OLLAMA_CHAT_MODEL']}")
     print("Entity resolution and execution are REAL Oracle calls (ajsmgpt_ro, read-only).")
 

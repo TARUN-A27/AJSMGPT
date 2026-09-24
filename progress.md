@@ -344,6 +344,14 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   new bank, so it was a no-op. `scripts/evaluate_v1_real_questions_live.py` imports `_select_questions()`
   from this module, so the live-Oracle evaluator on the server picked up the fix with no separate edit.
   326/326 across the 11 core suites (this script isn't one of them -- no dedicated test file; verified by
-  direct invocation instead). Still open, separately: the depth-bar's held-out-half methodology (partition
-  each family so half is never used to tune prompts/catalog) is not yet built -- selection is fixed, the
-  train/test split is a distinct next step.
+  direct invocation instead).
+- 2026-09-24 — that held-out-half split, built same day ("continue working"). `_select_questions(split=...)`
+  takes `"all"` (unchanged default) / `"train"` / `"test"`. `"test"` membership is a deterministic hash of the
+  question's own text (stable across runs, nothing persisted to drift), with every Claude-generated golden-pair
+  question forced into `"train"` -- they were written with full visibility into the catalog, so they can't be
+  blind test data. `--split test` CLI flag added to both the offline and live evaluators (the live one inherits
+  `_select_questions` by import, same as the earlier fix). Verified by direct invocation: 0 overlap between the
+  two splits, 0 of the 26 generated questions leaked into `test`. Two families end up thin on the test side from
+  small-N alone (material_lookup 2, consumption 2) -- flagged in V1_FREEZE_CRITERIA.md, not a code defect.
+  326/326 core suites. Still open: actually running `--split test` and reporting the per-family pass rate --
+  the mechanism is done, the measurement run itself hasn't happened yet (needs Ollama, gated by CLAUDE.md §9).

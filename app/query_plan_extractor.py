@@ -87,6 +87,10 @@ item_identifier, set status to "not_required" -- never "unresolved" or "resolved
 guaranteed directly by the SQL condition generated for it, not by a separate identity lookup; keep the spoken value
 in original_value (or "true" if the concept word itself is the whole condition). Represent such a condition as
 exactly one entity, never also as a filter with the same meaning.
+An approval-stage word (store officer, internal audit, JMD, or similar) that names WHERE a status applies, in the
+same clause as that status word, is part of that same entity, not a separate one -- e.g. "approval pending at
+Store officer" is one entity with concept="pending at store officer", never two entities for "pending" and
+"Store officer" separately.
 A question can name both a real supplier/material AND a status/approval condition at once (e.g. "approved MRS for
 keyboard" names both "approved" and the material "keyboard") -- these are two independent entities. Only the
 status/approval/identifier entity gets status="not_required"; a named supplier or material is still exactly one of

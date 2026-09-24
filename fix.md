@@ -518,6 +518,40 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
 - **Not done:** confirming what the real Oracle error actually was (timeout vs. something else) -- not needed
   to fix or test this; the gap was upstream of execution and is now closed there instead.
 
+## 17. 🟡 Approval-stage word split from its status word into a second entity (mrs family) -- one of two fixed
+
+- **Found by:** the same held-out run, diagnosed by a background agent then independently verified against the
+  real model (not trusted on the agent's word alone). "list out material approval pending at Store officer?"
+  and "list out material hold at Store officer?" both `GROUNDING_FAILURE`'d with "No verified V1 column
+  supports this required concept" repeated -- suspicious, since `mrs_ready_for_approval`'s alias "store officer
+  pending" already exists in the catalog for exactly the first question's concept (added 2026-09-23, per fix.md
+  #4/CLAUDE.md §6). Confirmed by extracting both questions directly: the model produced **two entities**
+  ("pending"/"hold" and "Store officer" separately) instead of one, so grounding never even got a single
+  string to try against the existing alias.
+- **This is a recurrence of a residual fix.md #14 already flagged and left unfixed** ("the model still
+  sometimes splits the status phrase into two entities... flagged there as known, lower-priority, not yet
+  fixed") -- not a new class of bug, fresh evidence for an old one. The prompt already said "never split one
+  such phrase into more than one entity" with an example ("pending at store officer") that exactly matches this
+  shape, and the model still split it -- the existing instruction alone wasn't reliable enough.
+- **Fixed (partially):** added one sentence naming the specific pattern -- an approval-stage word (store
+  officer, internal audit, JMD) co-occurring with a status word in the same clause is part of that same entity.
+  Verified against the real model, 2 repeats: **"approval pending at Store officer" now correctly fuses into
+  one entity** (`concept="pending at store officer"`, matching the existing alias). Zero regressions across a
+  battery of prior fixes (fix.md #15's stock cases, fix.md #16's MRS-number/purchase-item-code, "approved MRS
+  for keyboard" correctly keeping its two genuinely-independent entities).
+- **Not fixed: "hold at Store officer" still splits into two entities, unchanged by this edit.** Root cause is
+  different from the pending case: `mrs_hold_flag`'s only aliases are `["mrs hold", "hold", "on hold"]` -- there
+  is no stage-qualified alias for hold at all, because `HOLDINGSTATUS` (`INVENTORY.MRS_TEMP`) is a single flag
+  with no evidence it's tracked per-approval-stage in the data. Fusing the entity string wouldn't fix grounding
+  here even if the model did it, because there's nothing in the catalog to fuse it to -- this needs a decision
+  (does the data even support "on hold, specifically at the store-officer stage" as a distinct condition, or
+  should "at Store officer" just be dropped as non-restrictive for hold questions?), not another prompt
+  sentence. Left open rather than iterating further on wording alone -- matches the same "stop after a couple
+  of rounds, don't force it" judgment as fix.md #15.
+- **Where:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT` only).
+- **Tests:** 1 new (asserts the new sentence is present in `SYSTEM_PROMPT`; effectiveness verified live above).
+  11 core suites **328/328**.
+
 - **Closed 2026-09-23 (same day, continued).** Traced the actual root cause by reading `app/entity_resolution.py`
   directly rather than guessing further: `resolve_entity` forces **any** entity concept outside the 5-token
   identity-verification whitelist (`supplier`/`supplier_name`/`supplier_identifier`/`material`/`item_identifier`)

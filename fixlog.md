@@ -653,3 +653,30 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Tests:** 1 new, using the exact real question's entity value ("BARCODE SCANNER", already in the
   `MATERIAL_ROWS` fixture) so the regression test reproduces the actual reported case, not a synthetic stand-in.
   11 core suites **328/328**.
+
+### Diagnose and partially fix the mrs cluster (fix.md #17) -- agent finding, verified before trusting it
+- **Prompt:** same authorization, continuing down the diagnosed clusters. A background agent (spawned to
+  investigate mrs's grounding gaps in parallel with a grn one) reported back that "material approval
+  pending"/"material hold at Store officer" are a *recurrence* of a residual fix.md #14 already flagged and
+  left unfixed, and that "indent for indent number" is genuinely unresolved (INDENT/INDENTTYPE not in the
+  catalog at all, the original schema study already couldn't answer what they mean, an old unverified guess
+  sits in a non-V1 unwired file) -- correctly recommended as blocked on Tarun, not a code fix.
+- **Didn't just trust the agent's hypothesis -- reproduced it against the real model first:** ran both exact
+  questions through `extract_query_plan` over the SSH tunnel to the server's qwen3:14b. Confirmed precisely:
+  the model splits "pending"/"hold" and "Store officer" into two separate entities, despite the prompt already
+  saying "never split one such phrase into more than one entity" with almost this exact example. The existing
+  instruction wasn't reliable enough on its own.
+- **Fixed the half that's actually fixable by prompt wording:** added one sentence naming the pattern directly
+  (an approval-stage word co-occurring with a status word in the same clause is part of that same entity).
+  Verified, 2 repeats: "approval pending at Store officer" now fuses into one entity matching the catalog's
+  existing "store officer pending" alias. Ran the full regression battery from the last two fixes (fix.md
+  #15's stock cases, #16's MRS-number/purchase-item-code) plus a fresh case ("approved MRS for keyboard") to
+  confirm genuinely-independent entities still stay separate -- zero regressions.
+- **Didn't force the other half:** "hold at Store officer" is unchanged by the fix -- checked the catalog
+  directly and `mrs_hold_flag`'s aliases have no stage qualifier at all (`HOLDINGSTATUS` looks like it isn't
+  tracked per approval stage), so fusing the entity string wouldn't have anything to ground against even if it
+  worked. This is a data/catalog question, not an extraction-wording one -- stopped there rather than trying a
+  3rd or 4th sentence, matching the same discipline as fix.md #15.
+- **Files:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`), `scripts/test_query_plan_extractor.py` (+1 test),
+  `fix.md`, `progress.md`.
+- **Tests:** 1 new. 11 core suites **328/328**.

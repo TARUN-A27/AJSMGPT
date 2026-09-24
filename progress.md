@@ -382,3 +382,12 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   it just never got the entity, since resolution was skipped upstream. One-line deterministic fix (no prompt
   change, no live-model verification needed) plus 1 regression test using the exact real question's entity
   value. 11 core suites 328/328.
+- 2026-09-24 — mrs cluster (fix.md #17), diagnosed by a background agent then independently verified against
+  the real model before trusting it. A recurrence of a fix.md #14 residual: an approval-stage word ("Store
+  officer") kept splitting off from its status word ("pending"/"hold") into a second entity, so grounding never
+  got one string to match against the existing "store officer pending" alias. One prompt sentence fixes the
+  "pending" case cleanly (verified, zero regressions); the "hold" case is unchanged because there's no
+  stage-qualified catalog alias for it to match even if extraction were perfect -- `HOLDINGSTATUS` looks like a
+  single flag, not tracked per approval stage. Left open pending a decision (does the data support "on hold at
+  store officer" as distinct, or should the stage qualifier just be dropped for hold?) rather than iterating
+  prompt wording further. 1 new test, 11 core suites 328/328.

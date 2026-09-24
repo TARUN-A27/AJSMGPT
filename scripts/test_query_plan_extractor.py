@@ -364,6 +364,17 @@ class QueryPlanExtractorTests(unittest.TestCase):
         self.assertIn("Always set business_subject", flat)
         self.assertIn("A filtered entity is not also a dimension", flat)
 
+    def test_system_prompt_teaches_approval_stage_stays_with_its_status_word(self) -> None:
+        # 2026-09-24 held-out eval, mrs family (fix.md #17): "list out material
+        # approval pending at Store officer?" was split into two entities
+        # ("pending" and "Store officer") despite the prompt's existing "never
+        # split one such phrase into more than one entity" rule -- the model
+        # apparently didn't read a bare approval-stage word as part of the
+        # SAME phrase as a co-occurring status word. Verified against the
+        # real model that this sentence fixes that exact question (fixlog.md).
+        flat = " ".join(SYSTEM_PROMPT.split())
+        self.assertIn("is part of that same entity, not a separate one", flat)
+
     def test_system_prompt_teaches_stock_quantity_is_aggregate_not_detail(self) -> None:
         # 2026-09-24 held-out eval: stock questions ("what is the stock of X")
         # were consistently extracted as operation=detail, which the stock

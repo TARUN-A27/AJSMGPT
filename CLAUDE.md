@@ -91,7 +91,9 @@ UNSUPPORTED_EXPECTED         12   ← by design (attendance, camera_ip, dell sys
 CAPABILITY_FAILURE           11   ← stock/grn now genuinely reachable (fix.md #13); model op-choice failures
 GROUNDING_FAILURE              7   ← catalog gaps + real, diagnosable model output
 QUERY_PLAN_FAILURE             7   ← all model behaviour (low confidence, undeclared sort field)
-ENTITY_RESOLUTION_REJECTION    6   ← values absent from the offline fixture (recheck on real master data)
+ENTITY_RESOLUTION_REJECTION    6   ← checked against real Oracle 2026-09-24: correct, working exact-match
+                                     refusals (shorthand like "mouse"/"dell" isn't the real full item/party
+                                     name) -- not a data gap; fuzzy matching is an open product question, fix.md #2
 PASS_PIPELINE                  4
 SQL_VALIDATION_FAILURE         0
 SQL_GENERATION / ENVIRONMENT   0

@@ -371,3 +371,22 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   `scripts/v1_real_question_eval_results.json`, `fix.md`, `progress.md`, `CLAUDE.md`.
 - **Tests:** `test_entity_resolution` added to the tracked core-suite list (always part of the real V1 chain,
   just never counted there before). 11 core suites **318/318**.
+
+## 2026-09-24
+
+### Check fix.md #2's "recheck on real master data" assumption against real Oracle
+- **Prompt:** "do it then" — confirmed proceeding with the leftover items from yesterday's brief, starting with
+  the smallest one: verifying the assumption that `ENTITY_RESOLUTION_REJECTION`'s remaining cases are just
+  "value absent from the small offline fixture" and would resolve fine against real data.
+- **Done:** synced the deployed server to latest (`73d6fe4` → `8f862a2`, 4 commits behind). Ran the real
+  `oracle_entity_lookup` on the server for the 4 unique values still in the bucket after yesterday's 14b run
+  (`dell`, `mouse`, `dell system`, `yarn`) — printed only the resolution status, never the actual row values
+  (§3). Found the assumption was wrong for 3 of 4: they come back `UNRESOLVED` against real data too, not just
+  the fixture. Root cause isn't a data gap, it's `resolve_entity`'s own documented design (exact match only, no
+  fuzzy matching) meeting real users typing shorthand ("mouse") instead of the full real item name. `yarn`
+  correctly comes back `AMBIGUOUS` (2 real candidates). Recorded this as an open product question (add
+  `LIKE`-based fuzzy matching, a deliberate change to an intentionally-designed module?) for Tarun to decide, not
+  something to unilaterally fix — these are still correct, fail-closed refusals, acceptable under the freeze
+  criteria, just not the "will probably resolve fine" outcome originally assumed.
+- **Files:** `fix.md` (#2 updated), `CLAUDE.md` (§6 comment corrected). No code changes.
+- **Tests:** none needed (verification only, no code touched).

@@ -55,6 +55,19 @@ Totals: S = 10, U = 9. Of the 10 supported-domain losses: 4 validator bug (6a), 
 - **Fix:** for the 4, adjust QueryPlan prompt/ontology so Qwen emits catalog-canonical concept names; add a `test_query_plan_extractor.py` case per pattern. Do not add aliases to `_VERIFIED_SOURCES` to paper over it. Do not resolve entities via the LLM.
 - **Depends on:** #1 result (some may reclassify once QueryPlans are correct).
 - **Closed 2026-09-22 (P4, commit `7816149`):** resolution now matches the ERP's own definitions instead of the whole party table — supplier sources carry the fixed scope `GOODSTYPECODE = 2` (the `INVENTORY.SUPPLIER` view, study §6.1), and candidates dedupe by **code** not display name, because 407 `ITEM_NAME`s are shared by more than one `ITEM_CODE` in the live master. Those now return AMBIGUOUS with `NAME [CODE] (obsolete)` candidates surfaced in the rejection message instead of silently resolving to one item. This changes offline counts only after Step 6 (real master data).
+- **Checked against real Oracle 2026-09-24 (on the server, via `oracle_entity_lookup`; only status checked, never
+  the actual row values, per §3).** The "recheck on real master data" assumption above was wrong for 3 of the 4
+  values still checkable this way: `supplier:"dell"`, `material:"mouse"`, `material:"dell system"` all come back
+  **`UNRESOLVED`** against real data too, not just the small offline fixture. Root cause is not a data gap — it's
+  `resolve_entity`'s own documented design: exact case/whitespace-normalized match only, no fuzzy/partial/LIKE
+  matching, no edit distance (see the module docstring). Real users type shorthand ("mouse", "dell") while the
+  real `ITEM_NAME`/`PARTYNAME` rows are almost certainly longer, more specific strings — an exact match correctly
+  finds nothing. `material:"yarn"` returns **`AMBIGUOUS`** (2 real candidates) — working exactly as designed, not
+  a bug. **Open product question, not a bug to silently fix:** should V1 widen this to a `LIKE '%value%'` search
+  that returns multiple candidates as `AMBIGUOUS` (still never auto-picks one) when an exact match finds nothing?
+  That's a deliberate change to an intentionally-designed "no fuzzy matching" module (see its own docstring
+  rationale) — needs Tarun's sign-off, not a unilateral fix. Until decided, this stays a correct, working, but
+  user-unfriendly refusal — acceptable under the freeze criteria's "a refusal is fine" rule, not a wrong answer.
 
 ## 3. ⬜ MRS `lookup`/`unknown` operation — re-diagnosed 2026-09-23, original framing was wrong
 - **Count (14b re-run):** 4 × `CAPABILITY_FAILURE`, all `domain=mrs`: `Mrs rejected reason?` (`operation=lookup`),

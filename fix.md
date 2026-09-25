@@ -962,12 +962,22 @@ recommendation caught its own gap before shipping
   untouched) + 1 new in `test_nlp_execution.py` (proves the orchestration wiring: `resolve_entities`
   receives the corrected concept, not the model's raw one). 11 core suites plus the eval-classifier file:
   **353/353**.
-- **Not yet confirmed:** the real, live-Oracle depth-bar movement for purchase. This fix only changes
-  code upstream of entity resolution and grounding -- correctness of the *rest* of the pipeline for these
-  newly-grounding questions (SQL generation, real Oracle entity resolution against actual master data,
-  execution) still needs the live test-split re-run on the server, same as every other fix this session.
+- **Confirmed live on the server (same day): the largest single-fix jump this session.** Deployed and
+  re-ran the identical held-out test split. **purchase 25%→50%, grn 14%→43%, mrs 20%→30%; stock
+  unchanged at 70%** (proves no regression to the two entities this fix must never touch --
+  `"pending at store officer"` and stock's own `"material"` -- both confirmed unchanged question-by-
+  question, not just in the aggregate). Purchase's `GROUNDING_FAILURE` fell from 11 to 1; almost all of
+  it converted to `ENTITY_AMBIGUOUS_DEFERRED` (a real "did you mean X/Y/Z" against actual Oracle master
+  data) or a clean `ENTITY_RESOLUTION_REJECTION` -- both safe, neither a new failure shape, no
+  `HARNESS_FAILURE`/crash category appeared anywhere. One brand-new `PASS_PIPELINE` in grn
+  (`"how many qty received in last one year?"`). The other previously-fragile real pass,
+  `"purchase order for item code C02000094"`, stayed `PASS_PIPELINE`. One purchase pass
+  (`"Which supplier is given lowest price?"`) flipped to `ENTITY_RESOLUTION_REJECTION` -- confirmed
+  unrelated (see above: same unmodified prompt, 3/3 then 4/4, ~20-30 minutes apart). Full detail and the
+  question-by-question diff: `docs/V1_FREEZE_CRITERIA.md`.
 - **Where:** `app/schema_grounding.py` (+1 function), `app/nlp_execution.py` (1 import + 2 lines wiring it
-  in), `scripts/test_schema_grounding.py` (+7 tests), `scripts/test_nlp_execution.py` (+1 test).
+  in), `scripts/test_schema_grounding.py` (+7 tests), `scripts/test_nlp_execution.py` (+1 test),
+  `docs/V1_FREEZE_CRITERIA.md`.
 
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.

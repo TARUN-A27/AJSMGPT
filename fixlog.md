@@ -978,6 +978,9 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `app/schema_grounding.py`, `app/nlp_execution.py`, `scripts/test_schema_grounding.py` (+7),
   `scripts/test_nlp_execution.py` (+1), `fix.md`, `progress.md`.
 - **Tests:** 8 new. 11 core suites plus the eval-classifier file: **353/353**.
-- **Not yet done:** the live-Oracle test-split re-run on the server -- this only verifies through
-  grounding; real Oracle entity resolution and SQL execution for these newly-grounding questions still
-  need the authoritative live check, same as every other fix this session.
+- **Deployed and re-ran the live test-split eval same day.** Largest single-fix jump this session:
+  purchase 25%->50%, grn 14%->43% (one brand-new real pass), mrs 20%->30%; stock unchanged at 70%,
+  confirming no regression to the entity it must never touch. Checked every purchase/grn/mrs question
+  individually before trusting the aggregate -- `GROUNDING_FAILURE` mostly converted to
+  `ENTITY_AMBIGUOUS_DEFERRED`/`ENTITY_RESOLUTION_REJECTION` (both safe), no new failure shape anywhere.
+  Updated `docs/V1_FREEZE_CRITERIA.md` and fix.md #27 with the real numbers.

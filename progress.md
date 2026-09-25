@@ -495,5 +495,6 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   against the real model: 6 of 8 previously-broken purchase questions now ground cleanly; the known-fragile
   real passes (mrs, purchase-by-code) and the two worked-example entities (mrs pending-at-store-officer,
   stock material) all confirmed untouched -- the negative-case safety tests were as important as the fix
-  itself. 8 new tests, 353/353. Live-Oracle confirmation still pending (next: deploy + re-run the test-split
-  eval on the server).
+  itself. 8 new tests, 353/353. Confirmed live on the server same day: purchase 25%->50%, grn 14%->43%,
+  mrs 20%->30%, stock unchanged at 70% (no regression) -- the largest single-fix jump this session, and
+  question-by-question checked, not just the aggregate. Updated docs/V1_FREEZE_CRITERIA.md.

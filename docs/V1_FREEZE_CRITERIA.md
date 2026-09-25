@@ -64,11 +64,34 @@ the already-correct fuzzy fallback (fix.md #2) and the already-decided methodolo
 over. Two `SQL_VALIDATION_FAILURE`s appeared in this run for the first time — both the validator
 correctly rejecting bad model SQL (an ungrounded column, a wildcard-selection retry), not a new gap.
 
-**Not "nearly there" yet, but no longer just "diagnosed, not fixed" either.** `GROUNDING_FAILURE`
-(19) and `QUERY_PLAN_FAILURE` (13) are now the largest categories — still catalog/model gaps, but
-the *shape* of what's failing has shifted as the easy, high-leverage patterns get closed one at a
-time. The families not yet dug into as deeply (purchase, supplier_lookup, material_lookup) still
-have room the same cluster-by-cluster method could reach.
+**Measured again 2026-09-25, same day, after fix.md #27 — the largest single-fix jump yet.** Three
+prompt-side attempts to fix purchase's concept-naming bug (the model writing the raw spoken value
+itself as `entities[].concept`, e.g. `concept="Keyboard"`, instead of `"material"`) each regressed a
+different real pass — fix.md #24, #25, #26. Fixed instead in deterministic code
+(`correct_mislabeled_entity_concepts`, `app/schema_grounding.py`): rewrite the entity's concept once,
+right after extraction, before either entity resolution or grounding sees it. Re-ran the identical
+held-out test split: **purchase 25%→50%, grn 14%→43%, mrs 20%→30%; stock unchanged at 70% (confirms
+no regression); supplier_lookup/consumption/material_lookup unchanged (untouched by this fix).**
+Checked every purchase/grn/mrs question individually, not just the aggregate: `GROUNDING_FAILURE`
+dropped from 11 to 1 in purchase alone, almost entirely converted into `ENTITY_AMBIGUOUS_DEFERRED`
+(a real "did you mean X/Y/Z" against actual Oracle master data, not a dead-end refusal) or a clean
+`ENTITY_RESOLUTION_REJECTION` (no real match) — both safe, neither a new failure shape. One brand-new
+`PASS_PIPELINE` appeared in grn (`"how many qty received in last one year?"`). Both entities the fix
+must never touch — the mrs worked example's `"pending at store officer"` and stock's `"material"` —
+were confirmed unchanged in both this run and a direct extraction-time check against the real model.
+One purchase `PASS_PIPELINE` (`"Which supplier is given lowest price?"`) flipped to
+`ENTITY_RESOLUTION_REJECTION` — confirmed unrelated to this fix (`app/query_plan_extractor.py` has a
+zero diff; the same question passed 3/3 then failed 4/4 with the *identical* unmodified prompt ~20-30
+minutes apart, same-session model-serving drift, fix.md #14's already-documented pattern). The other
+previously-fragile real pass, `"purchase order for item code C02000094"`, stayed `PASS_PIPELINE`.
+
+**Not "nearly there" yet, but the cluster-by-cluster method keeps compounding real gains.**
+`GROUNDING_FAILURE` fell from 19 to 6 across the whole 68-question set (mostly converted into
+`ENTITY_AMBIGUOUS_DEFERRED`, 11→19, and `ENTITY_RESOLUTION_REJECTION`, 5→13 — both safe outcomes, not
+a different flavor of failure); overall `PASS_PIPELINE` held steady at 6 (purchase -1, grn +1, net
+zero, both explained above, neither a concern). Purchase specifically went from "worst-diagnosed,
+least-fixed" to roughly tied with mrs. The families not yet dug into as deeply (supplier_lookup,
+material_lookup) still have room the same method could reach.
 
 **Decided 2026-09-24 (Tarun):** the ambiguous-refusal methodology question — a genuine
 multi-candidate entity ambiguity (real shorthand, real multiple matches, correct refusal) is not a
@@ -125,11 +148,13 @@ in the held-out set blocks freeze regardless of the pass-rate number.
 
 The question bank, split mechanism, and the measurement itself are all done — see "Measured" above
 for the numbers. **Freeze is still not ready by the letter of this bar**: every family remains
-below 75%. But 2026-09-25's re-measurement is real evidence the cluster-by-cluster method compounds
-— stock alone moved 30%→70% from three targeted fixes, not a full rewrite. The realistic choices
-are unchanged in shape, but option (1) now has a concrete data point behind it rather than just a
-plan: (1) continue the same diagnosis-and-few-shot cycle — stock's trajectory suggests purchase/
-mrs/supplier_lookup could see similar jumps once dug into as deeply, (2) freeze a subset now (e.g.
-purchase/mrs/consumption, which have real historical passes) and push the weaker ones to a
-fast-follow, or (3) renegotiate the bar or timeline itself. Still Tarun's call — the evidence
-changed, not who decides.
+below 75%. But 2026-09-25 gave two full rounds of real evidence the cluster-by-cluster method
+compounds — stock 30%→70% in the morning round, then purchase 25%→50% and grn 14%→43% in the
+afternoon round, from targeted fixes, not a rewrite, and not always a few-shot example: purchase's
+fix landed in deterministic code after three prompt attempts each broke something else (fix.md
+#24–#27), which is itself evidence the method generalizes across *how* a family gets fixed, not just
+that fixes accumulate. The realistic choices are unchanged in shape, but option (1) now has two data
+points behind it: (1) continue the same diagnosis-and-fix cycle — mrs and supplier_lookup haven't had
+this depth of attention yet, (2) freeze a subset now (e.g. purchase/mrs/consumption/stock/grn, which
+all have real passes) and push the weaker ones to a fast-follow, or (3) renegotiate the bar or
+timeline itself. Still Tarun's call — the evidence changed, not who decides.

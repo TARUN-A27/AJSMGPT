@@ -454,3 +454,10 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   "hold" without ever mentioning it in an example. No regressions on prior fixes or real `PASS_PIPELINE`
   cases. Confirms the plan's own recommendation: try few-shot before another round of prompt wording, and
   before fine-tuning. 1 new test, 11 core suites plus the eval-test file: 343/343.
+- 2026-09-25 — closed fix.md #24: extended few-shot to grn's remaining diagnosed gaps. All 3 target examples
+  verified correct in isolation; added together, caused a real regression (2 of 3 real `PASS_PIPELINE`
+  cases broke by fabricating extra measures) -- caught before shipping, not after. Isolated to one example
+  ("qty received" measure-fidelity) that fixes its target with zero regressions; the other two dropped,
+  documented as a genuinely open problem rather than silently abandoned. Confirms few-shot needs the same
+  regression discipline as prompt-sentence changes -- it isn't automatically safe. 1 new test, 11 core
+  suites plus the eval-test file: 344/344.

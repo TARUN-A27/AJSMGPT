@@ -784,6 +784,40 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   worth trying before a third or fourth attempt at the sentence -- it fixed the case that resisted 3 rounds
   of wording changes, on the first try, with no observed side effects.
 
+## 24. ✅ grn measure-fidelity: one worked example shipped, two dropped after a real regression
+
+- **Prompt:** 2026-09-25, continuing the plan's few-shot step onto grn's remaining diagnosed gaps (fix.md
+  #18's "Related, NOT fixed" list): measure-phrase fidelity, the `business_subject`-as-dimension question,
+  and the generic "domain for entity, no verb" operation-choice gap.
+- **All three examples verified correct in isolation first** (against real `ground_query_plan()` +
+  `validate_query_plan_semantics()`, same discipline as fix.md #22/#23) -- confirmed along the way that
+  `material` genuinely grounds as a dimension on the `grn` domain anchor via the existing `GRN.CODE ->
+  INVITEMS.ITEM_CODE` FK, so "Today received material names and qty?" really was an extraction-choice
+  problem (wrong `business_subject`), not a grounding-strictness one, exactly as fix.md #18 suspected but
+  left undecided.
+- **All three added together caused a real regression, caught before shipping:** verified against the real
+  model that all three of the target grn questions grounded cleanly -- but 2 of the only 3 real
+  `PASS_PIPELINE` cases in the whole eval broke, both by fabricating extra measures that don't exist
+  ("MRS details for MRS number 890330" invented `qty requested`/`approval status`/`material`/`supplier`;
+  "purchase order for item code C02000094" invented `purchase order details`). Reproduced 2/2, not a flake.
+- **Isolated the cause instead of abandoning the whole attempt:** reverted all three, then re-added just the
+  measure-fidelity example alone. That one alone fixes its target with zero regressions across the full
+  battery (stock, mrs-pending, mrs-hold unchanged, both real passes). The other two -- individually or in
+  combination -- are what caused the fabrication; not isolated further than that (would be a 3rd/4th
+  diagnostic round on top of an already-diagnosed problem, matching the same "stop, don't force it"
+  discipline as fix.md #15/#17).
+- **Shipped:** one worked example (`"how many qty received in last one year?"` -> `aggregate`,
+  `measures:[{"concept":"qty received","aggregation":"sum"}]`). **Not shipped:** the material-dimension
+  example and the bare-domain-for-entity example -- both correct in isolation, but their combination with
+  each other or with the others produces fabricated measures on real passing cases. Left as a genuinely
+  open problem, not silently dropped without a trace.
+- **Where:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`, +1 worked example).
+- **Tests:** 1 new (asserts the shipped example's content in `SYSTEM_PROMPT`). 11 core suites plus the
+  eval-classifier file: **344/344**.
+- **Takeaway:** few-shot isn't risk-free just because it beat declarative wording once (fix.md #23) -- each
+  new example still needs the same regression battery as a prompt-sentence change, and combining several at
+  once can interact in ways that adding one at a time reveals cleanly.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

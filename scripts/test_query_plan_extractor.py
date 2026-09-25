@@ -386,6 +386,18 @@ class QueryPlanExtractorTests(unittest.TestCase):
         self.assertIn('"domain":"stock","operation":"aggregate"', flat)
         self.assertIn('"concept":"pending at store officer"', flat)
 
+    def test_system_prompt_carries_the_grn_measure_fidelity_example(self) -> None:
+        # fix.md #24: "how many qty received in last one year?" dropped
+        # "received" and hit the deliberate fix.md #13 quantity/qty tie.
+        # Two more grn examples (material-as-dimension business_subject,
+        # bare "grn for yarn") were tried in the same pass and dropped --
+        # verified reproducibly against the real model that adding all
+        # three together made it fabricate extra measures on 2 of the only
+        # 3 real PASS_PIPELINE cases in the whole eval. This one example
+        # alone doesn't regress anything; only it shipped.
+        flat = " ".join(SYSTEM_PROMPT.split())
+        self.assertIn('"concept":"qty received","aggregation":"sum"', flat)
+
     def test_system_prompt_teaches_stock_quantity_is_aggregate_not_detail(self) -> None:
         # 2026-09-24 held-out eval: stock questions ("what is the stock of X")
         # were consistently extracted as operation=detail, which the stock

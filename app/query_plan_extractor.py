@@ -103,6 +103,8 @@ Question: do we have yarn in stock
 Output: {"domain":"stock","operation":"aggregate","business_subject":{"concept":"stock"},"entities":[{"concept":"material","original_value":"yarn"}],"measures":[{"concept":"stock quantity","aggregation":"sum"}],"requested_output":{"fields":["stock quantity"]},"confidence":0.9}
 Question: list out material approval pending at Store officer
 Output: {"domain":"mrs","operation":"detail","business_subject":{"concept":"mrs"},"entities":[{"concept":"pending at store officer","original_value":"approval pending at Store officer","status":"not_required"}],"dimensions":[{"concept":"material","grouping":false}],"requested_output":{"fields":["material"]},"confidence":0.9}
+Question: how many qty received in last one year?
+Output: {"domain":"grn","operation":"aggregate","business_subject":{"concept":"grn"},"measures":[{"concept":"qty received","aggregation":"sum"}],"date_range":{"kind":"relative","original_text":"last one year"},"requested_output":{"fields":["qty received"]},"confidence":0.9}
 Return one JSON object only."""
 
 

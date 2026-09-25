@@ -841,3 +841,28 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`), `scripts/test_query_plan_extractor.py` (+1
   test), `fix.md`, `progress.md`.
 - **Tests:** 1 new. 11 core suites plus the eval-classifier file: **343/343**.
+
+### Extend few-shot to grn's remaining gaps -- a real regression caught, not shipped (fix.md #24)
+- **Prompt:** "give me plan for today" -> agreed plan's step 2, extending yesterday's few-shot win to grn's
+  three remaining diagnosed-but-not-fixed patterns from fix.md #18.
+- **All three verified in isolation first**, same discipline as yesterday -- and confirmed something fix.md
+  #18 left as an open question: "material" genuinely grounds as a dimension on `grn`'s domain anchor via the
+  existing GRN.CODE->INVITEMS.ITEM_CODE FK. So the "Today received material names and qty?" gap really was
+  an extraction/business_subject-choice problem, not a grounding-strictness one -- confirmed, not guessed.
+- **Added all three, verified against the real model -- and found a real regression before shipping
+  anything:** all 3 target grn questions grounded cleanly, but 2 of the only 3 real `PASS_PIPELINE` cases in
+  the whole eval broke, both by fabricating extra measures that don't exist. Reproduced 2/2. Reverted
+  immediately rather than debug it live -- confirmed the revert restored the correct (empty-measures)
+  behavior before doing anything else.
+- **Isolated instead of walking away:** re-added just the simplest example (measure-fidelity) alone --
+  fixes its target, zero regressions across the full battery. The other two, individually or combined, are
+  what caused the fabrication. Didn't chase which one exactly or why -- that's a further diagnostic round on
+  an already-diagnosed problem, and yesterday's own lesson (fix.md #15/#17) was to stop forcing it rather
+  than keep iterating blind.
+- **What this adds to yesterday's finding:** fix.md #23 showed few-shot beating declarative prompt-wording
+  on the first try. This shows few-shot isn't automatically safe just because it worked once -- each new
+  example needs the same regression battery as any other prompt change, and stacking several at once can
+  interact in ways adding them one at a time reveals cleanly. Worth remembering before the next round.
+- **Files:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`, +1 example), `scripts/test_query_plan_extractor.py`
+  (+1 test), `fix.md`, `progress.md`.
+- **Tests:** 1 new. 11 core suites plus the eval-classifier file: **344/344**.

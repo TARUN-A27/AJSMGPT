@@ -469,3 +469,11 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   documented as a genuinely open problem rather than silently abandoned. Confirms few-shot needs the same
   regression discipline as prompt-sentence changes -- it isn't automatically safe. 1 new test, 11 core
   suites plus the eval-test file: 344/344.
+- 2026-09-25 — purchase deep-dive (fix.md #25), same method that took stock 30%->70%. Found a high-value,
+  widespread bug (6 of 11 purchase grounding failures share one root cause: the model uses the raw spoken
+  value as the entity concept instead of "material"), but two few-shot attempts to fix it both regressed
+  the same real `PASS_PIPELINE` case ("purchase order for item code C02000094") -- the second time this
+  exact question has broken from a nearby purchase-domain example (fix.md #24 was the first). Reverted both
+  attempts; shipped only the one safe, unrelated catalog alias found along the way ("purchase qty"). The
+  concept-naming bug itself stays open, confirmed real and high-value, needs a different approach than
+  another worked example. 1 new test, 11 core suites plus the eval-test file: 345/345.

@@ -886,3 +886,32 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   a new gap.
 - **Files:** `docs/V1_FREEZE_CRITERIA.md`, `progress.md` (numbers + updated freeze-option framing).
 - **Tests:** none (measurement + investigation, no code changed).
+
+### Purchase deep-dive -- a real, high-value bug found, few-shot can't clear it yet (fix.md #25)
+- **Prompt:** "start" on plan item #1 (purchase deep-dive), the highest-value item on today's list.
+- **Pulled every purchase `GROUNDING_FAILURE`'s actual `full_query_plan` before hypothesizing** -- same
+  discipline as yesterday's grn dig, and it paid off immediately: 6 of the 11 share one root cause. The
+  model puts the raw spoken value itself as the entity concept (`concept="Keyboard"`, `concept="BARCODE
+  SCANNER"`, `concept="dell system"`, `concept="monitor"`) instead of `concept="material"`. The existing
+  prompt already says "material for an item name" -- it's just not reliable for bare names.
+- **Tried the exact playbook that worked yesterday (fix.md #23) -- it didn't work this time, and I didn't
+  force it:** one worked example fixed all 6 targets' concept extraction cleanly, but broke both real
+  `PASS_PIPELINE` cases: MRS number got a fabricated concept, and `"purchase order for item code
+  C02000094"` got a fabricated measure. Reverted, then ran ONE more diagnostic (swap the new example in for
+  yesterday's grn one, same total count) to separate "too many examples" from "this example's content" as
+  the cause -- the purchase-order case broke again, the same shape of failure fix.md #24 already hit on
+  this exact question. Two different examples, two different sessions, same real question breaking the
+  same way -- that's a real, repeatable interaction, not something to keep guessing at with a third example.
+- **Shipped the one safe, unrelated thing found in the same dig:** `purchase_quantity` was missing the
+  abbreviated `"purchase qty"` alias several real questions actually use (`"purchase quantity"` was already
+  there). Pure catalog addition, verified it can't touch model behavior since grounding doesn't feed back
+  into extraction.
+- **Left open, not silently dropped:** the concept-naming bug (confirmed worth ~6 of 11 purchase grounding
+  failures), "purchase date" being used as a measure when the catalog correctly scopes that column to
+  filtering/grouping (needs the existing "last N" sorting shape instead, apparently not applied reliably
+  when the asked-about thing is a date rather than a quantity), an invented "purchase details" measure, and
+  a domain-misrouting bug ("last supply of mouse" -> `domain='stock'`). None attempted -- flagging clearly
+  rather than letting today's report imply purchase got the same treatment stock did.
+- **Files:** `app/resources/business_schema_catalog.json` (+1 alias), `scripts/test_schema_grounding.py`
+  (+1 test), `fix.md`, `progress.md`.
+- **Tests:** 1 new. 11 core suites plus the eval-classifier file: **345/345**.

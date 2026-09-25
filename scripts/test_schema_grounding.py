@@ -168,6 +168,19 @@ class SchemaGroundingTests(unittest.TestCase):
         self.assertIn(("INVENTORY.MRS_TEMP", "MRSNO"), columns)
         self.assertEqual(columns[("INVENTORY.MRS_TEMP", "MRSNO")].logical_concept, "mrs_number")
 
+    def test_purchase_qty_abbreviation_grounds(self):
+        # fix.md #25: the purchase deep-dive found the model extracts the
+        # measure concept "purchase qty" (abbreviated) for real questions
+        # like "Last 3 purchase qty ... of the item Keyboard" -- the catalog
+        # only had the full-word "purchase quantity", an exact-match miss.
+        result = ground_query_plan(plan(
+            "purchase", "purchase",
+            measures=[Measure(concept="purchase qty", aggregation=Aggregation.NONE)],
+        ))
+        self.assert_grounded(result)
+        columns = {(column.full_table_name, column.column_name): column for column in result.selected_columns}
+        self.assertIn(("INVENTORY.PURCHASEORDER", "QTY"), columns)
+
     def test_mrs_ready_for_approval_grounds_in_question_word_order(self):
         # fix.md #22: fix.md #17 verified the model fuses "approval pending at
         # Store officer" into one entity, concept="pending at store officer"

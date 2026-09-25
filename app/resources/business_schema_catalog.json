@@ -48,7 +48,7 @@
   "concepts": [
     {
       "name": "purchase_quantity",
-      "aliases": ["purchase quantity", "quantity", "qty"],
+      "aliases": ["purchase quantity", "purchase qty", "quantity", "qty"],
       "columns": [{"table": "INVENTORY.PURCHASEORDER", "column": "QTY", "roles": ["measure"], "confidence": 0.9, "evidence": "metadata and purchase analytics router"}]
     },
     {

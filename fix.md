@@ -818,6 +818,50 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   new example still needs the same regression battery as a prompt-sentence change, and combining several at
   once can interact in ways that adding one at a time reveals cleanly.
 
+## 25. 🟡 Purchase deep-dive: a high-value extraction bug confirmed real, few-shot repeatedly regresses one specific real pass
+
+- **Prompt:** "start" -- the purchase deep-dive, same cluster-by-cluster method that took stock 30%->70%.
+  Pulled the actual `full_query_plan` for every purchase `GROUNDING_FAILURE` in the 2026-09-25 run (11 of 20)
+  rather than guess from the reason strings alone.
+- **Found: a widespread, high-value bug shared by 6 of the 11.** The model puts the raw spoken value itself
+  as the entity concept -- `concept="Keyboard"`, `concept="BARCODE SCANNER"`, `concept="dell system"`,
+  `concept="monitor"` -- instead of `concept="material"` with the value in `original_value`. The existing
+  prompt already says "material for an item name" (§ near the entity rules); the model just doesn't follow
+  it reliably for bare, unquoted names, quoted or not, "item" cue word or not. This is upstream of and
+  distinct from fix.md #16's fix (which only forces real verification when `concept` is already one of the
+  5 correct tokens -- it can't help when the concept string itself is wrong).
+- **Verified a fix, twice, both times with a real regression on the same real pass:**
+  - Round 1: one worked example (bare material -> `concept="material"`). Fixed all 6 target questions'
+    entity concept cleanly. But broke both real non-tiny `PASS_PIPELINE` cases: `"MRS details for MRS
+    number 890330"` got a fabricated concept (`"material requisition slip number"`), and `"purchase order
+    for item code C02000094"` got a fabricated measure (`"purchase order"`) that doesn't exist. Reverted.
+  - Round 2 (diagnostic, not a fix attempt): swapped the new example in for fix.md #24's grn one (same
+    total example count, to separate "too many examples" from "this example's content"). The MRS case
+    recovered (differently -- now grounds via an accidental, still-wrong `material` match), but
+    `"purchase order for item code C02000094"` **broke the same way again**, ruling out "example count"
+    as the cause. This is the second time this exact question has broken from a nearby purchase-domain
+    example (fix.md #24 broke it the same way, with a different fabricated measure name) -- a real,
+    repeatable fragility in this specific model around this specific question shape, not a fluke.
+- **Shipped only the safe part:** a `"purchase qty"` catalog alias (found in the same investigation --
+  `purchase_quantity` had `"purchase quantity"` but not the abbreviated form several real questions use).
+  Pure catalog addition, verified to cause zero model-behavior change on its own (grounding-only, doesn't
+  touch extraction).
+- **Not shipped, left open, not silently dropped:** the material-concept-naming bug itself. It's real,
+  confirmed, and worth roughly 6 of purchase's 11 grounding failures if fixed cleanly -- but two rounds of
+  few-shot both hit the same wall. This needs a different approach next time: maybe a declarative sentence
+  instead of an example (the reverse of fix.md #15/#23's usual lesson, since few-shot is what's unstable
+  here), maybe restructuring where in the prompt examples sit, or maybe accepting this specific interaction
+  needs dedicated, careful iteration on its own rather than being bundled into a broader sweep.
+- **Also found, not yet investigated:** "purchase date" used as a `measure` when the catalog correctly
+  restricts that column's role to `date_filter`/`grouping` (a `detail`-with-sorting shape, like the existing
+  "last N" rule already describes, is probably the right fix -- but that rule apparently isn't reliably
+  applied when the thing being asked about is a bare date field rather than a quantity). "purchase details"
+  as an invented, non-existent measure for a generic "show me details" phrasing. One domain-misrouting bug
+  ("last supply of mouse" extracted as `domain='stock'` instead of `purchase`). None of these attempted yet.
+- **Where:** `app/resources/business_schema_catalog.json` only (1 alias). `app/query_plan_extractor.py`
+  tried and reverted twice -- no net change there this round.
+- **Tests:** 1 new in `test_schema_grounding.py`. 11 core suites plus the eval-classifier file: **345/345**.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

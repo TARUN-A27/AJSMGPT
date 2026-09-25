@@ -866,3 +866,23 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `app/query_plan_extractor.py` (`SYSTEM_PROMPT`, +1 example), `scripts/test_query_plan_extractor.py`
   (+1 test), `fix.md`, `progress.md`.
 - **Tests:** 1 new. 11 core suites plus the eval-classifier file: **344/344**.
+
+### Re-measure the full held-out set, investigate yesterday's leftover bug
+- **Prompt:** today's plan item 1 (re-measure) and item 4 (the "issue for yarn" contract failure found
+  yesterday). Launched the re-measurement first (server, `--split test`, same detached-nohup-plus-watcher
+  pattern as every prior run), then used the wait time productively on item 4 rather than idling.
+- **"issue for yarn" investigated, not fixed -- confirmed why:** reproduced yesterday's exact failure path
+  with model-call recording. Got a clean **success** first try, then 6/6 more successes. 7/7 today vs. 3/3
+  failures yesterday, same question, same prompt at the time -- this is model-serving non-determinism
+  (already documented in fix.md #14 as real and not chased), not a reproducible bug. Nothing to fix; recording
+  the investigation happened rather than silently dropping it.
+- **Re-measurement result, fetched once the watcher confirmed real completion (not the launcher-return
+  false signal, same distinction made every prior run):** real, compounding movement from fix.md #21-#23 --
+  stock 30%->70% (mostly `ENTITY_AMBIGUOUS_DEFERRED`: fixing operation-choice let those questions reach
+  entity resolution at all, where the already-correct fuzzy fallback and the already-decided deferred-vs-fail
+  methodology take over), purchase 15%->25%, mrs 10%->20%, supplier_lookup 0%->10%. Two
+  `SQL_VALIDATION_FAILURE`s appeared for the first time this run -- checked both before reporting anything:
+  one ungrounded-column rejection, one wildcard-SELECT retry, both the validator correctly doing its job, not
+  a new gap.
+- **Files:** `docs/V1_FREEZE_CRITERIA.md`, `progress.md` (numbers + updated freeze-option framing).
+- **Tests:** none (measurement + investigation, no code changed).

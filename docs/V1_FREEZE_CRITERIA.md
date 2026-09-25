@@ -51,37 +51,41 @@ can never count as blind held-out data. Two of the smaller pools are thin on the
 from small-N: material_lookup (2) and consumption (2) — real per-family pass/fail is noisy for
 those two until the bank grows more, not a code defect.
 
-**Measured 2026-09-24, three times, on the server against real Oracle + qwen3:14b — every family
-still fails the 75% bar.** First run found the raw signal; fix.md #15–#20 closed six real issues
-(stock's operation-choice, a safety-stack gap in entity resolution, mrs's approval-stage splitting,
-a missing grn catalog concept, the depth-bar's ambiguous-refusal methodology, and a crash that
-concept exposed) between the second and third. Final, confirmed numbers (pass + genuinely-deferred
-ambiguity, out-of-scope excluded): **consumption 50% (n=2), stock 30% (n=10), purchase 15% (n=20),
-grn 14% (n=7), mrs 10% (n=10), material_lookup 0% (n=2), supplier_lookup 0% (n=10 — but 6 of those
-10 are mistagged out-of-scope questions, so the real signal is thinner than the number suggests)**.
+**Measured 2026-09-24, three times, then again 2026-09-25 after the few-shot round — real,
+compounding movement, still short of the bar everywhere.** 2026-09-24 (fix.md #15–#20): consumption
+50% (n=2), stock 30% (n=10), purchase 15% (n=20), grn 14% (n=7), mrs 10% (n=10), material_lookup 0%
+(n=2), supplier_lookup 0% (n=10). 2026-09-25, after fix.md #21–#23 (the labeled-dataset catalog
+finds, the fix.md #17 grounding gap it caught, and the stock/mrs few-shot examples) — **stock
+30%→70%**, purchase 15%→25%, mrs 10%→20%, supplier_lookup 0%→10%; consumption and material_lookup
+unchanged (n=2 each, still too small to move); grn unchanged in this run (fix.md #24's grn example
+landed just after it). Most of stock's jump is the `ENTITY_AMBIGUOUS_DEFERRED` bucket, not raw
+`PASS_PIPELINE`: fixing operation-choice let those questions reach entity resolution at all, where
+the already-correct fuzzy fallback (fix.md #2) and the already-decided methodology (fix.md #19) take
+over. Two `SQL_VALIDATION_FAILURE`s appeared in this run for the first time — both the validator
+correctly rejecting bad model SQL (an ungrounded column, a wildcard-selection retry), not a new gap.
 
-**This is not a "nearly there" state.** Of 68 questions, `GROUNDING_FAILURE` (11) and
-`CAPABILITY_FAILURE` (11) together are the largest share — catalog/capability coverage gaps, not
-model-quality issues. Today's session found and fixed one clean example of each gap *type*
-(operation-choice, entity-splitting, missing concept, unsafe type coercion) inside the families it
-dug into deeply (stock, mrs, grn); the volume remaining suggests more of the same kind exist,
-unexamined, in the families not yet gone through as carefully (purchase, supplier_lookup,
-material_lookup). Closing the gap to 75% everywhere looks like several more sessions of this same
-cluster-by-cluster diagnosis, not a final push before freeze.
+**Not "nearly there" yet, but no longer just "diagnosed, not fixed" either.** `GROUNDING_FAILURE`
+(19) and `QUERY_PLAN_FAILURE` (13) are now the largest categories — still catalog/model gaps, but
+the *shape* of what's failing has shifted as the easy, high-leverage patterns get closed one at a
+time. The families not yet dug into as deeply (purchase, supplier_lookup, material_lookup) still
+have room the same cluster-by-cluster method could reach.
 
 **Decided 2026-09-24 (Tarun):** the ambiguous-refusal methodology question — a genuine
 multi-candidate entity ambiguity (real shorthand, real multiple matches, correct refusal) is not a
 depth-bar failure. Implemented as a third classification, `ENTITY_AMBIGUOUS_DEFERRED` (fix.md #19),
-deliberately narrow: only when *every* ambiguity in a rejection is a clean 2+-candidate one.
+deliberately narrow: only when *every* ambiguity in a rejection is a clean 2+-candidate one. This is
+most of why stock's number moved so much once operation-choice was also fixed.
 
 **Still open, confirmed as real scope decisions, not bugs:**
 - `supplier_lookup`'s "who supplies item X" (reverse item→supplier lookup) has no capability at all
   — is this in scope for v1.0, or new work?
 - mrs's "hold at Store officer" — `HOLDINGSTATUS` isn't tracked per approval-stage in the data, so
   there's nothing to ground even with perfect extraction, unless the business genuinely distinguishes it.
-- Several grn/purchase findings diagnosed but deliberately not attempted (measure-phrase fidelity,
-  `business_subject` grounding strictness vs. an extraction fix, a generic operation-choice gap) —
-  each needs a real decision, not a guess. Full detail: fix.md #18.
+- grn's `business_subject`-as-dimension and generic operation-choice patterns (fix.md #24) — both
+  verified correct in isolation, but adding them alongside the measure-fidelity fix made the model
+  fabricate extra measures on real passing cases. Not a scope question like the two above — a real,
+  open prompt-engineering problem that needs a different approach than "add another example," not a
+  decision only Tarun can make.
 
 **Non-negotiable regardless of the number: zero wrong answers — confirmed as-is, not loosened.**
 A refusal is acceptable — it's the system working as designed. A confidently wrong number is not,
@@ -119,13 +123,13 @@ in the held-out set blocks freeze regardless of the pass-rate number.
 - Zero wrong answers: **confirmed as-is**, not loosened.
 - Attendance: **deferred to v1.1**, not in v1.0 coverage.
 
-The question bank, split mechanism, and the measurement itself are all done 2026-09-24 — see
-"Measured 2026-09-24" above for the final numbers. **Freeze is not ready by the letter of this
-bar, and this isn't close enough to call a final push**: every family is far below 75%, and the
-dominant failure mode (catalog/capability coverage gaps) appears to recur at similar volume across
-families that haven't been dug into as deeply as stock/mrs/grn were today. The realistic choices
-are: (1) continue the same cluster-by-cluster diagnosis-and-fix cycle for several more sessions
-before re-measuring, (2) freeze a subset of families now (e.g. purchase/mrs/consumption, which
-have real historical passes) and explicitly push the weaker ones to a fast-follow, or (3)
-renegotiate the bar or timeline itself. This is Tarun's call, not something to decide by continuing
-to fix clusters one at a time indefinitely.
+The question bank, split mechanism, and the measurement itself are all done — see "Measured" above
+for the numbers. **Freeze is still not ready by the letter of this bar**: every family remains
+below 75%. But 2026-09-25's re-measurement is real evidence the cluster-by-cluster method compounds
+— stock alone moved 30%→70% from three targeted fixes, not a full rewrite. The realistic choices
+are unchanged in shape, but option (1) now has a concrete data point behind it rather than just a
+plan: (1) continue the same diagnosis-and-few-shot cycle — stock's trajectory suggests purchase/
+mrs/supplier_lookup could see similar jumps once dug into as deeply, (2) freeze a subset now (e.g.
+purchase/mrs/consumption, which have real historical passes) and push the weaker ones to a
+fast-follow, or (3) renegotiate the bar or timeline itself. Still Tarun's call — the evidence
+changed, not who decides.

@@ -454,6 +454,14 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   "hold" without ever mentioning it in an example. No regressions on prior fixes or real `PASS_PIPELINE`
   cases. Confirms the plan's own recommendation: try few-shot before another round of prompt wording, and
   before fine-tuning. 1 new test, 11 core suites plus the eval-test file: 343/343.
+- 2026-09-25 — **re-measured the full held-out set** (fix.md #21-#23 landed, #24 not yet). Real,
+  compounding movement: stock **30%→70%** (mostly via `ENTITY_AMBIGUOUS_DEFERRED` -- fixing operation-choice
+  let those questions reach entity resolution at all, where the fuzzy fallback and the deferred-methodology
+  decision take over), purchase 15%→25%, mrs 10%→20%, supplier_lookup 0%→10%. consumption/material_lookup
+  unchanged (n=2 each). Two `SQL_VALIDATION_FAILURE`s appeared for the first time, both the validator
+  correctly rejecting bad model SQL, not a new gap. Updated `docs/V1_FREEZE_CRITERIA.md` with the real
+  numbers -- freeze still isn't ready by the letter of the bar, but option 1 (keep fixing clusters) now has
+  real evidence behind it, not just a plan.
 - 2026-09-25 — closed fix.md #24: extended few-shot to grn's remaining diagnosed gaps. All 3 target examples
   verified correct in isolation; added together, caused a real regression (2 of 3 real `PASS_PIPELINE`
   cases broke by fabricating extra measures) -- caught before shipping, not after. Isolated to one example

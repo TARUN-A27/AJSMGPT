@@ -915,3 +915,34 @@ Format: date · prompt (short) · what was done · files touched · tests run.
 - **Files:** `app/resources/business_schema_catalog.json` (+1 alias), `scripts/test_schema_grounding.py`
   (+1 test), `fix.md`, `progress.md`.
 - **Tests:** 1 new. 11 core suites plus the eval-classifier file: **345/345**.
+
+### Purchase concept-naming bug, round 3: declarative sentence also regresses a real pass (fix.md #26)
+- **Prompt:** "continue with that" -- picking up fix.md #25's own closing suggestion (try a declarative
+  sentence, not another worked example, since few-shot was what broke twice).
+- **First, checked whether the background live-eval re-run from earlier was still relevant:** it had
+  already finished and its output was byte-identical to the "run5" data already used for #25's report --
+  nothing new there. Recomputed the freeze-doc percentages against it to be sure: the doc's own formula
+  counts `ENTITY_AMBIGUOUS_DEFERRED` as a pass (not excluded), so stock's 70% = 7/10 exactly, confirmed
+  stable, no regression. Worth writing down since I initially mis-recomputed it with deferred excluded
+  from the denominator and got a false 0% alarm before re-reading the doc's own methodology text.
+- **The declarative sentence:** extended the prompt's existing "material for an item name" rule in place
+  with five named real examples and one clarifying clause, instead of adding a new Question/Output pair.
+- **Result against the real model (qwen3:14b, SSH tunnel): partial fix, new regression.** 3 of the 8
+  confirmed-broken purchase questions now ground correctly as `material`; 1 more got the concept right but
+  still fails for an unrelated pre-existing reason; 4 unchanged. But a third real `PASS_PIPELINE` case --
+  `"Which supplier is given lowest price?"`, no material entity in it at all -- started failing extraction
+  outright, 3/3 reproducible. Isolated with `git stash push -- app/query_plan_extractor.py`: the identical
+  3 calls against the unmodified prompt, same session, passed 3/3. A real regression, not model flakiness.
+- **Stopped after this one attempt, same discipline as #24/#25** -- three different techniques (two
+  worked examples, one declarative sentence) have now each broken a different real pass in this same
+  prompt region. That's a broader signal than "few-shot is unstable" -- reverted (`git checkout --`,
+  confirmed zero diff), did not try a fourth variant.
+- **Recommendation surfaced, not implemented:** move the fix to deterministic code instead of the prompt
+  -- when an entity's literal `concept` fails to ground, retry once as `concept="material"` before
+  rejecting it. Legitimate status/workflow entities never reach this fallback (their literal phrase
+  already grounds today); a wrong guess still fails closed via entity resolution's existing behavior
+  (fix.md #2), so the worst case is a safe refusal, not a wrong answer. Not implemented -- touches
+  `app/schema_grounding.py`'s core entity loop (§3-relevant), and moving a fix from prompt to deterministic
+  code is a design fork worth flagging before writing, not doing silently.
+- **Files:** none shipped. `fix.md`, `progress.md`, `fixlog.md` only.
+- **Tests:** none new. 11 core suites plus the eval-classifier file re-confirmed: **345/345**.

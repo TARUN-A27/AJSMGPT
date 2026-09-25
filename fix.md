@@ -862,6 +862,52 @@ dedupe-by-code cannot turn AMBIGUOUS into RESOLVED, and every catalog change agr
   tried and reverted twice -- no net change there this round.
 - **Tests:** 1 new in `test_schema_grounding.py`. 11 core suites plus the eval-classifier file: **345/345**.
 
+## 26. 🟡 Purchase concept-naming bug, round 3: a declarative sentence also regresses a real pass -- three
+different techniques, three different real questions broken, same prompt region
+
+- **Prompt:** "continue with that" -- following up on fix.md #25's own suggestion to try a declarative
+  sentence instead of a worked example, since few-shot was what broke twice.
+- **What was tried:** extended the existing "material for an item name" rule (already in the prompt) with
+  five concrete named examples ("keyboard", "barcode scanner", "monitor", "printer toner", "dell system")
+  and one clarifying clause ("material names a *kind* of entity, it is never itself the value of that
+  entity") -- a plain rule-text edit, not a new Question/Output pair.
+- **Partial win on the target bug:** of the 8 real purchase questions confirmed broken by this pattern,
+  3 now ground correctly with `concept="material"` (`"BARCODE SCANNER"`, `"dell system"`,
+  `"keyboard last purchase date"`). 1 more got the concept right but still fails for an unrelated,
+  pre-existing reason (a bare recency word, "latest", gets extracted as its own spurious entity). 4 stayed
+  broken (`"Keyboard"`, `"printer toner"`, `"computer monitor"`, `"monitor"`) -- no discernible pattern
+  found yet for why these four didn't move (quoting doesn't explain it: `keyboard last purchase date` fixed
+  unquoted, `printer toner` stayed broken unquoted).
+- **New regression, cleanly isolated:** `"Which supplier is given lowest price?"` -- a real, currently
+  shipped `PASS_PIPELINE` case with no material entity at all -- failed extraction outright (invalid
+  QueryPlan even after the one correction retry). Reproduced 3/3 with the change in place. Controlled with
+  `git stash push -- app/query_plan_extractor.py` and re-ran the identical 3 calls against the unmodified
+  prompt, same session, same tunnel, same model: 3/3 passed. Not model-serving flakiness (fix.md #14) --
+  a real, deterministic-within-this-session regression caused by this specific edit.
+- **Why this matters more than a third failed attempt:** fix.md #24 broke a real pass via one worked
+  example; fix.md #25 broke a different real pass via a different worked example; this round broke a
+  *third* real pass via a declarative sentence -- not a worked example at all. Three different techniques,
+  three different casualties, all in the same prompt region (purchase's entity/material rules). That
+  rules out "few-shot specifically is unstable" as the explanation -- the more accurate read is that this
+  region of the prompt is fragile to *any* addition right now, regardless of mechanism.
+- **Reverted, matching the same discipline as #24/#25.** `git checkout -- app/query_plan_extractor.py`;
+  confirmed zero diff. Did not attempt a fourth prompt variant.
+- **Recommendation for next time, not yet implemented:** stop iterating on the prompt for this specific
+  bug and fix it where the architecture already says fixes belong -- deterministic code. The failure
+  signature is mechanical and detectable without any new LLM judgment call: the model already puts the
+  raw value in both `concept` and `original_value` when it makes this mistake, and legitimate
+  status/workflow entities (`concept="pending"`, `concept="pending at store officer"`, etc.) already
+  ground successfully on their literal phrase today (their alias is in the catalog), so a fallback that
+  only fires *after* an entity's literal `concept` fails to match anything in the catalog, retried once as
+  `concept="material"`, would never touch a case that already works -- and if the fallback's own guess is
+  wrong too, entity resolution's existing fail-closed behavior (fix.md #2) turns it into a safe refusal,
+  never a wrong answer. Not implemented this round -- it touches `app/schema_grounding.py`'s core entity
+  loop, which is safety-relevant (§3), and changing *where* a fix lives (prompt vs. deterministic code) is
+  a design fork worth flagging before writing it, not just doing silently.
+- **Where:** nothing shipped this round -- `app/query_plan_extractor.py` diff is zero.
+- **Tests:** none new (nothing shipped). 11 core suites plus the eval-classifier file re-confirmed:
+  **345/345**.
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

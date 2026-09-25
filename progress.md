@@ -477,3 +477,11 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   attempts; shipped only the one safe, unrelated catalog alias found along the way ("purchase qty"). The
   concept-naming bug itself stays open, confirmed real and high-value, needs a different approach than
   another worked example. 1 new test, 11 core suites plus the eval-test file: 345/345.
+- 2026-09-25 — tried fix.md #25's own suggested next step (fix.md #26): a declarative sentence instead of
+  a worked example for the same purchase concept-naming bug. Partial win (3 of 8 target questions fixed
+  cleanly), but broke a third real `PASS_PIPELINE` case (`"Which supplier is given lowest price?"`) --
+  isolated cleanly via `git stash`, confirmed not model flakiness. Third technique, third real casualty in
+  the same prompt region -- reverted, net zero diff. This now points away from more prompt iteration and
+  toward a deterministic-code-side repair in `app/schema_grounding.py` (retry an entity's failed literal
+  `concept` as `material` before rejecting it) -- proposed, not yet implemented; flagged as a design-fork
+  decision rather than done silently. 345/345, no new tests (nothing shipped).

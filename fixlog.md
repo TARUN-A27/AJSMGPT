@@ -946,3 +946,38 @@ Format: date · prompt (short) · what was done · files touched · tests run.
   code is a design fork worth flagging before writing, not doing silently.
 - **Files:** none shipped. `fix.md`, `progress.md`, `fixlog.md` only.
 - **Tests:** none new. 11 core suites plus the eval-classifier file re-confirmed: **345/345**.
+
+### Fix the purchase concept-naming bug deterministically (fix.md #27)
+- **Prompt:** "lets do as you recommend" -- fix.md #26's own proposal: deterministic code instead of the
+  prompt.
+- **First attempt caught itself before shipping.** Wrote the obvious version first -- a retry-as-material
+  fallback inside `ground_query_plan`'s own entity loop. All 48 existing grounding tests passed unchanged,
+  which could have looked like "done." Instead of trusting that, traced what actually consumes
+  `entity.concept` *after* grounding: `resolve_entity` only forces real verification for a concept already
+  in `resolvable_concepts()` (fix.md #16) -- it never sees grounding's internal decision, only the plan's
+  own field, which the grounding-only version never touched. And the prompt already tells the model to
+  mark exactly this case `status="not_required"`, which `build_bind_parameters` skips binding entirely.
+  So the "fix" would have let the pipeline run one stage further, then fail with a plain
+  `ParameterBindingError` instead of a `GROUNDING_FAILURE` -- still safe, but zero new passes. Reverted
+  before writing a single test for it, on the strength of tracing the real call order, not a failing test.
+- **Placed it where it actually reaches every consumer:** `correct_mislabeled_entity_concepts`
+  (`app/schema_grounding.py`) rewrites the entity's `concept` field itself, once, reusing grounding's own
+  alias-matching helpers to decide whether it's needed. Wired into `execute_nlp_query`
+  (`app/nlp_execution.py`) right after extraction, before entity resolution -- one point, every downstream
+  consumer sees the correction consistently.
+- **Verified against the real model (qwen3:14b, same SSH tunnel), no prompt touched this time:** 6 of 8
+  previously-broken purchase questions now ground cleanly end to end; 1 more has its concept fixed but
+  hits a different, already-documented, unrelated gap ("purchase rate" as a dimension). Checked the
+  fragile real passes and both existing worked-example entities (mrs "pending at store officer", stock
+  "material") explicitly -- all confirmed untouched by the correction, not just accidentally still correct.
+- **One extraction failure ("Which supplier is given lowest price?") recurred, confirmed unrelated:**
+  `app/query_plan_extractor.py` has a zero diff against `HEAD` right now -- my fix cannot have caused an
+  extraction-time failure since it only runs after extraction succeeds. 4/4 failures on repeat, ~20-30
+  minutes after the identical unmodified prompt passed 3/3 earlier this session -- model-serving drift
+  across time (fix.md #14's pattern), not a regression. Not chased.
+- **Files:** `app/schema_grounding.py`, `app/nlp_execution.py`, `scripts/test_schema_grounding.py` (+7),
+  `scripts/test_nlp_execution.py` (+1), `fix.md`, `progress.md`.
+- **Tests:** 8 new. 11 core suites plus the eval-classifier file: **353/353**.
+- **Not yet done:** the live-Oracle test-split re-run on the server -- this only verifies through
+  grounding; real Oracle entity resolution and SQL execution for these newly-grounding questions still
+  need the authoritative live check, same as every other fix this session.

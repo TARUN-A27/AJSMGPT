@@ -348,6 +348,40 @@ class NLPExecutionTests(unittest.TestCase):
             confidence=0.9,
         )
 
+    def test_mislabeled_material_concept_is_corrected_before_resolution_sees_it(self) -> None:
+        # fix.md #25/#26: the model sometimes writes the raw spoken value
+        # itself as entities[].concept (e.g. concept="Keyboard") instead of
+        # "material". correct_mislabeled_entity_concepts must run between
+        # extract_plan and resolve_entities so the *real* resolver (asserted
+        # here via a stub standing in for it) verifies it like any other
+        # material, not the model's own unverified "not_required" claim.
+        plan = QueryPlan(
+            original_question="purchase quantity for Keyboard",
+            domain="purchase",
+            operation="detail",
+            business_subject=BusinessSubject(concept="purchase"),
+            measures=[Measure(concept="purchase quantity")],
+            entities=[EntityReference(concept="Keyboard", original_value="Keyboard", status=EntityStatus.NOT_REQUIRED)],
+            requested_output=RequestedOutput(fields=["purchase quantity"]),
+            confidence=0.9,
+        )
+        runner = RecordingRunner()
+        seen_by_resolver = []
+
+        def resolve_entities(p):
+            seen_by_resolver.append((p.entities[0].concept, p.entities[0].original_value))
+            return p.model_copy(update={"entities": [
+                EntityReference(concept="material", original_value="Keyboard", status=EntityStatus.UNRESOLVED),
+            ]})
+
+        with self.assertRaises(ExecutionRejectedError):
+            execute_nlp_query(
+                plan.original_question,
+                dependencies=dependencies(plan, "SELECT 1 FROM DUAL", runner, resolve_entities=resolve_entities),
+            )
+        self.assertEqual(seen_by_resolver, [("material", "Keyboard")])
+        self.assertEqual(runner.calls, [])
+
     def test_unresolved_entity_after_resolution_executes_zero_times(self) -> None:
         plan = self._one_entity_plan()
         runner = RecordingRunner()

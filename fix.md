@@ -908,6 +908,67 @@ different techniques, three different real questions broken, same prompt region
 - **Tests:** none new (nothing shipped). 11 core suites plus the eval-classifier file re-confirmed:
   **345/345**.
 
+## 27. ✅ Purchase concept-naming bug, fixed deterministically -- first attempt at fix.md #26's own
+recommendation caught its own gap before shipping
+
+- **Prompt:** "lets do as you recommend" -- implementing fix.md #26's proposal: fix the concept-naming bug
+  in deterministic code instead of the prompt, since three prompt-side attempts had each broken a
+  different real pass.
+- **First attempt (caught, not shipped): a grounding-only retry was insufficient.** The obvious version --
+  in `ground_query_plan`'s entity loop, if an entity's literal `concept` matches nothing, retry once as
+  `concept="material"` -- looked right and passed all 48 existing grounding tests unchanged. But tracing
+  the *rest* of the pipeline (not just grounding) surfaced a real gap before shipping: `resolve_entity`
+  (`app/entity_resolution.py:177`) only forces real Oracle verification for a concept in
+  `resolvable_concepts()` (fix.md #16); it never sees grounding's internal decision, only the plan's own
+  `entity.concept` field, which a grounding-only fix never rewrites. Worse, the prompt already tells the
+  model to set `status="not_required"` for exactly this case (any concept outside the 5 canonical tokens)
+  -- and `build_bind_parameters` (`app/nlp_execution.py:528`) skips binding *any* value for a
+  `NOT_REQUIRED` entity entirely. So a grounding-only fix would have let the pipeline run further, then
+  fail with `ParameterBindingError("Generated SQL contains unresolved bind parameters.")` -- safe (still no
+  wrong answer), but pointless: it would never have produced a single new `PASS_PIPELINE`, just moved the
+  same refusal to a later, less clear stage. Caught by tracing `execute_nlp_query`'s real call order
+  end-to-end before trusting the passing unit tests; reverted before writing a single test for it.
+- **Placed the fix where it actually reaches every consumer:** a new `correct_mislabeled_entity_concepts`
+  in `app/schema_grounding.py` (reusing its existing `_matching_columns`/`_matching_compound_concept`
+  alias lookups) that rewrites an entity's `concept` field itself, on the `QueryPlan`, to `"material"` --
+  but only when it matches neither a real catalog column concept nor a compound-condition concept. A
+  genuine status/workflow entity (`concept="pending"`, `"pending at store officer"`, ...) always matches
+  the second lookup on its own literal phrase -- exactly how it already grounds today -- so it is never
+  touched; verified directly against the real model's own actual output for the mrs worked example, not
+  just a hand-built fixture. Wired into `app/nlp_execution.py`'s `execute_nlp_query`, called once, right
+  after `extract_plan` and before `resolve_entities` -- the one point upstream of every downstream consumer
+  (resolution, capability, grounding, SQL generation, bind construction), so one rewrite fixes all of them
+  consistently instead of patching each separately.
+- **Verified against the real model (qwen3:14b, SSH tunnel), extraction only re-run, no prompt touched:**
+  6 of the 8 previously-confirmed-broken purchase questions now ground cleanly end to end (`concept`
+  corrected, then grounds). 1 more gets the concept fixed but is still blocked by a different, already-
+  documented gap ("purchase rate" as a *dimension* has no verified column -- fix.md #25's own leftover
+  list, unrelated to this fix). The 3 previously fragile real passes (`"MRS details for MRS number
+  890330"`, `"purchase order for item code C02000094"`, and now also `"list out material approval pending
+  at Store officer"` and `"do we have yarn in stock"` checked for good measure) all ground unchanged --
+  their concepts were already valid tokens, so the correction is confirmed a no-op for them, not a rewrite
+  that happens to net out the same.
+- **One question, "Which supplier is given lowest price?", failed extraction again** -- but this time
+  provably unrelated to this fix: `app/query_plan_extractor.py` has a zero diff against `HEAD` (confirmed
+  via `git diff --stat` at the moment of the failure), and my correction function only ever runs *after*
+  extraction already returned a plan, so it cannot be the cause of an extraction-time failure. Re-ran the
+  identical call 4/4 times, unmodified prompt, and got 4/4 failures -- roughly 20-30 minutes after this
+  exact question passed 3/3 with the very same unmodified prompt earlier in this session (fix.md #26's
+  isolation control). Model-serving non-determinism drifting across time, not across a single burst --
+  the same phenomenon fix.md #14 already documented ("yarn": 3/3 fail one day, 7/7 pass the next), just
+  observed at a finer time grain. Not chased, matching this session's own established practice.
+- **Tests:** 7 new in `test_schema_grounding.py` (the pure correction function, including the two
+  safety-critical negative cases -- a genuine status phrase and a real identifier concept must stay
+  untouched) + 1 new in `test_nlp_execution.py` (proves the orchestration wiring: `resolve_entities`
+  receives the corrected concept, not the model's raw one). 11 core suites plus the eval-classifier file:
+  **353/353**.
+- **Not yet confirmed:** the real, live-Oracle depth-bar movement for purchase. This fix only changes
+  code upstream of entity resolution and grounding -- correctness of the *rest* of the pipeline for these
+  newly-grounding questions (SQL generation, real Oracle entity resolution against actual master data,
+  execution) still needs the live test-split re-run on the server, same as every other fix this session.
+- **Where:** `app/schema_grounding.py` (+1 function), `app/nlp_execution.py` (1 import + 2 lines wiring it
+  in), `scripts/test_schema_grounding.py` (+7 tests), `scripts/test_nlp_execution.py` (+1 test).
+
 ## Not fixes (do not do)
 - Switching to Qwen3:14b/30B before #1 is classified.
 - Wiring RAG/Qdrant into the runtime.

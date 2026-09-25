@@ -5,7 +5,7 @@ from app.query_plan import (
     Aggregation, BusinessSubject, DateRange, DateRangeKind, Dimension, FilterOperator, QueryFilter,
     EntityReference, EntityStatus, Measure, QueryPlan,
 )
-from app.schema_grounding import ground_query_plan
+from app.schema_grounding import correct_mislabeled_entity_concepts, ground_query_plan
 
 
 def plan(domain, subject, *, operation="detail", measures=None, dimensions=None, entities=None, date_range=None):
@@ -680,6 +680,60 @@ class CatalogDatatypeCategoryTests(unittest.TestCase):
                     self.assertEqual(metadata[key], "VARCHAR2", key)
                 if category == "DATE":
                     self.assertIn(metadata[key], ("DATE", "TIMESTAMP(6)"), key)
+
+
+class CorrectMislabeledEntityConceptsTests(unittest.TestCase):
+    def test_plan_without_entities_is_returned_unchanged(self):
+        original = plan("purchase", "purchase")
+        self.assertIs(correct_mislabeled_entity_concepts(original), original)
+
+    def test_raw_material_name_used_as_concept_is_corrected(self):
+        original = plan("purchase", "purchase", entities=[
+            EntityReference(concept="Keyboard", original_value="Keyboard", status=EntityStatus.NOT_REQUIRED),
+        ])
+        corrected = correct_mislabeled_entity_concepts(original)
+        self.assertEqual(corrected.entities[0].concept, "material")
+        self.assertEqual(corrected.entities[0].original_value, "Keyboard")
+
+    def test_already_correct_material_concept_is_untouched(self):
+        original = plan("purchase", "purchase", entities=[
+            EntityReference(concept="material", original_value="yarn", status=EntityStatus.UNRESOLVED),
+        ])
+        corrected = correct_mislabeled_entity_concepts(original)
+        self.assertIs(corrected, original)
+
+    def test_genuine_status_phrase_is_untouched_not_mistaken_for_material(self):
+        original = plan("mrs", "mrs", entities=[
+            EntityReference(
+                concept="pending at store officer", original_value="approval pending at Store officer",
+                status=EntityStatus.NOT_REQUIRED,
+            ),
+        ])
+        corrected = correct_mislabeled_entity_concepts(original)
+        self.assertIs(corrected, original)
+
+    def test_a_real_identifier_concept_is_untouched(self):
+        original = plan("mrs", "mrs", entities=[
+            EntityReference(concept="mrs number", original_value="890330", status=EntityStatus.NOT_REQUIRED),
+        ])
+        corrected = correct_mislabeled_entity_concepts(original)
+        self.assertIs(corrected, original)
+
+    def test_mixed_plan_only_rewrites_the_entity_that_needs_it(self):
+        original = plan("purchase", "purchase", entities=[
+            EntityReference(concept="item_identifier", original_value="C02000094", status=EntityStatus.NOT_REQUIRED),
+            EntityReference(concept="monitor", original_value="monitor", status=EntityStatus.NOT_REQUIRED),
+        ])
+        corrected = correct_mislabeled_entity_concepts(original)
+        self.assertEqual(corrected.entities[0].concept, "item_identifier")
+        self.assertEqual(corrected.entities[1].concept, "material")
+
+    def test_corrected_entity_then_grounds_successfully(self):
+        original = plan("purchase", "purchase", entities=[
+            EntityReference(concept="BARCODE SCANNER", original_value="BARCODE SCANNER", status=EntityStatus.NOT_REQUIRED),
+        ])
+        result = ground_query_plan(correct_mislabeled_entity_concepts(original))
+        self.assertTrue(result.is_grounded, result.model_dump())
 
 
 if __name__ == "__main__":

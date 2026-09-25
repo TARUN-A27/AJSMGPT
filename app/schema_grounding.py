@@ -257,6 +257,45 @@ def _matching_anti_join_concept(catalog: dict, phrase: str, role: str) -> dict |
     return None
 
 
+def correct_mislabeled_entity_concepts(plan: QueryPlan) -> QueryPlan:
+    """Repair a confirmed, repeatable extraction mistake before anything else
+    sees the plan: the model sometimes writes the raw spoken value itself as
+    entities[].concept (e.g. concept="Keyboard") instead of the fixed
+    vocabulary token "material". Three separate prompt-side fix attempts
+    (two worked examples, one declarative sentence) each regressed a
+    different real, previously-passing question -- fix.md #25, #26 -- so
+    this is fixed deterministically instead, matching the architecture's own
+    "Qwen proposes, deterministic code verifies" principle.
+
+    Only rewrites an entity whose concept matches neither a real catalog
+    column concept nor a compound-condition concept. A genuine status or
+    workflow entity (concept="pending", "pending at store officer", ...)
+    always matches the compound-condition lookup on its own literal phrase
+    -- that is exactly how it already grounds today -- so it is never
+    touched. Must run before both entity resolution and schema grounding see
+    the plan: resolution only forces real verification for a concept in
+    `resolvable_concepts()` (fix.md #16), and grounding only recognises the
+    same fixed vocabulary, so rewriting the concept once, here, is the only
+    change that fixes both. A wrong guess still fails closed -- real entity
+    resolution rejects any value with no genuine match (fix.md #2) -- so the
+    worst case is a refusal, never a wrong answer.
+    """
+    if not plan.entities:
+        return plan
+    catalog, _, _ = _load_inputs()
+    corrected = []
+    changed = False
+    for entity in plan.entities:
+        if _matching_columns(catalog, entity.concept, "entity_filter") or _matching_compound_concept(
+            catalog, entity.concept, "entity_filter"
+        ):
+            corrected.append(entity)
+            continue
+        corrected.append(entity.model_copy(update={"concept": "material"}))
+        changed = True
+    return plan.model_copy(update={"entities": corrected}) if changed else plan
+
+
 # Kept in sync by hand with app/v1_capabilities.py's identical exclusion
 # (fix.md #12) -- domains the model can tag that name a different, explicitly
 # unsupported family. None of these are schema-catalog domains (they have no

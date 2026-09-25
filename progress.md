@@ -485,3 +485,15 @@ RAG / Qdrant in runtime, 30B models, QueryPlan rewrite, architecture redesign, e
   toward a deterministic-code-side repair in `app/schema_grounding.py` (retry an entity's failed literal
   `concept` as `material` before rejecting it) -- proposed, not yet implemented; flagged as a design-fork
   decision rather than done silently. 345/345, no new tests (nothing shipped).
+- 2026-09-25 — implemented fix.md #26's recommendation (fix.md #27): fixed the purchase concept-naming bug
+  deterministically instead of in the prompt. First attempt (grounding-only) was caught as insufficient
+  before shipping -- entity resolution and bind construction never see grounding's internal decision, only
+  the plan's own `entity.concept`, so a grounding-only retry would have failed safely later without ever
+  producing a new pass. Fixed by rewriting `entity.concept` itself, once, in a new
+  `correct_mislabeled_entity_concepts` (`app/schema_grounding.py`), wired into `execute_nlp_query` right
+  after extraction and before entity resolution -- the one point upstream of every consumer. Verified
+  against the real model: 6 of 8 previously-broken purchase questions now ground cleanly; the known-fragile
+  real passes (mrs, purchase-by-code) and the two worked-example entities (mrs pending-at-store-officer,
+  stock material) all confirmed untouched -- the negative-case safety tests were as important as the fix
+  itself. 8 new tests, 353/353. Live-Oracle confirmation still pending (next: deploy + re-run the test-split
+  eval on the server).

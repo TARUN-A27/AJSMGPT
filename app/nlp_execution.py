@@ -32,7 +32,7 @@ from app.oracle_client import (
 )
 from app.query_plan import Aggregation, DateRange, DateRangeKind, EntityStatus, FilterOperator, QueryPlan
 from app.query_plan_extractor import extract_query_plan
-from app.schema_grounding import GroundedSchemaPlan, ground_query_plan
+from app.schema_grounding import GroundedSchemaPlan, correct_mislabeled_entity_concepts, ground_query_plan
 from app.spacy_nlp import NLPAnalysis, analyze_question_with_spacy
 from app.sql_datatype_validator import NUMERIC, _column_datatype_category
 from app.sql_safety import add_oracle_row_limit
@@ -761,6 +761,11 @@ def execute_nlp_query(
         nlp_analysis=analysis,
         original_question=correction.original_question,
     )
+    # Deterministic repair of a confirmed extraction mistake (fix.md #25,
+    # #26) before either of the next two steps sees the plan -- see
+    # correct_mislabeled_entity_concepts's own docstring for why this one
+    # spot fixes both.
+    plan = correct_mislabeled_entity_concepts(plan)
     # Discard any status/selected_value the model claimed and independently
     # verify every entity against the ERP master data before anything below
     # trusts it. This is the only place UNRESOLVED -> RESOLVED may happen.
